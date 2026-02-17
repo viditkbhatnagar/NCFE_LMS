@@ -17,7 +17,9 @@ export const authConfig: NextAuthConfig = {
         nextUrl.pathname.startsWith('/notifications') ||
         nextUrl.pathname.startsWith('/profile') ||
         nextUrl.pathname.startsWith('/submissions') ||
-        nextUrl.pathname.startsWith('/progress');
+        nextUrl.pathname.startsWith('/progress') ||
+        nextUrl.pathname.startsWith('/c/') ||
+        nextUrl.pathname === '/c';
 
       if (isOnDashboard) {
         if (isLoggedIn) return true;
@@ -30,6 +32,10 @@ export const authConfig: NextAuthConfig = {
         nextUrl.pathname.startsWith('/forgot-password');
 
       if (isOnAuthPage && isLoggedIn) {
+        const role = (auth?.user as Record<string, unknown> | undefined)?.role;
+        if (role === 'assessor') {
+          return Response.redirect(new URL('/c', nextUrl));
+        }
         return Response.redirect(new URL('/dashboard', nextUrl));
       }
 

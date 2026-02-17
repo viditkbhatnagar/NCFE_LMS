@@ -9,12 +9,13 @@ const ALLOWED_TYPES = [
   'application/pdf',
   'application/msword',
   'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+  'application/vnd.openxmlformats-officedocument.presentationml.presentation',
   'image/jpeg',
   'image/png',
   'video/mp4',
 ];
 
-const ALLOWED_EXTENSIONS = ['.pdf', '.doc', '.docx', '.jpg', '.jpeg', '.png', '.mp4'];
+const ALLOWED_EXTENSIONS = ['.pdf', '.doc', '.docx', '.pptx', '.jpg', '.jpeg', '.png', '.mp4'];
 
 interface UploadResult {
   filePath: string;

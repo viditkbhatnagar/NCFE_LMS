@@ -7,6 +7,12 @@ export default async function DashboardPage() {
   if (!session?.user) redirect('/sign-in');
 
   const role = (session.user as { role?: UserRole }).role || 'student';
+
+  // Redirect assessors to the new BRITEthink dashboard
+  if (role === 'assessor') {
+    redirect('/c');
+  }
+
   const name = session.user.name || 'User';
 
   return (
@@ -16,12 +22,11 @@ export default async function DashboardPage() {
           Welcome back, {name}
         </h1>
         <p className="text-text-secondary mt-1">
-          Here&apos;s an overview of your {role === 'student' ? 'learning' : role === 'assessor' ? 'assessment' : 'quality assurance'} activity
+          Here&apos;s an overview of your {role === 'student' ? 'learning' : 'quality assurance'} activity
         </p>
       </div>
 
       {role === 'student' && <StudentDashboardContent />}
-      {role === 'assessor' && <AssessorDashboardContent />}
       {role === 'iqa' && <IQADashboardContent />}
     </div>
   );
@@ -34,17 +39,6 @@ function StudentDashboardContent() {
       <DashboardCard title="Evidence Uploaded" value="0" subtitle="Across all units" color="bg-info" />
       <DashboardCard title="Units Completed" value="0/3" subtitle="Mandatory units" color="bg-warning" />
       <DashboardCard title="Overall Progress" value="0%" subtitle="Qualification completion" color="bg-success" />
-    </div>
-  );
-}
-
-function AssessorDashboardContent() {
-  return (
-    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-      <DashboardCard title="Active Learners" value="0" subtitle="Assigned to you" color="bg-primary" />
-      <DashboardCard title="Pending Submissions" value="0" subtitle="Awaiting assessment" color="bg-warning" />
-      <DashboardCard title="Decisions This Month" value="0" subtitle="Assessments completed" color="bg-info" />
-      <DashboardCard title="IQA Pending" value="0" subtitle="Awaiting IQA review" color="bg-secondary" />
     </div>
   );
 }

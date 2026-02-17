@@ -1,0 +1,107 @@
+import { NextResponse } from 'next/server';
+import dbConnect from '@/lib/db';
+import { withAuth } from '@/lib/route-guard';
+import { remarkActionSchema } from '@/lib/validators';
+import Assessment from '@/models/Assessment';
+import Remark from '@/models/Remark';
+
+export async function GET(
+  request: Request,
+  { params }: { params: Promise<{ id: string }> }
+) {
+  try {
+    const { id } = await params;
+    const { session, error } = await withAuth(['assessor']);
+    if (error) return error;
+
+    await dbConnect();
+
+    const assessment = await Assessment.findById(id).lean();
+    if (!assessment) {
+      return NextResponse.json(
+        { success: false, error: 'Assessment not found' },
+        { status: 404 }
+      );
+    }
+    if (assessment.assessorId.toString() !== session!.user.id) {
+      return NextResponse.json(
+        { success: false, error: 'Forbidden' },
+        { status: 403 }
+      );
+    }
+
+    const remarks = await Remark.find({ assessmentId: id })
+      .populate('createdBy', 'name email')
+      .sort({ createdAt: -1 })
+      .lean();
+
+    return NextResponse.json({ success: true, data: remarks });
+  } catch (err) {
+    console.error('Error fetching remarks:', err);
+    return NextResponse.json(
+      { success: false, error: 'Internal server error' },
+      { status: 500 }
+    );
+  }
+}
+
+export async function POST(
+  request: Request,
+  { params }: { params: Promise<{ id: string }> }
+) {
+  try {
+    const { id } = await params;
+    const { session, error } = await withAuth(['assessor']);
+    if (error) return error;
+
+    const body = await request.json();
+    const validation = remarkActionSchema.safeParse(body);
+    if (!validation.success) {
+      return NextResponse.json(
+        {
+          success: false,
+          error: 'Validation failed',
+          details: validation.error.flatten().fieldErrors,
+        },
+        { status: 400 }
+      );
+    }
+
+    await dbConnect();
+
+    const assessment = await Assessment.findById(id).lean();
+    if (!assessment) {
+      return NextResponse.json(
+        { success: false, error: 'Assessment not found' },
+        { status: 404 }
+      );
+    }
+    if (assessment.assessorId.toString() !== session!.user.id) {
+      return NextResponse.json(
+        { success: false, error: 'Forbidden' },
+        { status: 403 }
+      );
+    }
+
+    const remark = await Remark.create({
+      assessmentId: id,
+      content: validation.data.content,
+      createdBy: session!.user.id,
+    });
+
+    const populated = await Remark.findById(remark._id)
+      .populate('createdBy', 'name email')
+      .lean();
+
+    return NextResponse.json(
+      { success: true, data: populated },
+      { status: 201 }
+    );
+  } catch (err) {
+    console.error('Error creating remark:', err);
+    return NextResponse.json(
+      { success: false, error: 'Internal server error' },
+      { status: 500 }
+    );
+  }
+}

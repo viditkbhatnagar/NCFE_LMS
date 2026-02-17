@@ -1,0 +1,208 @@
+'use client';
+
+import { useState, useEffect, useCallback } from 'react';
+import { useAssessorCourse } from '@/contexts/AssessorCourseContext';
+import FileManagerToolbar from '@/components/assessor/FileManagerToolbar';
+import FileBreadcrumbs from '@/components/assessor/FileBreadcrumbs';
+import FileGrid from '@/components/assessor/FileGrid';
+import FileListView from '@/components/assessor/FileListView';
+import FileUploadModal from '@/components/assessor/FileUploadModal';
+import NewFolderModal from '@/components/assessor/NewFolderModal';
+import type { FileItem, FolderBreadcrumb } from '@/types';
+
+type ViewMode = 'grid' | 'list';
+
+export default function CourseDocumentsPage() {
+  const { qualification } = useAssessorCourse();
+
+  const [items, setItems] = useState<FileItem[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [currentFolderId, setCurrentFolderId] = useState<string | null>(null);
+  const [breadcrumbs, setBreadcrumbs] = useState<FolderBreadcrumb[]>([]);
+  const [viewMode, setViewMode] = useState<ViewMode>('grid');
+  const [fileTypeFilter, setFileTypeFilter] = useState('');
+  const [showUploadModal, setShowUploadModal] = useState(false);
+  const [showFolderModal, setShowFolderModal] = useState(false);
+  const [deleteConfirmId, setDeleteConfirmId] = useState<string | null>(null);
+
+  const fetchItems = useCallback(async () => {
+    setLoading(true);
+    try {
+      const params = new URLSearchParams({ qualificationId: qualification._id });
+      if (currentFolderId) params.set('folderId', currentFolderId);
+      if (fileTypeFilter) params.set('fileType', fileTypeFilter);
+
+      const res = await fetch(`/api/v2/course-documents?${params}`);
+      const json = await res.json();
+      if (json.success) setItems(json.data);
+    } catch (err) {
+      console.error('Error fetching course documents:', err);
+    } finally {
+      setLoading(false);
+    }
+  }, [qualification._id, currentFolderId, fileTypeFilter]);
+
+  useEffect(() => {
+    fetchItems();
+  }, [fetchItems]);
+
+  const handleItemClick = (item: FileItem) => {
+    if (item.isFolder) {
+      setBreadcrumbs((prev) => [...prev, { _id: item._id, name: item.fileName }]);
+      setCurrentFolderId(item._id);
+    }
+  };
+
+  const handleBreadcrumbNavigate = (folderId: string | null) => {
+    if (folderId === null) {
+      setBreadcrumbs([]);
+      setCurrentFolderId(null);
+    } else {
+      const idx = breadcrumbs.findIndex((b) => b._id === folderId);
+      if (idx >= 0) {
+        setBreadcrumbs(breadcrumbs.slice(0, idx + 1));
+        setCurrentFolderId(folderId);
+      }
+    }
+  };
+
+  const handleNewFolder = async (name: string) => {
+    try {
+      const res = await fetch('/api/v2/course-documents', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          fileName: name,
+          qualificationId: qualification._id,
+          folderId: currentFolderId,
+        }),
+      });
+      const json = await res.json();
+      if (json.success) {
+        setShowFolderModal(false);
+        fetchItems();
+      }
+    } catch (err) {
+      console.error('Error creating folder:', err);
+    }
+  };
+
+  const handleRename = async (id: string, newName: string) => {
+    try {
+      const res = await fetch(`/api/v2/course-documents/${id}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ fileName: newName }),
+      });
+      const json = await res.json();
+      if (json.success) fetchItems();
+    } catch (err) {
+      console.error('Error renaming:', err);
+    }
+  };
+
+  const handleDelete = async (id: string) => {
+    if (deleteConfirmId !== id) {
+      setDeleteConfirmId(id);
+      return;
+    }
+    try {
+      const res = await fetch(`/api/v2/course-documents/${id}`, { method: 'DELETE' });
+      const json = await res.json();
+      if (json.success) {
+        setDeleteConfirmId(null);
+        fetchItems();
+      }
+    } catch (err) {
+      console.error('Error deleting:', err);
+    }
+  };
+
+  return (
+    <div className="flex flex-col h-full p-6">
+      {/* Header */}
+      <div className="mb-5">
+        <h1 className="text-2xl font-bold text-gray-900 mb-4">Course Documents</h1>
+        <FileManagerToolbar
+          fileTypeFilter={fileTypeFilter}
+          onFileTypeChange={setFileTypeFilter}
+          viewMode={viewMode}
+          onViewModeChange={setViewMode}
+          onUpload={() => setShowUploadModal(true)}
+          onNewFolder={() => setShowFolderModal(true)}
+        />
+      </div>
+
+      {/* Breadcrumbs */}
+      {breadcrumbs.length > 0 && (
+        <FileBreadcrumbs
+          path={breadcrumbs}
+          onNavigate={handleBreadcrumbNavigate}
+          rootLabel="Course Documents"
+        />
+      )}
+
+      {/* Content */}
+      <div className="flex-1 overflow-y-auto">
+        {loading ? (
+          <div className="flex justify-center py-12">
+            <div className="w-6 h-6 border-2 border-blue-500 border-t-transparent rounded-full animate-spin" />
+          </div>
+        ) : items.length === 0 ? (
+          <div className="flex flex-col items-center py-16 text-gray-400">
+            <svg className="w-16 h-16 mb-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1} d="M7 21h10a2 2 0 002-2V9.414a1 1 0 00-.293-.707l-5.414-5.414A1 1 0 0012.586 3H7a2 2 0 00-2 2v14a2 2 0 002 2z" />
+            </svg>
+            <p className="text-lg font-medium text-gray-500 mb-1">No course documents found</p>
+            <p className="text-sm text-gray-400">No course documents are available for this course yet.</p>
+          </div>
+        ) : viewMode === 'grid' ? (
+          <FileGrid
+            items={items}
+            onItemClick={handleItemClick}
+            onRename={handleRename}
+            onDelete={handleDelete}
+          />
+        ) : (
+          <FileListView
+            items={items}
+            onItemClick={handleItemClick}
+            onRename={handleRename}
+            onDelete={handleDelete}
+          />
+        )}
+      </div>
+
+      {/* Delete confirmation */}
+      {deleteConfirmId && (
+        <div className="fixed bottom-6 left-1/2 -translate-x-1/2 z-50 bg-gray-900 text-white px-4 py-2.5 rounded-lg shadow-lg flex items-center gap-3 text-sm">
+          <span>Click delete again to confirm</span>
+          <button
+            onClick={() => setDeleteConfirmId(null)}
+            className="text-gray-400 hover:text-white"
+          >
+            Cancel
+          </button>
+        </div>
+      )}
+
+      {/* Modals */}
+      <FileUploadModal
+        isOpen={showUploadModal}
+        onClose={() => setShowUploadModal(false)}
+        uploadEndpoint="/api/v2/course-documents"
+        extraFields={{
+          qualificationId: qualification._id,
+          folderId: currentFolderId || '',
+        }}
+        onUploaded={fetchItems}
+      />
+
+      <NewFolderModal
+        isOpen={showFolderModal}
+        onClose={() => setShowFolderModal(false)}
+        onConfirm={handleNewFolder}
+      />
+    </div>
+  );
+}

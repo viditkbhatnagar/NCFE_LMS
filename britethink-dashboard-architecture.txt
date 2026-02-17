@@ -1,0 +1,620 @@
+
+BRITEthink Dashboard - Complete Architecture & Feature Documentation
+====================================================================
+Generated: 2026-02-17T10:22:27.808Z
+Version: For Claude Code Implementation
+
+═══════════════════════════════════════════════════════════════
+1. GLOBAL LAYOUT ARCHITECTURE
+═══════════════════════════════════════════════════════════════
+
+OVERALL LAYOUT:
+- Top Navigation Bar (fixed/sticky)
+- Left Sidebar (icon-only, ~65px wide)
+- Sub-header / Breadcrumb Bar
+- Main Content Area (left panel)
+- Right Detail Panel (appears when item selected)
+
+TOP NAVIGATION BAR:
+- Logo: BRITEthink (green circle "b" icon + "BRITEthink" text)
+- Search Bar (center, full-width input): placeholder "Search courses, members, assessments..."
+  - Has search icon on left, clear X button when typing
+  - Dropdown: "Searching [Organization Name]" header
+  - Filter tabs: All (count) | Courses (count) | Members (count) | Assessments (count) | Evidence (count)
+  - Results grouped by category (MEMBERS section, etc.)
+  - Each result: Avatar initials | Name | Role Badge | email | email icon
+  - Search terms highlighted in yellow
+- User Avatar Button (top right): Shows user initials "JI" + dropdown arrow
+  - Dropdown contents:
+    - Large avatar circle with initials
+    - "Hi, [First Name Last Name]!" greeting
+    - User email
+    - "Manage your account" button
+    - "Your organizations" section:
+      - Organization row: logo | Name | email (highlighted if current with green border + "Current" badge)
+    - "+ Add account" button | "⇄ Sign out" button
+
+SUB-HEADER / BREADCRUMB BAR:
+- "·" separator + Course name (truncated with ellipsis)
+- "Learners ▾" dropdown button (or specific learner name when selected)
+  - Dropdown: "Learners - Select a learner to filter by"
+  - "All - All learners" option (green highlight when selected)
+  - "TU - Test User - email" option rows
+
+LEFT SIDEBAR:
+- 65px wide icon strip
+- Icons (top to bottom):
+  1. Home (house icon) - tooltip: "Home"
+  2. Assessment (green checkbox with checkmark) - tooltip: "Assessment"
+  3. Progress (pie/donut chart) - tooltip: "Progress"
+  4. Portfolio (orange folder) - tooltip: "Portfolio"
+  [divider]
+  5. Course Documents (blue document with shield) - tooltip: "Course Documents"
+  6. Personal Documents (blue backpack) - tooltip: "Personal Documents"
+  7. Materials (pink/purple open book) - tooltip: "Materials"
+  8. Work Hours (blue clock/calendar) - tooltip: "Work Hours"
+- Active icon: highlighted with white background, rounded corners
+- Each is a square button (~50x50px) with centered 3D-style icon image
+- Hover: shows tooltip label
+
+FLOATING CHAT BUTTON:
+- Bottom right corner
+- Green circle with chat bubble icon
+- Fixed position
+
+═══════════════════════════════════════════════════════════════
+2. HOME PAGE (Course Overview)
+═══════════════════════════════════════════════════════════════
+
+URL: /c/{course-slug}?currentEnrollmentId={id}
+
+HEADING:
+- H1: Full course name
+- Subtitle: "Course overview and recent activity"
+
+MY LEARNERS CARD:
+- White rounded card
+- Header: person group icon + "My Learners" + arrow button (→) to Members page
+- "Assessor (X)" section with graduation cap icon
+  - Assessor rows: [Initial avatar] | Name | email | "Enrolled [date]" | "Assessor" badge (green)
+  - Grid layout (2 columns for assessors)
+- "Learner (X)" section with person icon
+  - Learner rows: [Initial avatar] | Name | email | "Enrolled [date]" | "Learner" badge (outline)
+
+RECENT ASSESSMENTS CARD (left column):
+- Header: clipboard icon + "Recent Assessments" + arrow button (→)
+- Assessment rows (list):
+  - Assessment title (bold)
+  - Person icon + Learner name
+  - Calendar icon + time ago (e.g., "about 1 month ago", "27 days ago")
+  - Status badge: "Published" (dark/black rounded badge)
+  - Assessment type abbreviation badge: "RA" (Reflective Account), "WP" (Work Product), "WA" (Written Assessment)
+
+RECENT EVIDENCE CARD (right column):
+- Header: folder icon + "Recent Evidence" + arrow button (→)
+- Empty state: "No recent evidence"
+
+RECENT MATERIALS CARD:
+- Header: book icon + "Recent Materials" + arrow button (→)
+- Empty state: "No recent materials"
+
+═══════════════════════════════════════════════════════════════
+3. ASSESSMENTS LIST PAGE
+═══════════════════════════════════════════════════════════════
+
+URL: /c/{course-slug}/assessment?currentEnrollmentId={id}
+
+HEADER:
+- H1: "Assessments"
+- "+ Create an Assessment" button (top right, green/primary)
+
+GROUPING SECTIONS:
+- "TODAY" section label (uppercase) + horizontal rule + count badge
+- "LAST MONTH" section label + horizontal rule + count badge
+- Additional sections as needed (e.g., "THIS MONTH")
+
+ASSESSMENT CARD GRID:
+- Cards in horizontal row (wrap)
+- Each card (~160x200px, white, rounded corners, shadow):
+  - "Learner: [Name]" (smaller text)
+  - "Assessors: [Name]" (smaller text)
+  - Date (e.g., "27 Feb 2026")
+  - Assessment Type Badge: colored pill/chip
+    - Reflective Account: purple/violet (#8B5CF6 ish)
+    - Work Product: yellow/amber
+    - Written Assessment: orange/red
+    - Observation: (color TBD)
+    - Professional Discussion: (color TBD)
+    - Verbal Assessment: (color TBD)
+    - Witness Testimony: (color TBD)
+  - "X Criteria ●●●●" - dots equal to criteria count
+- Draft cards: dashed border, no type badge
+- Card title appears BELOW the card (not inside it)
+- Clicking card opens assessment detail panel on the right
+
+CREATE ASSESSMENT FLOW:
+- Clicking "+ Create an Assessment" opens "Please select a learner first" modal
+  - Modal shows list of learners with avatar + name + email
+  - Clicking learner creates new draft assessment and opens detail panel
+  - Top-right breadcrumb changes from "Learners" to selected learner name
+
+═══════════════════════════════════════════════════════════════
+4. ASSESSMENT DETAIL PANEL
+═══════════════════════════════════════════════════════════════
+
+Layout: Right panel (~420px wide) slides in alongside list
+
+STICKY HEADER (always visible, top of panel):
+Row 1: [Back button (mobile only)] [Date Pill] [Title Input (flex)] [Sign-off Icons] [Saved] [Status Button] [Delete Button]
+
+  - Back button: "<" arrow icon, hidden on desktop
+  - Date Pill: calendar icon + formatted date (e.g., "February 27th, 2026")
+    - Clicking opens date picker calendar popup
+    - New assessment: "Set assessment date" placeholder
+  - Title Input: border-less, transparent, text-lg font-medium, placeholder "Assessment title"
+    - Takes remaining flex space between date and icons
+    - Auto-saves as you type
+  - Sign-off Icons (4 icons with tooltips):
+    1. Person with checkmark icon - tooltip: "Assessor - [status]"
+    2. Shield icon - tooltip: "Internal Quality Assurers - [status]"
+    3. Graduation cap icon - tooltip: "External Quality Assurers - [status]"  
+    4. Person icon - tooltip: "Learner - [status]"
+    - Status values: "Not signed off" (gray), "Signed off" (green/colored)
+  - "Saved" text indicator (shows auto-save state)
+  - Status Button:
+    - Draft: "Send to learner" (blue, primary, clickable)
+    - Published: "Published" (gray, disabled-looking)
+  - Delete Button: red trash/bin icon
+
+DATE PICKER POPUP:
+- Month selector (dropdown ▾) + Year selector (dropdown ▾)
+- Left/Right navigation arrows
+- Calendar grid: Su Mo Tu We Th Fr Sa headers
+- Day cells, selected day highlighted (dark circle)
+
+SCROLLABLE CONTENT SECTIONS:
+
+--- SECTION 1: Assessment Kind ---
+- Heading: "Assessment Kind"
+- Subtext: "Select the type of assessment being conducted"
+- 3x3 grid of buttons (last row is 1 button):
+  Row 1: [Observation] [Professional Discussion] [Reflective Account]
+  Row 2: [Verbal Assessment] [Written Assessment] [Work Product]
+  Row 3: [Witness Testimony]
+- Each button: icon + label, rounded border
+- Selected state: blue border, blue text, blue dot in top-right corner of button
+- Icons (outline/grey style):
+  - Observation: eye icon
+  - Professional Discussion: speech bubble
+  - Reflective Account: document with lines
+  - Verbal Assessment: microphone
+  - Written Assessment: pen/tag icon
+  - Work Product: folder
+  - Witness Testimony: two-person group
+
+--- SECTION 2: Plan Intent ---
+- Heading: "Plan Intent"
+- Rich Text Editor toolbar: [B] [I] [U] [List] [Numbered List]
+- Editable text area (empty by default)
+- Auto-saves
+
+--- SECTION 3: Plan Implementation ---
+- Heading: "Plan Implementation"
+- Same rich text editor as Plan Intent
+- [B] [I] [U] [List] [Numbered List] toolbar
+- Editable text area
+
+--- SECTION 4: Evidence Mapping ---
+- Heading: "Evidence Mapping"
+- Instruction text: "Select an evidence item to perform actions"
+- Toolbar row:
+  - "Upload Evidence" button (with upload icon)
+  - "All Files" filter button (with filter icon)
+  - "Date Sort" button (with sort arrows icon)
+  - Grid view toggle (filled, dark when active)
+  - List view toggle
+- "Attached Evidence" sub-heading + "0 items" count
+  - Empty state: chain link icon + "No attached evidence" + "Select evidence from the Available section to attach it"
+- "Available Evidence" sub-heading + "0 items" count
+  - Empty state: file icon + "No available evidence" + "No evidence has been uploaded yet."
+
+--- SECTION 5: Criteria Mapping ---
+- Heading: "Criteria Mapping" + "[X] mapped" badge + gear/settings icon + "Edit Mapping" button
+- Shows unit name (as blue link): "[Unit code] - [Unit name]"
+- Outcome grouping: "[number] - [Outcome description]"
+- Criterion rows: "[number]" (green badge) + criterion description text
+- "Edit Mapping" button opens Edit Criteria Mapping modal
+
+EDIT CRITERIA MAPPING MODAL:
+- Title: "Edit Criteria Mapping"
+- X close button (top right)
+- Subtitle: "Select criteria to map to this assessment. Changes are saved automatically."
+- Status bar: "[X] of [Total] criteria mapped" | "Check boxes to map criteria to this assessment"
+- Scrollable list of units with expandable sections:
+  - Unit row: chevron down ▼ | [Unit code badge] | Unit name | "X criteria" count
+  - Outcome sub-group: chevron ▼ | number badge | Outcome description | "X criteria" count
+  - Criterion row: [checkbox circle] | [criterion number badge] | criterion text | "Mapped" badge (if selected)
+  - Checked criteria: filled checkmark circle (✓), green highlight row, "Mapped" badge
+  - Unchecked: empty circle (○)
+- Footer: "[X] criteria mapped" | "Close" button
+
+--- SECTION 6: Sign-off Status ---
+- Heading: "Sign-off Status"
+- Status badge: "[X]/4 Complete"
+- Next badge: "Next: [Role Name]"
+- Progress bar (horizontal, below heading)
+- Role cards (4 total, connected by vertical line):
+  1. Assessor card:
+     - Number circle "1"
+     - Role icon (person)
+     - Role name "Assessor"
+     - "Awaiting sign off" text (or "Signed off")
+     - "Sign Off" button (dark/black when it's your turn, "Pending" with clock icon otherwise)
+  2. IQA card (same structure, number "2", shield icon)
+  3. EQA card (same structure, number "3", graduation cap icon)
+  4. Learner card (same structure, number "4", person icon)
+- Summary: "Assessment requires additional signatures" + "[X] of 4 roles completed"
+
+--- SECTION 7: Remarks ---
+- Heading: speech bubble icon + "Remarks"
+- Empty state: "No remarks yet"
+- "Add a remark" label with speech bubble icon
+- Rich text editor: [B] [I] [U] [List] [Numbered List] toolbar + text area
+- "Submit Remark" button (with send arrow icon, dark/black)
+
+═══════════════════════════════════════════════════════════════
+5. PROGRESS PAGE
+═══════════════════════════════════════════════════════════════
+
+URL: /c/{course-slug}/progress?currentEnrollmentId={id}[&learnerEnrlId={id}][&unitId={id}][&outcomeId={id}][&criterionId={id}]
+
+EMPTY STATE (no learner selected):
+- People group icon (large, grey)
+- "Select a learner to view their progress"
+- "Choose a learner to view their progress"
+- "Select Learner" button (green, with person icon)
+- Clicking opens Learners dropdown (same as top-right dropdown)
+
+WITH LEARNER SELECTED:
+COURSE PROGRESS SUMMARY (top card):
+- "Course Progress" heading
+- "[X] of [Total] criteria completed" subtitle
+- "Refresh" button (with refresh/circular arrow icon)
+- "[X]% Complete" badge (blue text)
+- "Progress" label + "X%" right-aligned
+- Progress bar (blue, thin)
+
+4-COLUMN DRILL-DOWN LAYOUT:
+Column 1 - Units:
+- "Units" heading + "[X] items" count
+- Unit cards (list):
+  - Unit name (truncated with ellipsis if long)
+  - Unit code (e.g., "SHC 53", "O43")
+  - "[X] of [Y]" criteria count
+  - "X%" percentage right-aligned
+  - Progress bar (blue, thin)
+  - Selected: blue border
+  - Empty progress: no bar shown (0%)
+
+Column 2 - Outcomes (appears when unit selected):
+- "Outcomes" heading + "[X] items" count
+- Outcome cards:
+  - Outcome number (bold)
+  - Outcome description text
+  - "[X] of [Y]" count + "X%" percentage
+  - Progress bar (blue)
+  - Selected: blue border
+
+Column 3 - Criteria (appears when outcome selected):
+- "Criteria" heading + "[X] items" count
+- Criteria cards:
+  - Criterion number (e.g., "1.1", "2.1b")
+  - Criterion description text
+  - "[X] of [Y]" + "X%" + progress bar
+  - Completed: green checkmark ✓ circle (top right)
+  - Incomplete: empty circle ○
+
+Column 4 - Assessments (appears when criterion selected):
+- "Assessments" heading + "[X] assessments" count
+- Assessment cards:
+  - Assessment title
+  - "[Learner name] • [Type abbreviation]"
+  - Date
+  - Type abbreviations: RA, WP, WA, etc.
+
+═══════════════════════════════════════════════════════════════
+6. PORTFOLIO PAGE
+═══════════════════════════════════════════════════════════════
+
+URL: /c/{course-slug}/portfolio?currentEnrollmentId={id}[&learnerEnrlId={id}]
+
+HEADING: "Portfolio"
+
+TOOLBAR:
+- "Select an evidence item to perform actions" (left text)
+- "Upload Evidence" button (with upload icon)
+- "All Status" filter button (with link/chain icon)
+- "All Files" filter button (with filter icon)
+- "Date Sort" button (with sort arrows)
+- Grid view toggle (dark when active)
+- List view toggle
+
+EMPTY STATE:
+- Paper/document icon (grey)
+- "No evidence found"
+- "No evidence has been uploaded yet."
+
+═══════════════════════════════════════════════════════════════
+7. COURSE DOCUMENTS PAGE
+═══════════════════════════════════════════════════════════════
+
+URL: /c/{course-slug}/course-documents?currentEnrollmentId={id}
+
+HEADING: "Course Documents"
+TOP-RIGHT: "Learners ▾" (course-wide, not per-learner)
+
+TOOLBAR:
+- "Select a file to see actions" (left text)
+- "All Files" filter button
+- "Upload Files" button (with upload icon)
+- "New Folder" button (with folder+ icon)
+- Grid view toggle
+- List view toggle
+
+EMPTY STATE:
+- Document outline icon
+- "No course documents found"
+- "No course documents are available for this course yet."
+
+═══════════════════════════════════════════════════════════════
+8. PERSONAL DOCUMENTS PAGE
+═══════════════════════════════════════════════════════════════
+
+URL: /c/{course-slug}/personal-documents?currentEnrollmentId={id}
+
+HEADING: "Personal Documents"
+
+TOOLBAR:
+- "Select a file to see actions" (left text)
+- "All Files" filter button
+- Grid view toggle
+- List view toggle
+(Note: NO Upload or New Folder buttons - read-only for non-owners)
+
+EMPTY STATE:
+- Document outline icon
+- "No personal documents found"
+- "No personal documents are available yet."
+
+═══════════════════════════════════════════════════════════════
+9. MATERIALS PAGE
+═══════════════════════════════════════════════════════════════
+
+URL: /c/{course-slug}/materials?currentEnrollmentId={id}
+
+HEADING: "Materials"
+
+TOOLBAR:
+- "Select a file to see actions"
+- "All Files" filter button
+- "Upload Files" button
+- "New Folder" button
+- Grid view toggle
+- List view toggle
+
+EMPTY STATE:
+- Document outline icon
+- "No materials found"
+- "No materials have been uploaded to this course yet."
+
+═══════════════════════════════════════════════════════════════
+10. WORK HOURS LOG PAGE
+═══════════════════════════════════════════════════════════════
+
+URL: /c/{course-slug}/work-hours?currentEnrollmentId={id}
+
+HEADING: "Work Hours Log"
+TOP-RIGHT BUTTON: "+ New" (black button with + icon)
+
+DAY NAVIGATION:
+- "< Previous Day" button (left arrow + text)
+- "📅 [Day Abbreviation] [Month Abbreviation] [Day Number]" center button (e.g., "Tue Feb 17")
+- "Next Day >" button (right arrow + text)
+
+EMPTY STATE: "No time logs for this date"
+
+NEW ENTRY ROW (appears after clicking "+ New" and selecting learner):
+- "Select Learner" modal first:
+  - "TU - Test User - email" rows
+- Then inline row appears:
+  - Avatar initials circle
+  - Name + "New Entry" blue badge
+  - Text area: "Optional notes here" placeholder
+  - Hours input + "h" label
+  - Minutes input + "m" label
+  - Save button (black disk icon)
+  - Cancel button "x"
+
+═══════════════════════════════════════════════════════════════
+11. MEMBERS PAGE
+═══════════════════════════════════════════════════════════════
+
+URL: /c/{course-slug}/members?currentEnrollmentId={id}
+
+HEADING: "Members"
+SUBTITLE: "Your allocated members as ASSESSOR"
+
+TEAM MEMBERS CARD:
+- people icon + "Team Members"
+- "Other assessors who share learners with you (X learners allocated)"
+- Assessor rows: [NK avatar] | Name | email | "ASSESSOR" badge (green outline)
+
+LEARNER GROUPS:
+- Group name (e.g., "Default") + "Created [date]"
+- "Learner (X)" section with person icon
+- Learner rows: [TU avatar] | Name | email
+
+═══════════════════════════════════════════════════════════════
+12. URL ROUTING STRUCTURE
+═══════════════════════════════════════════════════════════════
+
+Base: /c/{course-slug}?currentEnrollmentId={enrollmentId}
+
+Routes:
+- Home:              /c/{slug}
+- Assessment List:   /c/{slug}/assessment
+- Assessment Detail: /c/{slug}/assessment/{assessmentId}
+- Progress:          /c/{slug}/progress
+- Portfolio:         /c/{slug}/portfolio
+- Course Documents:  /c/{slug}/course-documents
+- Personal Documents:/c/{slug}/personal-documents
+- Materials:         /c/{slug}/materials
+- Work Hours:        /c/{slug}/work-hours
+- Members:           /c/{slug}/members
+
+Query Parameters:
+- currentEnrollmentId: always present (assessor's enrollment ID)
+- learnerEnrlId: when learner filter is active
+- unitId: when unit selected in progress
+- outcomeId: when outcome selected in progress
+- criterionId: when criterion selected in progress
+
+═══════════════════════════════════════════════════════════════
+13. ASSESSMENT CARD DESIGN DETAILS
+═══════════════════════════════════════════════════════════════
+
+ASSESSMENT TYPE BADGE COLORS:
+- Reflective Account: purple/violet background, violet text
+- Work Product: amber/yellow background, amber text
+- Written Assessment: orange/red background, orange text
+- Observation: (likely blue)
+- Professional Discussion: (likely teal/green)
+- Verbal Assessment: (likely blue-grey)
+- Witness Testimony: (likely brown/warm)
+
+SHORT CODES FOR TYPES:
+- RA = Reflective Account
+- WP = Work Product
+- WA = Written Assessment
+- OB = Observation (likely)
+- PD = Professional Discussion (likely)
+- VA = Verbal Assessment (likely)
+- WT = Witness Testimony (likely)
+
+CRITERIA DOTS:
+- Shows a dot for each mapped criterion
+- Dots are small filled circles (●)
+- Color: grey/muted when not signed off
+
+DRAFT CARD:
+- Dashed border (vs solid border)
+- No type badge shown
+- Title: "Draft - Untitled Assess..."
+- Date shown
+- Learner/Assessor info same as published
+
+═══════════════════════════════════════════════════════════════
+14. SIGN-OFF WORKFLOW
+═══════════════════════════════════════════════════════════════
+
+FLOW: Assessor → IQA → EQA → Learner
+
+STATUS STATES:
+1. "Awaiting sign off" + active "Sign Off" button (your turn)
+2. "Awaiting sign off" + "Pending" (clock icon, not your turn yet)
+3. Completed states (TBD - not seen in current data)
+
+HEADER ICON STATES:
+- Not signed off: grey/muted icon
+- Signed off: colored/active icon (green or blue)
+
+═══════════════════════════════════════════════════════════════
+15. COMMON UI COMPONENTS
+═══════════════════════════════════════════════════════════════
+
+AVATAR CIRCLES:
+- Small circles with user initials (2 chars)
+- Background: grey or colored
+- Used everywhere for user representation
+
+STATUS BADGES / PILLS:
+- "Published" (dark/black, rounded full)
+- "Assessor" (green background or outline)
+- "Learner" (grey outline)
+- "LEARNER" (in search, similar)
+- "Mapped" (green, in criteria modal)
+- "Current" (green, in org switcher)
+- "New Entry" (blue, in work hours)
+
+FILTER BUTTONS:
+- Pill-shaped buttons with icon + text
+- "All Files", "Date Sort", "All Status" etc.
+- Hover/active state changes background
+
+VIEW TOGGLE BUTTONS:
+- Grid icon (4 squares) - for card view
+- List icon (3 lines) - for list view
+- Active: dark/black filled background
+- Inactive: grey/outline
+
+RICH TEXT EDITOR:
+- Used in: Plan Intent, Plan Implementation, Remarks
+- Toolbar buttons: B (Bold) | I (Italic) | U (Underline) | ≡ (Bullet List) | ≣ (Numbered List)
+- Clean white text area below toolbar
+- Auto-saves
+
+MODAL DIALOGS:
+- Centered overlay with dark backdrop
+- White rounded card
+- X button (top right) to close
+- Title + subtitle pattern
+- Content area
+- Footer with action buttons
+
+EMPTY STATES:
+- Icon (large, muted/grey)
+- Primary message (bold)
+- Secondary message (muted text)
+- Sometimes includes action button
+
+SECTION DIVIDERS (Assessment List):
+- Full-width horizontal line
+- Section label uppercase on left
+- Count badge on right
+
+PROGRESS BARS:
+- Thin, rounded
+- Blue color (#3B82F6 approximately)
+- Background: light grey (#E5E7EB)
+
+═══════════════════════════════════════════════════════════════
+16. RESPONSIVE BEHAVIOR NOTES
+═══════════════════════════════════════════════════════════════
+
+- Left sidebar is always icon-only (no text labels except on hover tooltip)
+- At narrower widths: Assessment detail panel overlaps main content
+- Progress page columns stack/scroll horizontally at narrower widths
+- At 1440px+: Full 4-column layout visible for Progress page
+- Assessment detail right panel: ~420px fixed width
+- Assessment list left panel: remaining width
+- Main content: ~880px when detail panel is closed
+
+═══════════════════════════════════════════════════════════════
+17. NOTIFICATION SYSTEM
+═══════════════════════════════════════════════════════════════
+
+- "Notifications alt+T" region visible in DOM
+- Keyboard shortcut: Alt+T
+- Location: likely a bell icon in header area
+
+═══════════════════════════════════════════════════════════════
+18. AUTO-SAVE BEHAVIOR
+═══════════════════════════════════════════════════════════════
+
+- Assessment title: auto-saves as you type
+- Plan Intent / Implementation: auto-saves
+- Criteria mapping: "Changes are saved automatically" (shown in modal)
+- Assessment Kind selection: auto-saves on click
+- "Saved" indicator appears in header after changes
+
+END OF DOCUMENTATION

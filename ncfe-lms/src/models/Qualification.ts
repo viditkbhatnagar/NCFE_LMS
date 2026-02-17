@@ -2,6 +2,7 @@ import mongoose, { Schema, Document, Model } from 'mongoose';
 
 export interface IQualification extends Document {
   title: string;
+  slug: string;
   level: number;
   code: string;
   awardingBody: string;
@@ -17,6 +18,12 @@ const QualificationSchema = new Schema<IQualification>(
       type: String,
       required: [true, 'Qualification title is required'],
       trim: true,
+    },
+    slug: {
+      type: String,
+      unique: true,
+      trim: true,
+      lowercase: true,
     },
     level: {
       type: Number,
@@ -49,6 +56,35 @@ const QualificationSchema = new Schema<IQualification>(
     timestamps: true,
   }
 );
+
+QualificationSchema.pre('validate', async function () {
+  if (this.title && !this.slug) {
+    const baseSlug = this.title
+      .toLowerCase()
+      .replace(/[^a-z0-9]+/g, '-')
+      .replace(/(^-|-$)/g, '');
+
+    let candidate = baseSlug;
+    let suffix = 0;
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const Model = this.constructor as any;
+    const selfId = this._id;
+
+    while (true) {
+      const existing = await Model.findOne({
+        slug: candidate,
+        ...(selfId ? { _id: { $ne: selfId } } : {}),
+      });
+      if (!existing) break;
+      suffix++;
+      candidate = `${baseSlug}-${suffix}`;
+    }
+
+    this.slug = candidate;
+  }
+});
+
+QualificationSchema.index({ slug: 1 });
 
 const Qualification: Model<IQualification> =
   mongoose.models.Qualification ||

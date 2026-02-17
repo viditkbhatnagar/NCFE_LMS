@@ -6,8 +6,12 @@ export interface ILearningMaterial extends Document {
   title: string;
   description: string;
   fileUrl: string;
-  fileType: 'pdf' | 'pptx' | 'video' | 'template';
-  category: 'manual' | 'slides' | 'video' | 'guidance' | 'template';
+  fileName: string;
+  fileType: 'pdf' | 'pptx' | 'video' | 'template' | 'other' | '';
+  fileSize: number;
+  category: 'manual' | 'slides' | 'video' | 'guidance' | 'template' | '';
+  folderId: mongoose.Types.ObjectId | null;
+  isFolder: boolean;
   uploadedBy: mongoose.Types.ObjectId;
   createdAt: Date;
   updatedAt: Date;
@@ -35,18 +39,36 @@ const LearningMaterialSchema = new Schema<ILearningMaterial>(
     },
     fileUrl: {
       type: String,
-      required: [true, 'File URL is required'],
+      default: '',
+      trim: true,
+    },
+    fileName: {
+      type: String,
+      default: '',
       trim: true,
     },
     fileType: {
       type: String,
-      enum: ['pdf', 'pptx', 'video', 'template'],
-      required: [true, 'File type is required'],
+      enum: ['pdf', 'pptx', 'video', 'template', 'other', ''],
+      default: '',
+    },
+    fileSize: {
+      type: Number,
+      default: 0,
     },
     category: {
       type: String,
-      enum: ['manual', 'slides', 'video', 'guidance', 'template'],
-      required: [true, 'Category is required'],
+      enum: ['manual', 'slides', 'video', 'guidance', 'template', ''],
+      default: '',
+    },
+    folderId: {
+      type: Schema.Types.ObjectId,
+      ref: 'LearningMaterial',
+      default: null,
+    },
+    isFolder: {
+      type: Boolean,
+      default: false,
     },
     uploadedBy: {
       type: Schema.Types.ObjectId,
@@ -65,6 +87,7 @@ const LearningMaterialSchema = new Schema<ILearningMaterial>(
 
 LearningMaterialSchema.index({ qualificationId: 1 });
 LearningMaterialSchema.index({ unitId: 1 });
+LearningMaterialSchema.index({ folderId: 1 });
 
 const LearningMaterial: Model<ILearningMaterial> =
   mongoose.models.LearningMaterial ||

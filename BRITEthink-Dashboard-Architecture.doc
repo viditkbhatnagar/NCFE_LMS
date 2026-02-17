@@ -1,0 +1,774 @@
+<!DOCTYPE html><html><head><meta charset="UTF-8"><title>BRITEthink Dashboard Architecture</title><style>body{font-family:Arial,sans-serif;max-width:900px;margin:0 auto;padding:20px;line-height:1.6}h1{color:#1a1a2e;border-bottom:3px solid #16213e;padding-bottom:10px}h2{color:#16213e;border-bottom:2px solid #0f3460;margin-top:30px;padding:8px;background:#f0f4ff}h3{color:#0f3460;margin-top:20px}h4{color:#333;margin-top:15px}table{border-collapse:collapse;width:100%;margin:10px 0}th{background:#16213e;color:white;padding:8px;text-align:left}td{border:1px solid #ddd;padding:8px}tr:nth-child(even){background:#f9f9f9}.note{background:#fff3cd;border-left:4px solid #ffc107;padding:10px;margin:10px 0}.info{background:#d1ecf1;border-left:4px solid #17a2b8;padding:10px;margin:10px 0}.section{background:#f8f9fa;border:1px solid #dee2e6;border-radius:5px;padding:15px;margin:15px 0}code{background:#f4f4f4;padding:2px 5px;border-radius:3px;font-family:monospace}</style></head><body>
+<h1>BRITEthink Dashboard - Complete Architecture & Feature Documentation</h1>
+<p><strong>Purpose:</strong> Complete technical specification for replicating the BRITEthink course management dashboard</p>
+<p><strong>Generated:</strong> February 17, 2026</p>
+
+<h2>1. GLOBAL LAYOUT ARCHITECTURE</h2>
+<div class="section">
+<h3>Overall Page Structure</h3>
+<p>The dashboard uses a fixed-layout with the following main zones:</p>
+<ul>
+<li><strong>Top Navigation Bar</strong> – Fixed/sticky, full width, ~60px height</li>
+<li><strong>Left Sidebar</strong> – Fixed, ~65px wide, icon-only navigation</li>
+<li><strong>Sub-header/Breadcrumb Bar</strong> – Below top nav, shows course name + learner filter</li>
+<li><strong>Main Content Area</strong> – Remaining space, scrollable</li>
+<li><strong>Right Detail Panel</strong> – Slides in (~420px) when an assessment is selected</li>
+</ul>
+
+<h3>Top Navigation Bar</h3>
+<table>
+<tr><th>Element</th><th>Description</th></tr>
+<tr><td>Logo (left)</td><td>Green circle with "b" icon + "BRITEthink" text, links to home /</td></tr>
+<tr><td>Search Bar (center)</td><td>Full-width input, placeholder: "Search courses, members, assessments..." Has search icon left, X clear button when active</td></tr>
+<tr><td>User Avatar (right)</td><td>Initials badge (e.g. "JI") + dropdown arrow button</td></tr>
+</table>
+
+<h4>Search Dropdown Behavior</h4>
+<ul>
+<li>Header: "Searching [Organization Name]"</li>
+<li>Filter tabs: All (count) | Courses (count) | Members (count) | Assessments (count) | Evidence (count) with arrow for more</li>
+<li>Results grouped by category with "MEMBERS", "ASSESSMENTS" etc. section headings</li>
+<li>Under each section: course name as sub-header, then result rows</li>
+<li>Result row: person icon | Name (bold) | Role badge | email | email icon</li>
+<li>Matched search term highlighted in yellow</li>
+</ul>
+
+<h4>User Avatar Dropdown</h4>
+<ul>
+<li>Large avatar circle with initials</li>
+<li>"Hi, [First Name Last Name]!" greeting</li>
+<li>User email address</li>
+<li>"Manage your account" button (full width)</li>
+<li>"Your organizations" section header</li>
+<li>Organization rows: org logo | Org name | email – current org has green border + "Current" pill badge</li>
+<li>"+ Add account" button | "⇄ Sign out" button (side by side)</li>
+</ul>
+
+<h3>Sub-header / Breadcrumb Bar</h3>
+<ul>
+<li>Small dot "·" + course name (truncated with ellipsis)</li>
+<li>Right side: Person group icon + "Learners ▾" dropdown (or selected learner name + ▾)</li>
+</ul>
+
+<h4>Learners Dropdown</h4>
+<ul>
+<li>Header: "Learners" | Subtitle: "Select a learner to filter by"</li>
+<li>Row: "All" badge | "All learners" text (green border when selected)</li>
+<li>Row per learner: "[XX]" avatar | Name | email</li>
+</ul>
+
+<h3>Left Sidebar Navigation (65px wide)</h3>
+<table>
+<tr><th>Position</th><th>Icon</th><th>Tooltip/Label</th><th>Route</th></tr>
+<tr><td>1</td><td>House (3D purple/blue house)</td><td>Home</td><td>/c/{slug}</td></tr>
+<tr><td>2</td><td>Green checkbox with white checkmark</td><td>Assessment</td><td>/c/{slug}/assessment</td></tr>
+<tr><td>3</td><td>Colorful pie/donut chart</td><td>Progress</td><td>/c/{slug}/progress</td></tr>
+<tr><td>4</td><td>Orange/yellow folder</td><td>Portfolio</td><td>/c/{slug}/portfolio</td></tr>
+<tr><td colspan="4" style="background:#eee">--- divider ---</td></tr>
+<tr><td>5</td><td>Blue document with shield overlay</td><td>Course Documents</td><td>/c/{slug}/course-documents</td></tr>
+<tr><td>6</td><td>Blue backpack</td><td>Personal Documents</td><td>/c/{slug}/personal-documents</td></tr>
+<tr><td>7</td><td>Pink/purple open book</td><td>Materials</td><td>/c/{slug}/materials</td></tr>
+<tr><td>8</td><td>Blue clock/calendar</td><td>Work Hours</td><td>/c/{slug}/work-hours</td></tr>
+</table>
+<p class="note"><strong>Note:</strong> Active icon has white background card behind it. Hover shows tooltip label. All icons are 3D-style rendered images (not SVG inline).</p>
+
+<h3>Floating Chat Button</h3>
+<p>Fixed position, bottom-right corner. Green circle button with chat bubble icon. Always visible across all pages.</p>
+</div>
+
+<h2>2. HOME PAGE (Course Overview)</h2>
+<div class="section">
+<p><strong>URL:</strong> <code>/c/{course-slug}?currentEnrollmentId={id}</code></p>
+
+<h3>Header Section</h3>
+<ul>
+<li>H1: Full course name (large, bold)</li>
+<li>Subtitle: "Course overview and recent activity" (muted text)</li>
+</ul>
+
+<h3>My Learners Card (White rounded card, full width)</h3>
+<ul>
+<li>Header row: person group icon + "My Learners" (left) | → arrow button (right, navigates to Members page)</li>
+<li><strong>Assessor section:</strong> graduation cap icon + "Assessor (X)"
+  <ul>
+  <li>2-column grid of assessor rows</li>
+  <li>Each row: [Initial] avatar circle | Name | email | "Enrolled [date]" | "Assessor" badge (green)</li>
+  </ul>
+</li>
+<li><strong>Learner section:</strong> person icon + "Learner (X)"
+  <ul>
+  <li>Learner rows: [Initial] avatar | Name | email | "Enrolled [date]" | "Learner" badge (grey outline)</li>
+  </ul>
+</li>
+</ul>
+
+<h3>Recent Assessments Card (bottom-left, ~50% width)</h3>
+<ul>
+<li>Header: clipboard icon + "Recent Assessments" + → button</li>
+<li>List of recent assessments:
+  <ul>
+  <li>Assessment title (bold heading)</li>
+  <li>Person icon + Learner name</li>
+  <li>Calendar icon + relative time ("about 1 month ago", "27 days ago")</li>
+  <li>"Published" badge (dark/black pill)</li>
+  <li>Type abbreviation badge: "RA", "WP", "WA" etc.</li>
+  </ul>
+</li>
+</ul>
+
+<h3>Recent Evidence Card (bottom-right, ~50% width)</h3>
+<ul>
+<li>Header: folder icon + "Recent Evidence" + → button</li>
+<li>Empty state: "No recent evidence"</li>
+</ul>
+
+<h3>Recent Materials Card (below, full width or ~50%)</h3>
+<ul>
+<li>Header: book icon + "Recent Materials" + → button</li>
+<li>Empty state: "No recent materials"</li>
+</ul>
+</div>
+
+<h2>3. ASSESSMENTS LIST PAGE</h2>
+<div class="section">
+<p><strong>URL:</strong> <code>/c/{course-slug}/assessment?currentEnrollmentId={id}</code></p>
+
+<h3>Page Header</h3>
+<ul>
+<li>H1: "Assessments" (left)</li>
+<li>"+ Create an Assessment" button (right, green/primary with + icon)</li>
+</ul>
+
+<h3>Time-Grouped Sections</h3>
+<p>Assessments are grouped into time periods:</p>
+<ul>
+<li>"TODAY" – uppercase label + full-width horizontal rule + count badge (right)</li>
+<li>"LAST MONTH" – same pattern</li>
+<li>"THIS MONTH" – as needed</li>
+<li>Other periods as needed</li>
+</ul>
+
+<h3>Assessment Card Design</h3>
+<p>Cards displayed in horizontal row (flexbox wrap), ~160px wide:</p>
+<table>
+<tr><th>Element</th><th>Detail</th></tr>
+<tr><td>Learner info</td><td>"Learner: [Name]" smaller text</td></tr>
+<tr><td>Assessor info</td><td>"Assessors: [Name]" smaller text</td></tr>
+<tr><td>Date</td><td>Formatted date "27 Feb 2026"</td></tr>
+<tr><td>Type Badge</td><td>Colored pill – see type colors below</td></tr>
+<tr><td>Criteria dots</td><td>"X Criteria ●●●" – one dot per mapped criterion</td></tr>
+<tr><td>Title</td><td>Below the card, not inside it</td></tr>
+</table>
+
+<h4>Assessment Type Badge Colors</h4>
+<table>
+<tr><th>Type</th><th>Short Code</th><th>Color</th></tr>
+<tr><td>Reflective Account</td><td>RA</td><td>Purple/violet background + text</td></tr>
+<tr><td>Work Product</td><td>WP</td><td>Amber/yellow background + text</td></tr>
+<tr><td>Written Assessment</td><td>WA</td><td>Orange/red background + text</td></tr>
+<tr><td>Observation</td><td>OB</td><td>(Similar pill style)</td></tr>
+<tr><td>Professional Discussion</td><td>PD</td><td>(Similar pill style)</td></tr>
+<tr><td>Verbal Assessment</td><td>VA</td><td>(Similar pill style)</td></tr>
+<tr><td>Witness Testimony</td><td>WT</td><td>(Similar pill style)</td></tr>
+</table>
+
+<h4>Draft Card vs Published Card</h4>
+<ul>
+<li><strong>Draft:</strong> Dashed border, no type badge, title shows "Draft - Untitled Assess..."</li>
+<li><strong>Published:</strong> Solid border, has type badge and criteria dots</li>
+</ul>
+
+<h3>Create Assessment Flow</h3>
+<ol>
+<li>Click "+ Create an Assessment" → "Please select a learner first" modal appears</li>
+<li>Modal shows: "TU" avatar + "Test User" + email for each learner</li>
+<li>Click learner → New draft created, right detail panel opens</li>
+<li>Sub-header changes from "Learners ▾" to "[Learner Name] ▾"</li>
+<li>New draft card appears in TODAY section with dashed border</li>
+</ol>
+</div>
+<h2>4. ASSESSMENT DETAIL PANEL</h2>
+<div class="section">
+<p><strong>URL:</strong> <code>/c/{course-slug}/assessment/{assessmentId}?currentEnrollmentId={id}</code></p>
+<p>The detail panel is a right-side panel (~420px wide) that opens alongside the assessments list when a card is clicked or a URL is navigated to directly.</p>
+
+<h3>Sticky Header (always visible at top of panel)</h3>
+<p>Structure (horizontal flex row, sticky top-0, z-20, border-bottom):</p>
+<table>
+<tr><th>Element</th><th>Details</th></tr>
+<tr><td>Back Button</td><td>"&lt;" icon, hidden on desktop (md:hidden), shows on mobile</td></tr>
+<tr><td>Date Pill</td><td>flex-shrink-0; calendar icon + formatted date; click opens date picker; new assessment shows "Set assessment date"</td></tr>
+<tr><td>Title Input</td><td>min-w-0 flex-1; border-0, bg-transparent, text-lg font-medium; placeholder "Assessment title"; auto-saves; opacity-50 when empty</td></tr>
+<tr><td>Sign-off Icons</td><td>4 icon buttons with tooltips (see below)</td></tr>
+<tr><td>Saved Indicator</td><td>"Saved" text, flex-shrink-0, shows after auto-save</td></tr>
+<tr><td>Status Button</td><td>Draft: "Send to learner" (blue primary); Published: "Published" (grey disabled-style)</td></tr>
+<tr><td>Delete Button</td><td>Red trash/bin icon button</td></tr>
+</table>
+
+<h4>Sign-off Icons (4 total, left to right)</h4>
+<table>
+<tr><th>Icon</th><th>Tooltip Text</th><th>Visual</th></tr>
+<tr><td>1st</td><td>"Assessor - Not signed off" / "Assessor - Signed off"</td><td>Person with check icon</td></tr>
+<tr><td>2nd</td><td>"Internal Quality Assurers - Not signed off"</td><td>Shield icon</td></tr>
+<tr><td>3rd</td><td>"External Quality Assurers - Not signed off"</td><td>Graduation cap icon</td></tr>
+<tr><td>4th</td><td>"Learner - Not signed off"</td><td>Person icon</td></tr>
+</table>
+
+<h4>Date Picker Calendar</h4>
+<ul>
+<li>Month dropdown selector (▾) | Year dropdown selector (▾)</li>
+<li>Left arrow ← | Right arrow → navigation</li>
+<li>Grid headers: Su Mo Tu We Th Fr Sa</li>
+<li>Day cells: number buttons</li>
+<li>Selected day: dark filled circle</li>
+</ul>
+
+<h3>Section 1: Assessment Kind</h3>
+<div class="info">
+<p><strong>Heading:</strong> "Assessment Kind"<br>
+<strong>Subtext:</strong> "Select the type of assessment being conducted"<br>
+<strong>Layout:</strong> 3-column grid of buttons (7 total, last row has 1)</p>
+</div>
+<table>
+<tr><th>Position</th><th>Label</th><th>Icon</th><th>Selected State</th></tr>
+<tr><td>Row 1, Col 1</td><td>Observation</td><td>Eye icon (outline)</td><td>Blue border + blue text + blue dot top-right</td></tr>
+<tr><td>Row 1, Col 2</td><td>Professional Discussion</td><td>Speech bubble</td><td>Same as above</td></tr>
+<tr><td>Row 1, Col 3</td><td>Reflective Account</td><td>Document with lines</td><td>Same as above</td></tr>
+<tr><td>Row 2, Col 1</td><td>Verbal Assessment</td><td>Microphone</td><td>Same as above</td></tr>
+<tr><td>Row 2, Col 2</td><td>Written Assessment</td><td>Pen/tag icon</td><td>Same as above</td></tr>
+<tr><td>Row 2, Col 3</td><td>Work Product</td><td>Folder</td><td>Same as above</td></tr>
+<tr><td>Row 3, Col 1</td><td>Witness Testimony</td><td>Two-person group</td><td>Same as above</td></tr>
+</table>
+
+<h3>Section 2: Plan Intent</h3>
+<ul>
+<li>Heading: "Plan Intent"</li>
+<li>Rich text toolbar: B (Bold) | I (Italic) | U (Underline) | ≡ (Bullet List) | ≣ (Numbered List)</li>
+<li>Content editable text area below toolbar</li>
+<li>Auto-saves on change</li>
+</ul>
+
+<h3>Section 3: Plan Implementation</h3>
+<ul>
+<li>Same structure as Plan Intent</li>
+<li>Heading: "Plan Implementation"</li>
+<li>Same rich text toolbar: B | I | U | ≡ | ≣</li>
+</ul>
+
+<h3>Section 4: Evidence Mapping</h3>
+<div class="section">
+<p><strong>Heading:</strong> "Evidence Mapping"</p>
+<p><strong>Instruction:</strong> "Select an evidence item to perform actions"</p>
+<h4>Toolbar Row</h4>
+<ul>
+<li>"Upload Evidence" button (with upload arrow icon)</li>
+<li>"All Files" filter button (with filter/funnel icon)</li>
+<li>"Date Sort" button (with up-down arrows icon)</li>
+<li>Grid view toggle button (4-square icon) – dark when active</li>
+<li>List view toggle button (lines icon)</li>
+</ul>
+<h4>Attached Evidence Sub-section</h4>
+<ul>
+<li>Heading: "Attached Evidence" + "[X] items" count</li>
+<li>Empty state: chain-link icon + "No attached evidence" heading + "Select evidence from the Available section to attach it"</li>
+</ul>
+<h4>Available Evidence Sub-section</h4>
+<ul>
+<li>Heading: "Available Evidence" + "[X] items" count</li>
+<li>Empty state: file/paper icon + "No available evidence" + "No evidence has been uploaded yet."</li>
+</ul>
+</div>
+
+<h3>Section 5: Criteria Mapping</h3>
+<div class="section">
+<p><strong>Header row:</strong> "Criteria Mapping" heading | "[X] mapped" badge | gear/settings icon + "Edit Mapping" button</p>
+<h4>Display View (read-only)</h4>
+<ul>
+<li>Unit name as blue hyperlink: "[Code] - [Unit Name]"</li>
+<li>Outcome group: "[number] - [Outcome description]"</li>
+<li>Criterion row: "[number]" (green badge/chip) + criterion description text</li>
+</ul>
+<h4>Edit Mapping Modal (opens on "Edit Mapping" click)</h4>
+<table>
+<tr><th>Element</th><th>Detail</th></tr>
+<tr><td>Title</td><td>"Edit Criteria Mapping"</td></tr>
+<tr><td>Close button</td><td>X top right</td></tr>
+<tr><td>Subtitle</td><td>"Select criteria to map to this assessment. Changes are saved automatically."</td></tr>
+<tr><td>Status bar</td><td>"[X] of [Total] criteria mapped" | "Check boxes to map criteria to this assessment"</td></tr>
+<tr><td>Unit row</td><td>Chevron ▼ (expand/collapse) | [Code] badge | Unit name | "X criteria" count</td></tr>
+<tr><td>Outcome row</td><td>Indented, chevron | number badge | outcome description | "X criteria"</td></tr>
+<tr><td>Criterion row</td><td>Circle checkbox (○ unchecked / ✓ checked) | [number] badge | criterion text | "Mapped" green badge (if selected)</td></tr>
+<tr><td>Selected row</td><td>Green highlight background, filled checkmark ✓, "Mapped" badge</td></tr>
+<tr><td>Footer</td><td>"[X] criteria mapped" (left) | "Close" button (right)</td></tr>
+</table>
+</div>
+
+<h3>Section 6: Sign-off Status</h3>
+<div class="section">
+<p><strong>Heading:</strong> "Sign-off Status"</p>
+<p><strong>Badges:</strong> "[X]/4 Complete" | "Next: [Role Name]"</p>
+<p><strong>Progress bar:</strong> horizontal, below badges</p>
+<h4>Role Cards (4 total, connected by vertical line)</h4>
+<table>
+<tr><th>Number</th><th>Role</th><th>Icon</th><th>Active State</th><th>Pending State</th></tr>
+<tr><td>1</td><td>Assessor</td><td>Person icon</td><td>"Sign Off" button (dark/black)</td><td>"Pending" with clock icon (grey)</td></tr>
+<tr><td>2</td><td>IQA</td><td>Shield icon</td><td>"Sign Off" button (dark/black)</td><td>"Pending" with clock icon</td></tr>
+<tr><td>3</td><td>EQA</td><td>Graduation cap</td><td>"Sign Off" button</td><td>"Pending" with clock icon</td></tr>
+<tr><td>4</td><td>Learner</td><td>Person icon</td><td>"Sign Off" button</td><td>"Pending" with clock icon</td></tr>
+</table>
+<p>Each card shows: number circle | role icon | role name | "Awaiting sign off" text | action button</p>
+<p><strong>Summary:</strong> "Assessment requires additional signatures" | "[X] of 4 roles completed"</p>
+<p class="note"><strong>Workflow:</strong> Assessor → IQA → EQA → Learner (sequential, each must complete before next can sign)</p>
+</div>
+
+<h3>Section 7: Remarks</h3>
+<div class="section">
+<p><strong>Header:</strong> speech bubble icon + "Remarks"</p>
+<p><strong>Empty state:</strong> "No remarks yet"</p>
+<h4>Add Remark Area</h4>
+<ul>
+<li>Label: speech bubble icon + "Add a remark"</li>
+<li>Rich text toolbar: B | I | U | ≡ | ≣</li>
+<li>Editable text area</li>
+<li>"Submit Remark" button (dark/black with send/arrow icon)</li>
+</ul>
+</div>
+</div>
+<h2>5. PROGRESS PAGE</h2>
+<div class="section">
+<p><strong>URL:</strong> <code>/c/{slug}/progress?currentEnrollmentId={id}[&learnerEnrlId={id}][&unitId={id}][&outcomeId={id}][&criterionId={id}]</code></p>
+
+<h3>Empty State (no learner selected)</h3>
+<ul>
+<li>People group icon (large, grey/muted)</li>
+<li>"Select a learner to view their progress" (heading)</li>
+<li>"Choose a learner to view their progress" (subtext)</li>
+<li>"Select Learner" button (green, with person+select icon) – opens same Learners dropdown</li>
+</ul>
+
+<h3>With Learner Selected – Course Progress Summary (top)</h3>
+<ul>
+<li>White card: "Course Progress" heading</li>
+<li>"[X] of [Total] criteria completed" subtext</li>
+<li>"Refresh" button (circular arrow icon)</li>
+<li>"[X]% Complete" badge – blue text, top right of card</li>
+<li>"Progress" label + "X%" percentage (right-aligned)</li>
+<li>Blue progress bar (thin, rounded)</li>
+</ul>
+
+<h3>4-Column Drill-Down Layout</h3>
+<p class="info">The progress page uses a horizontal multi-panel layout. Each column appears as a previous selection is made. At full width (1440px+) all 4 columns are visible simultaneously.</p>
+
+<h4>Column 1: Units</h4>
+<ul>
+<li>Heading: "Units" | "[X] items" count</li>
+<li>Unit cards (full-width list in column):
+  <ul>
+  <li>Unit name (truncated if long)</li>
+  <li>Unit code (e.g., "SHC 53", "O43", "M1")</li>
+  <li>"[X] of [Y]" criteria count + "X%" right-aligned</li>
+  <li>Blue progress bar (thin) – only shown if progress > 0</li>
+  <li>Selected: blue border highlight</li>
+  </ul>
+</li>
+</ul>
+
+<h4>Column 2: Outcomes (appears when unit selected)</h4>
+<ul>
+<li>Heading: "Outcomes" | "[X] items" count</li>
+<li>Outcome cards:
+  <ul>
+  <li>Outcome number (bold)</li>
+  <li>Outcome description (truncated)</li>
+  <li>"[X] of [Y]" + "X%" percentage</li>
+  <li>Blue progress bar</li>
+  <li>Selected: blue border</li>
+  </ul>
+</li>
+</ul>
+
+<h4>Column 3: Criteria (appears when outcome selected)</h4>
+<ul>
+<li>Heading: "Criteria" | "[X] items" count</li>
+<li>Criterion cards:
+  <ul>
+  <li>Criterion number (e.g., "1.1", "2.1b")</li>
+  <li>Criterion description text</li>
+  <li>"[X] of [Y]" + "X%" + progress bar</li>
+  <li>Completed indicator: green checkmark circle ✓ (top right of card)</li>
+  <li>Incomplete: empty circle ○ (top right)</li>
+  <li>Selected: blue border</li>
+  </ul>
+</li>
+</ul>
+
+<h4>Column 4: Assessments (appears when criterion selected)</h4>
+<ul>
+<li>Heading: "Assessments" | "[X] assessments" count</li>
+<li>Assessment list cards:
+  <ul>
+  <li>Assessment title</li>
+  <li>"[Learner Name] • [Type Code]" (e.g., "Test User • RA")</li>
+  <li>Date (dd/mm/yyyy format)</li>
+  </ul>
+</li>
+</ul>
+
+<p class="note"><strong>Responsive behavior:</strong> At narrow widths, only leftmost columns show; as URL query params are added, columns appear. Horizontal scrollbar shows when all 4 columns don't fit.</p>
+</div>
+
+<h2>6. PORTFOLIO PAGE</h2>
+<div class="section">
+<p><strong>URL:</strong> <code>/c/{slug}/portfolio?currentEnrollmentId={id}[&learnerEnrlId={id}]</code></p>
+<p>Shows evidence files for a specific learner.</p>
+
+<h3>Page Layout</h3>
+<ul>
+<li>H1: "Portfolio"</li>
+<li>Toolbar row:
+  <ul>
+  <li>"Select an evidence item to perform actions" (left instruction text)</li>
+  <li>"Upload Evidence" button (upload arrow icon)</li>
+  <li>"All Status" filter button (chain-link icon)</li>
+  <li>"All Files" filter button (funnel icon)</li>
+  <li>"Date Sort" button (up-down arrows)</li>
+  <li>Grid view toggle (4-square) – dark when active</li>
+  <li>List view toggle (3 lines)</li>
+  </ul>
+</li>
+</ul>
+
+<h3>Empty State</h3>
+<ul>
+<li>Paper/document icon (grey, large)</li>
+<li>"No evidence found" (heading)</li>
+<li>"No evidence has been uploaded yet." (subtext)</li>
+</ul>
+
+<p class="note"><strong>Note:</strong> When files exist, they show in grid or list view. Actions become available when file is selected (showing in the toolbar instruction area).</p>
+</div>
+
+<h2>7. COURSE DOCUMENTS PAGE</h2>
+<div class="section">
+<p><strong>URL:</strong> <code>/c/{slug}/course-documents?currentEnrollmentId={id}</code></p>
+<p><strong>Note:</strong> This is a course-wide page (top-right shows "Learners ▾" not a specific learner)</p>
+
+<h3>Page Layout</h3>
+<ul>
+<li>H1: "Course Documents"</li>
+<li>Toolbar: "Select a file to see actions" | "All Files" | "Upload Files" | "New Folder" | Grid | List</li>
+</ul>
+
+<h3>Empty State</h3>
+<ul>
+<li>Document outline icon</li>
+<li>"No course documents found"</li>
+<li>"No course documents are available for this course yet."</li>
+</ul>
+</div>
+
+<h2>8. PERSONAL DOCUMENTS PAGE</h2>
+<div class="section">
+<p><strong>URL:</strong> <code>/c/{slug}/personal-documents?currentEnrollmentId={id}</code></p>
+<p><strong>Note:</strong> Course-wide (uses "Learners ▾"). No upload buttons (read-only for assessors viewing others' docs)</p>
+
+<h3>Toolbar</h3>
+<ul>
+<li>"Select a file to see actions" (left)</li>
+<li>"All Files" filter button</li>
+<li>Grid view toggle | List view toggle</li>
+<li><strong>NO Upload Files or New Folder buttons</strong></li>
+</ul>
+
+<h3>Empty State</h3>
+<ul>
+<li>Document outline icon</li>
+<li>"No personal documents found"</li>
+<li>"No personal documents are available yet."</li>
+</ul>
+</div>
+
+<h2>9. MATERIALS PAGE</h2>
+<div class="section">
+<p><strong>URL:</strong> <code>/c/{slug}/materials?currentEnrollmentId={id}</code></p>
+
+<h3>Toolbar</h3>
+<ul>
+<li>"Select a file to see actions" | "All Files" | "Upload Files" | "New Folder" | Grid | List</li>
+</ul>
+
+<h3>Empty State</h3>
+<ul>
+<li>"No materials found"</li>
+<li>"No materials have been uploaded to this course yet."</li>
+</ul>
+</div>
+
+<h2>10. WORK HOURS LOG PAGE</h2>
+<div class="section">
+<p><strong>URL:</strong> <code>/c/{slug}/work-hours?currentEnrollmentId={id}</code></p>
+
+<h3>Page Header</h3>
+<ul>
+<li>H1: "Work Hours Log" (left)</li>
+<li>"+ New" button (right, black with + icon)</li>
+</ul>
+
+<h3>Day Navigation Bar</h3>
+<ul>
+<li>"&lt; Previous Day" button (left arrow + text)</li>
+<li>📅 "Tue Feb 17" center button (calendar icon + day abbreviation + month + day number)</li>
+<li>"Next Day &gt;" button (text + right arrow)</li>
+</ul>
+
+<h3>Empty State</h3>
+<p>"No time logs for this date" (centered)</p>
+
+<h3>Adding New Entry Flow</h3>
+<ol>
+<li>Click "+ New" button</li>
+<li>"Select Learner" modal appears: Shows learner rows with avatar + name + email</li>
+<li>Click learner → New inline row appears in the log</li>
+</ol>
+
+<h4>Inline Entry Row Structure</h4>
+<ul>
+<li>[Avatar circle with initials] (left)</li>
+<li>Name + "New Entry" blue badge</li>
+<li>Text area: "Optional notes here" placeholder</li>
+<li>Hours input field + "h" label</li>
+<li>Minutes input field + "m" label</li>
+<li>Save button (black disk/save icon)</li>
+<li>Cancel button "×"</li>
+</ul>
+</div>
+
+<h2>11. MEMBERS PAGE</h2>
+<div class="section">
+<p><strong>URL:</strong> <code>/c/{slug}/members?currentEnrollmentId={id}</code></p>
+
+<h3>Page Header</h3>
+<ul>
+<li>H1: "Members"</li>
+<li>Subtitle: "Your allocated members as ASSESSOR"</li>
+</ul>
+
+<h3>Team Members Card</h3>
+<ul>
+<li>People icon + "Team Members" heading</li>
+<li>"Other assessors who share learners with you (X learners allocated)" subtext</li>
+<li>Assessor rows: [NK] avatar | Name | email | "ASSESSOR" badge (green outline)</li>
+</ul>
+
+<h3>Learner Group Sections</h3>
+<ul>
+<li>Group name (e.g., "Default") + "Created [date]" subtext</li>
+<li>"Learner (X)" sub-section with person icon</li>
+<li>Learner rows: [TU] avatar | Name | email</li>
+</ul>
+</div>
+<h2>12. URL ROUTING STRUCTURE</h2>
+<div class="section">
+<h3>Base URL Pattern</h3>
+<p>All routes require: <code>?currentEnrollmentId={enrollmentId}</code></p>
+
+<table>
+<tr><th>Page</th><th>URL Pattern</th><th>Notes</th></tr>
+<tr><td>Home</td><td>/c/{slug}</td><td>Course overview</td></tr>
+<tr><td>Assessments List</td><td>/c/{slug}/assessment</td><td></td></tr>
+<tr><td>Assessment Detail</td><td>/c/{slug}/assessment/{assessmentId}</td><td>Opens detail panel</td></tr>
+<tr><td>Progress</td><td>/c/{slug}/progress</td><td>Learner-specific</td></tr>
+<tr><td>Portfolio</td><td>/c/{slug}/portfolio</td><td>Evidence files</td></tr>
+<tr><td>Course Documents</td><td>/c/{slug}/course-documents</td><td>Course-wide</td></tr>
+<tr><td>Personal Documents</td><td>/c/{slug}/personal-documents</td><td>Course-wide</td></tr>
+<tr><td>Materials</td><td>/c/{slug}/materials</td><td></td></tr>
+<tr><td>Work Hours</td><td>/c/{slug}/work-hours</td><td></td></tr>
+<tr><td>Members</td><td>/c/{slug}/members</td><td>Via → button on home</td></tr>
+</table>
+
+<h3>Query Parameters</h3>
+<table>
+<tr><th>Parameter</th><th>When Present</th><th>Example</th></tr>
+<tr><td>currentEnrollmentId</td><td>Always</td><td>72408272-d6ad-4b6c-be2f-73c2b7ee8b91</td></tr>
+<tr><td>learnerEnrlId</td><td>When learner filter active</td><td>1260158b-33da-459e-b90f-e11b6b217ec2</td></tr>
+<tr><td>unitId</td><td>Progress: unit selected</td><td>a66d111f-b70a-4e3f-8f4b-1cbe24bf833c</td></tr>
+<tr><td>outcomeId</td><td>Progress: outcome selected</td><td>6a9a91b8-3288-4e94-82c7-ac6641d4b9de</td></tr>
+<tr><td>criterionId</td><td>Progress: criterion selected</td><td>a8b94873-404e-4688-990b-c3b1a3173267</td></tr>
+</table>
+</div>
+
+<h2>13. COMMON UI COMPONENTS</h2>
+<div class="section">
+<h3>Avatar Circles</h3>
+<ul>
+<li>Small circles (32-40px) with 2-char initials</li>
+<li>Grey background for regular users</li>
+<li>Colored background for some roles</li>
+<li>Used everywhere for user identification</li>
+</ul>
+
+<h3>Status / Role Badges</h3>
+<table>
+<tr><th>Badge</th><th>Style</th></tr>
+<tr><td>"Published"</td><td>Dark/black background, white text, rounded-full pill</td></tr>
+<tr><td>"Assessor"</td><td>Green background or green outline</td></tr>
+<tr><td>"Learner"</td><td>Grey outline, default text</td></tr>
+<tr><td>"LEARNER" (in search)</td><td>Similar pill style</td></tr>
+<tr><td>"Mapped"</td><td>Green background (in criteria modal)</td></tr>
+<tr><td>"Current"</td><td>Green background (in org switcher)</td></tr>
+<tr><td>"New Entry"</td><td>Blue background (work hours)</td></tr>
+<tr><td>"Draft"</td><td>Prefix in card title</td></tr>
+<tr><td>"ASSESSOR"</td><td>Uppercase, green outline (Members page)</td></tr>
+</table>
+
+<h3>Filter / Toolbar Buttons</h3>
+<ul>
+<li>Rounded pill shape</li>
+<li>Icon on left + text label</li>
+<li>Examples: "All Files" (funnel icon), "Date Sort" (arrows icon), "All Status" (link icon), "Upload Evidence" (upload icon), "All Files", "New Folder" (folder+ icon)</li>
+<li>Hover: slight background change</li>
+</ul>
+
+<h3>View Toggle Buttons (Grid/List)</h3>
+<ul>
+<li>Grid icon: 4 small squares in 2x2 arrangement</li>
+<li>List icon: 3 horizontal lines</li>
+<li>Active state: dark/black filled background</li>
+<li>Inactive: grey/transparent</li>
+</ul>
+
+<h3>Rich Text Editor Toolbar</h3>
+<p>Used in: Plan Intent, Plan Implementation, Remarks</p>
+<ul>
+<li>Buttons: <strong>B</strong> (Bold) | <em>I</em> (Italic) | <u>U</u> (Underline) | ≡ (Bullet/Unordered List) | ≣ (Numbered/Ordered List)</li>
+<li>Clean white/light background text area below</li>
+<li>Auto-saves on content change</li>
+</ul>
+
+<h3>Modal Dialogs</h3>
+<ul>
+<li>Dark backdrop overlay (blurs/dims background)</li>
+<li>White card, rounded corners (border-radius ~12px)</li>
+<li>X close button (top right corner)</li>
+<li>Title (bold, larger) + subtitle/description (muted)</li>
+<li>Scrollable content area when needed</li>
+<li>Footer: count/status info (left) + action button (right)</li>
+</ul>
+
+<h3>Empty States</h3>
+<p>Consistent pattern across pages:</p>
+<ul>
+<li>Icon (large, ~64px, grey/muted color)</li>
+<li>Primary message (bold, e.g., "No materials found")</li>
+<li>Secondary message (muted text, more descriptive)</li>
+<li>Optional: action button (green or default)</li>
+</ul>
+
+<h3>Progress Bars</h3>
+<ul>
+<li>Thin, rounded ends</li>
+<li>Blue fill color (~#3B82F6)</li>
+<li>Light grey background track (~#E5E7EB)</li>
+<li>Width calculated as percentage of total</li>
+</ul>
+
+<h3>Section Dividers (Assessments List)</h3>
+<ul>
+<li>Section label (uppercase): "TODAY", "LAST MONTH", etc. (left-aligned)</li>
+<li>Full-width horizontal line (grey, hr)</li>
+<li>Count badge (right side of line)</li>
+</ul>
+</div>
+
+<h2>14. ASSESSMENT WORKFLOW DETAILS</h2>
+<div class="section">
+<h3>Status Flow</h3>
+<p><code>New Draft → Send to Learner → Published → Sign-off Flow (Assessor → IQA → EQA → Learner)</code></p>
+
+<h3>Sign-off Status Display</h3>
+<table>
+<tr><th>State</th><th>Role Cards</th><th>Header Icons</th></tr>
+<tr><td>0/4 complete</td><td>Assessor: "Sign Off" (active black); IQA/EQA/Learner: "Pending" (clock)</td><td>All 4 icons grey</td></tr>
+<tr><td>1/4 complete</td><td>Assessor: done; IQA: active; EQA/Learner: pending</td><td>Assessor icon green/active</td></tr>
+<tr><td>4/4 complete</td><td>All done</td><td>All 4 icons green</td></tr>
+</table>
+
+<h3>Auto-Save Behavior</h3>
+<ul>
+<li>Assessment title field: auto-saves on keystroke</li>
+<li>Plan Intent / Plan Implementation: auto-saves on change</li>
+<li>Assessment Kind selection: saves immediately on click</li>
+<li>Criteria mapping: "Changes are saved automatically" (stated in modal)</li>
+<li>"Saved" text indicator in header shows after successful save</li>
+<li>Assessment date selection: saves on calendar day click</li>
+</ul>
+
+<h3>Assessment Card Data Mapping</h3>
+<table>
+<tr><th>Card Element</th><th>Source Data</th></tr>
+<tr><td>Title (below card)</td><td>Assessment.title or "Draft - Untitled Assess..."</td></tr>
+<tr><td>"Learner: X"</td><td>Assigned learner's name</td></tr>
+<tr><td>"Assessors: X"</td><td>Assigned assessor(s) name</td></tr>
+<tr><td>Date shown</td><td>Assessment.assessmentDate (formatted)</td></tr>
+<tr><td>Type badge</td><td>Assessment.kind (maps to color/label)</td></tr>
+<tr><td>Criteria dots</td><td>Count of Assessment.mappedCriteria</td></tr>
+<tr><td>Border style</td><td>Dashed if Draft, Solid if Published</td></tr>
+</table>
+</div>
+
+<h2>15. RESPONSIVE DESIGN NOTES</h2>
+<div class="section">
+<table>
+<tr><th>Breakpoint</th><th>Behavior</th></tr>
+<tr><td>Desktop (1200px+)</td><td>Full layout: sidebar + main content + detail panel side by side</td></tr>
+<tr><td>1440px+</td><td>Progress 4-column layout fully visible without horizontal scroll</td></tr>
+<tr><td>Mobile (md: breakpoint)</td><td>Back button visible in assessment detail header; sidebar may collapse</td></tr>
+</table>
+
+<h3>Detail Panel</h3>
+<ul>
+<li>~420px fixed width</li>
+<li>Scrollable independently</li>
+<li>Sticky header remains fixed while body scrolls</li>
+<li>Left panel (assessments list) takes remaining width</li>
+</ul>
+</div>
+
+<h2>16. NOTIFICATIONS & ACCESSIBILITY</h2>
+<div class="section">
+<ul>
+<li>Notification region: accessible via keyboard shortcut Alt+T</li>
+<li>ARIA region="Notifications alt+T" in DOM</li>
+<li>Tooltips on hover for all sidebar icons</li>
+<li>Tooltips on hover for sign-off status icons</li>
+</ul>
+</div>
+
+<h2>17. KEY BEHAVIORAL PATTERNS</h2>
+<div class="section">
+<h3>Learner Context Switching</h3>
+<ul>
+<li>Top-right dropdown always available to switch learner context</li>
+<li>Most pages filter content by selected learner when set</li>
+<li>Course Documents, Personal Documents use "Learners" (all) by default</li>
+<li>Progress page requires learner selection to show data</li>
+</ul>
+
+<h3>Panel Architecture (Assessments)</h3>
+<ul>
+<li>Left: Assessments list (with time grouping)</li>
+<li>Right: Detail panel (slides in, ~420px)</li>
+<li>URL changes when assessment selected (includes assessmentId)</li>
+<li>Direct URL navigation opens correct assessment in panel</li>
+</ul>
+
+<h3>Search Scope</h3>
+<ul>
+<li>Search is organization-wide (shows "Searching [Org Name]")</li>
+<li>Results from all courses in the organization</li>
+<li>Grouped by type: Members, Courses, Assessments, Evidence</li>
+<li>Sub-grouped by course name</li>
+</ul>
+</div>
+
+</body></html>
