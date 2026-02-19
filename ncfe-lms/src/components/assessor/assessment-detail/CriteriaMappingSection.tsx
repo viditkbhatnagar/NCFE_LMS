@@ -9,6 +9,7 @@ interface CriteriaMappingSectionProps {
   qualificationId: string;
   criteriaMap: CriteriaMapEntry[];
   onUpdated: () => void;
+  readOnly?: boolean;
 }
 
 export default function CriteriaMappingSection({
@@ -16,6 +17,7 @@ export default function CriteriaMappingSection({
   qualificationId,
   criteriaMap,
   onUpdated,
+  readOnly = false,
 }: CriteriaMappingSectionProps) {
   const [showModal, setShowModal] = useState(false);
 
@@ -50,12 +52,14 @@ export default function CriteriaMappingSection({
             {criteriaMap.length} mapped
           </span>
         </div>
-        <button
-          onClick={() => setShowModal(true)}
-          className="text-xs font-medium text-primary hover:text-primary/80 transition-colors"
-        >
-          Edit Mapping
-        </button>
+        {!readOnly && (
+          <button
+            onClick={() => setShowModal(true)}
+            className="text-xs font-medium text-primary hover:text-primary/80 transition-colors"
+          >
+            Edit Mapping
+          </button>
+        )}
       </div>
 
       {criteriaMap.length === 0 ? (
@@ -92,17 +96,19 @@ export default function CriteriaMappingSection({
         </div>
       )}
 
-      <CriteriaMappingModal
-        isOpen={showModal}
-        onClose={() => setShowModal(false)}
-        assessmentId={assessmentId}
-        qualificationId={qualificationId}
-        currentMappedIds={currentMappedIds}
-        onSaved={() => {
-          setShowModal(false);
-          onUpdated();
-        }}
-      />
+      {!readOnly && (
+        <CriteriaMappingModal
+          isOpen={showModal}
+          onClose={() => setShowModal(false)}
+          assessmentId={assessmentId}
+          qualificationId={qualificationId}
+          currentMappedIds={currentMappedIds}
+          onSaved={() => {
+            setShowModal(false);
+            onUpdated();
+          }}
+        />
+      )}
     </div>
   );
 }

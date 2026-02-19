@@ -11,7 +11,7 @@ export async function PUT(
 ) {
   try {
     const { id } = await params;
-    const { session, error } = await withAuth(['assessor']);
+    const { session, error } = await withAuth(['assessor', 'student']);
     if (error) return error;
 
     const body = await request.json();
@@ -34,8 +34,13 @@ export async function PUT(
     }
 
     // Verify ownership via enrollment
+    const user = session!.user;
     const enrollment = await Enrolment.findById(existing.enrollmentId).lean();
-    if (!enrollment || enrollment.assessorId?.toString() !== session!.user.id) {
+    const isOwner =
+      user.role === 'student'
+        ? enrollment?.userId?.toString() === user.id
+        : enrollment?.assessorId?.toString() === user.id;
+    if (!enrollment || !isOwner) {
       return NextResponse.json(
         { success: false, error: 'Forbidden' },
         { status: 403 }
@@ -65,7 +70,7 @@ export async function DELETE(
 ) {
   try {
     const { id } = await params;
-    const { session, error } = await withAuth(['assessor']);
+    const { session, error } = await withAuth(['assessor', 'student']);
     if (error) return error;
 
     await dbConnect();
@@ -79,8 +84,13 @@ export async function DELETE(
     }
 
     // Verify ownership via enrollment
+    const user = session!.user;
     const enrollment = await Enrolment.findById(existing.enrollmentId).lean();
-    if (!enrollment || enrollment.assessorId?.toString() !== session!.user.id) {
+    const isOwner =
+      user.role === 'student'
+        ? enrollment?.userId?.toString() === user.id
+        : enrollment?.assessorId?.toString() === user.id;
+    if (!enrollment || !isOwner) {
       return NextResponse.json(
         { success: false, error: 'Forbidden' },
         { status: 403 }

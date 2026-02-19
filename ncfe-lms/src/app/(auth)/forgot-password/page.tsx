@@ -23,9 +23,10 @@ export default function ForgotPasswordPage() {
   return (
     <div className="min-h-screen flex items-center justify-center bg-background px-4">
       <div className="w-full max-w-md">
-        <div className="text-center mb-8">
-          <h1 className="text-3xl font-bold text-primary">NCFE LMS</h1>
-          <p className="text-text-secondary mt-1">Learning Management System</p>
+        <div className="flex items-center justify-center gap-4 mb-8">
+          <img src="/skillhub-logo.jpeg" alt="Skill Hub" className="h-12 w-auto object-contain" />
+          <div className="h-8 w-px bg-gray-200" />
+          <img src="/ncfe-logo.jpg" alt="NCFE" className="h-8 w-auto object-contain" />
         </div>
 
         <Card padding="lg">

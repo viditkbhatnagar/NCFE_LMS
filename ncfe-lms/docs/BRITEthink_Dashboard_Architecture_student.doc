@@ -1,0 +1,468 @@
+<!DOCTYPE html>
+<html><head><meta charset="UTF-8"><title>BRITEthink Dashboard Architecture</title>
+<style>
+body{font-family:Calibri,Arial,sans-serif;font-size:11pt;line-height:1.6;margin:2cm;color:#333}
+h1{font-size:22pt;color:#1a1a2e;border-bottom:3px solid #00C7B7;padding-bottom:8px;margin-bottom:20px}
+h2{font-size:15pt;color:#16213e;background:#f0fffe;padding:8px 12px;border-left:5px solid #00C7B7;margin-top:35px}
+h3{font-size:12pt;color:#0f3460;margin-top:20px}
+h4{font-size:11pt;color:#533483;margin-top:12px}
+p{margin:8px 0}
+ul,ol{margin:6px 0 10px 25px}
+li{margin:4px 0}
+table{width:100%;border-collapse:collapse;margin:12px 0}
+th{background:#00C7B7;color:white;padding:8px 10px;text-align:left;font-weight:bold}
+td{border:1px solid #ccc;padding:6px 10px;vertical-align:top}
+tr:nth-child(even){background:#f9f9f9}
+hr{border:none;border-top:2px solid #00C7B7;margin:30px 0}
+code{background:#f0f0f0;padding:2px 5px;border-radius:3px;font-family:monospace;font-size:9pt}
+.note{background:#fff9c4;border-left:4px solid #f9a825;padding:10px 15px;margin:12px 0;border-radius:0 4px 4px 0}
+</style></head><body>
+
+<h1>BRITEthink Dashboard - Complete Architecture Documentation</h1>
+<p><strong>Generated:</strong> 19 February 2026 &nbsp;|&nbsp; <strong>Source:</strong> britethink.co &nbsp;|&nbsp; <strong>Course:</strong> NCFE Level 3 Certificate in Assessing Vocational Achievement</p>
+
+<hr>
+<h2>1. OVERALL LAYOUT &amp; ARCHITECTURE</h2>
+
+<h3>1.1 Two-Zone Default Layout</h3>
+<ul>
+<li><strong>Left Sidebar</strong> — ~70px fixed width, vertical icon navigation</li>
+<li><strong>Main Content Area</strong> — all remaining width, full page content</li>
+</ul>
+
+<h3>1.2 Three-Column Assessment Layout (when an assessment is selected)</h3>
+<ul>
+<li><strong>Left Sidebar</strong> — ~70px, fixed global nav</li>
+<li><strong>Assessment List Panel</strong> — ~380px, scrollable list stays visible</li>
+<li><strong>Assessment Detail Panel</strong> — remaining width, scrollable detail form</li>
+</ul>
+
+<h3>1.3 Top Header Bar (fixed, full width)</h3>
+<ul>
+<li><strong>Left:</strong> BRITEthink logo — "b" icon + "BRITEthink" wordmark — links to "/"</li>
+<li><strong>Center:</strong> Global search bar — placeholder "Search courses, members, assessments..." — has magnifying glass icon button (two instances for responsive: desktop + mobile)</li>
+<li><strong>Right:</strong> User avatar button — shows user initials (e.g., "JI") + dropdown chevron for profile/logout menu</li>
+</ul>
+
+<h3>1.4 Course Breadcrumb Bar (below header)</h3>
+<ul>
+<li>Small grid/apps icon + truncated course name + dropdown chevron (to switch courses)</li>
+<li>Example: "NCFE Level 3 Certificate in Asse... ▼"</li>
+</ul>
+
+<h3>1.5 Left Sidebar Navigation — 8 Icon Buttons</h3>
+<p>All icons only (no text labels). Tooltips appear on hover. "Open navigation" toggle at very top.</p>
+<table>
+<tr><th>#</th><th>Name (aria-label)</th><th>Icon Description</th><th>URL</th></tr>
+<tr><td>1</td><td>Home</td><td>House icon — purple/blue gradient</td><td>/c/{slug}?currentEnrollmentId={id}</td></tr>
+<tr><td>2</td><td>Assessment</td><td>Clipboard/checklist — green checkmark style</td><td>/c/{slug}/assessment?currentEnrollmentId={id}</td></tr>
+<tr><td>3</td><td>Progress</td><td>Circular arrow/progress — green</td><td>/c/{slug}/progress?currentEnrollmentId={id}</td></tr>
+<tr><td>4</td><td>Portfolio</td><td>Folder — yellow/orange gradient</td><td>/c/{slug}/portfolio?currentEnrollmentId={id}</td></tr>
+<tr><td colspan="4" style="background:#eee;text-align:center;font-style:italic">— thin separator divider line —</td></tr>
+<tr><td>5</td><td>Course Documents</td><td>Document/file pages — blue</td><td>/c/{slug}/course-documents?currentEnrollmentId={id}</td></tr>
+<tr><td>6</td><td>Personal Documents</td><td>Person + document — blue/teal</td><td>/c/{slug}/personal-documents?currentEnrollmentId={id}</td></tr>
+<tr><td>7</td><td>Materials</td><td>Open book — pink/red gradient</td><td>/c/{slug}/materials?currentEnrollmentId={id}</td></tr>
+<tr><td>8</td><td>Work Hours</td><td>Backpack/bag — blue gradient</td><td>/c/{slug}/work-hours?currentEnrollmentId={id}</td></tr>
+</table>
+
+<hr>
+<h2>2. HOME / OVERVIEW PAGE</h2>
+<p><strong>URL:</strong> <code>/c/{course-slug}?currentEnrollmentId={id}</code></p>
+<p><strong>Heading:</strong> Course name (e.g., "NCFE Level 3 Certificate in Assessing Vocational Achievement") | <strong>Subtitle:</strong> "Course overview and recent activity"</p>
+
+<h3>2.1 Members Section (full-width card, top)</h3>
+<ul>
+<li>Header icon: People/group icon</li>
+<li>Heading: "Members"</li>
+<li>Content: List of enrolled members OR "Unable to load members" error state</li>
+</ul>
+
+<h3>2.2 Three Columns (below Members) — each equal width</h3>
+
+<h4>Column 1: Recent Assessments</h4>
+<ul>
+<li>Icon: Clipboard icon | Heading: "Recent Assessments" | Arrow "→" button (navigates to assessments list)</li>
+<li>Each item: Assessment title (heading) + Learner name (person icon) + Date (calendar icon) + Status badge ("Published" — green pill) + Type code badge ("RA", "PD", "WP" etc.)</li>
+</ul>
+
+<h4>Column 2: Recent Evidence</h4>
+<ul>
+<li>Icon: Folder icon | Heading: "Recent Evidence" | Arrow "→" button</li>
+<li>Each item: File name (truncated) + Uploader name + Date + File size + File type badge (PDF, VND.OPENXMLFORMATS... etc.)</li>
+</ul>
+
+<h4>Column 3: Recent Materials</h4>
+<ul>
+<li>Icon: Book icon | Heading: "Recent Materials" | Arrow "→" button</li>
+<li>2-column sub-grid: File type icon + Name + Uploader + Time ago + Size + Type badge</li>
+</ul>
+
+<hr>
+<h2>3. ASSESSMENTS LIST PAGE</h2>
+<p><strong>URL:</strong> <code>/c/{slug}/assessment?currentEnrollmentId={id}</code></p>
+
+<h3>3.1 Page Header</h3>
+<ul>
+<li><strong>Left:</strong> "Assessments" large heading</li>
+<li><strong>Right:</strong> "+ Create an Assessment" button — teal/green rounded pill, with "+" icon prefix</li>
+<li><strong>Also:</strong> When in detail view, a green "+" circle button appears at the top of the list panel</li>
+</ul>
+
+<h3>3.2 Chronological Grouping with Count Badges</h3>
+<ul>
+<li>"LAST MONTH" — count badge on right (e.g., "2")</li>
+<li>"LAST 6 MONTHS" — count badge (e.g., "15")</li>
+<li>"AUGUST 2025", "JULY 2025" — older items by month/year</li>
+</ul>
+
+<h3>3.3 Assessment Card Structure (clickable link cards)</h3>
+<p>Multi-column responsive grid (up to 5 columns at full width). Card content:</p>
+<ul>
+<li>"Learner: {Full Name}" with person icon</li>
+<li>"Assessors: {Full Name}" with person icon</li>
+<li>Date (e.g., "14 Jan 2026")</li>
+<li>Assessment Type badge (colored pill — see table below)</li>
+<li>Criteria count with colored dot indicators: "N Criteria ● ● ● ● ●" (green filled = complete, gray = incomplete)</li>
+<li>"+N" badge for overflow criteria (e.g., "+4")</li>
+<li>"Evidence: 🔗 N" — only shown if evidence exists</li>
+<li>"Remarks: 💬 N" — only shown if remarks exist</li>
+</ul>
+<p>Assessment title appears as a heading <em>below</em> each card (outside the card boundary).</p>
+
+<h3>3.4 Assessment Type Badges &amp; Colors</h3>
+<table>
+<tr><th>Type</th><th>Badge Background</th><th>Short Code (on overview cards)</th></tr>
+<tr><td>Professional Discussion</td><td>Blue/teal</td><td>PD</td></tr>
+<tr><td>Reflective Account</td><td>Purple/violet</td><td>RA</td></tr>
+<tr><td>Work Product</td><td>Yellow/amber/orange</td><td>WP</td></tr>
+<tr><td>Written Assessment</td><td>Blue (darker shade)</td><td>WA</td></tr>
+<tr><td>Verbal Assessment</td><td>Blue (lighter variant)</td><td>VA</td></tr>
+<tr><td>Observation</td><td>Gray/neutral</td><td>O</td></tr>
+<tr><td>Witness Testimony</td><td>Gray/neutral</td><td>WT</td></tr>
+</table>
+
+<hr>
+<h2>4. ASSESSMENT DETAIL PAGE (Core Feature — Most Complex)</h2>
+<p><strong>URL:</strong> <code>/c/{slug}/assessment/{assessment-uuid}?currentEnrollmentId={id}</code></p>
+
+<h3>4.1 Sticky Toolbar at Top of Detail Panel</h3>
+<p>Elements left-to-right:</p>
+<ol>
+<li>📅 <strong>Date button</strong> — styled as pill with calendar icon, shows "January 14th, 2026" — opens date picker on click</li>
+<li><strong>Inline title input</strong> — editable text field, placeholder "Assessment title"</li>
+<li><strong>"T" icon button</strong> — typography/title action (exact function unclear from UI)</li>
+<li><strong>Person icon button</strong> — learner/member assignment (shows learner linked to assessment)</li>
+<li><strong>Shield icon button</strong> — IQA (Internal Quality Assurer) assignment</li>
+<li><strong>Graduation cap icon button</strong> — EQA (External Quality Assurer) assignment</li>
+<li><strong>Person/user icon button</strong> — Assessor assignment</li>
+<li><strong>"Saved" text</strong> — auto-save indicator (appears when document was last saved)</li>
+<li><strong>"Published" toggle button</strong> — dark/filled pill when published, toggle for visibility status</li>
+</ol>
+
+<h3>4.2 Section: Assessment Kind</h3>
+<p>Heading: "Assessment Kind" | Subheading: "Select the type of assessment being conducted"</p>
+<p>7 clickable type selection buttons in a 4+3 grid layout:</p>
+<table>
+<tr><th>Row</th><th>Type Name</th><th>Icon</th><th>Selected State</th></tr>
+<tr><td>Row 1</td><td>Observation</td><td>Eye/binoculars icon</td><td rowspan="7">Blue border outline + colored icon + small blue dot indicator in top-right corner</td></tr>
+<tr><td>Row 1</td><td>Professional Discussion</td><td>Chat/speech bubble icon</td></tr>
+<tr><td>Row 1</td><td>Reflective Account</td><td>Document/notebook icon</td></tr>
+<tr><td>Row 1</td><td>Verbal Assessment</td><td>Microphone icon</td></tr>
+<tr><td>Row 2</td><td>Written Assessment</td><td>Pen/document writing icon</td></tr>
+<tr><td>Row 2</td><td>Work Product</td><td>Folder icon</td></tr>
+<tr><td>Row 2</td><td>Witness Testimony</td><td>Person/silhouette icon</td></tr>
+</table>
+<p>Unselected state: Grayed-out icon + gray label text</p>
+
+<h3>4.3 Section: Plan Intent</h3>
+<ul>
+<li>Heading: "Plan Intent"</li>
+<li>Large rich/plain text area for assessor planning notes</li>
+<li>Empty by default</li>
+</ul>
+
+<h3>4.4 Section: Plan Implementation</h3>
+<ul>
+<li>Heading: "Plan Implementation"</li>
+<li>Large rich/plain text area — companion to Plan Intent</li>
+<li>Empty by default</li>
+</ul>
+
+<h3>4.5 Section: Evidence Mapping</h3>
+
+<h4>Sub-section A: Evidence Selector / Available Evidence</h4>
+<ul>
+<li>Helper text: "Select an evidence item to perform actions"</li>
+<li><strong>"↑ Upload Evidence"</strong> button — disabled with tooltip "You don't have permission to upload evidence for this assessment" when user lacks permission</li>
+<li>Filter/view controls row:
+<ul>
+<li><strong>"🔽 All Files"</strong> — dropdown filter by file type (with filter funnel icon)</li>
+<li><strong>"↕ Date Sort"</strong> — dropdown sort options (with sort arrow icon)</li>
+<li><strong>Grid view button</strong> — square-grid icon, dark background = active</li>
+<li><strong>List view button</strong> — three lines icon, alternate view</li>
+</ul>
+</li>
+<li>Available evidence files appear in this area in selected view mode</li>
+</ul>
+
+<h4>Sub-section B: Attached Evidence</h4>
+<ul>
+<li>Heading: "Attached Evidence" + count badge (e.g., "0 items", "3 items")</li>
+<li><strong>Empty state:</strong> Large paperclip icon + "No attached evidence" heading + "Select evidence from the Available section to attach it" subtext — displayed in a dashed-border rectangular area</li>
+<li><strong>Populated state:</strong> Files in grid, grouped by time (e.g., "Last 6 Months"). Each file card:
+<ul>
+<li>File type icon (🎵 audio for .m4a/.mp3, 📄 document for .docx, etc.)</li>
+<li>File name abbreviation (e.g., "J p2.m4a")</li>
+<li>File size (e.g., "3.6 MB")</li>
+<li>Relative date (e.g., "3 months ago")</li>
+<li>Row 1 (eye/view icon): Avatar initials circle + name — e.g., "JI Jyothi Iyer"</li>
+<li>Row 2 (download icon): Avatar initials circle + name — e.g., "RM Robert Mi..."</li>
+</ul>
+</li>
+</ul>
+
+<h3>4.6 Section: Criteria Mapping</h3>
+<ul>
+<li>Heading: "Criteria Mapping" + count badge (e.g., "3 mapped", "14 mapped")</li>
+<li><strong>"👁 View Full Curriculum"</strong> button — navigate to full curriculum view</li>
+</ul>
+<p>Hierarchical structure (expandable/collapsible):</p>
+<ul>
+<li><strong>Unit level</strong> (e.g., "Unit 03 - Assess vocational skills, knowledge and understanding") — toggle arrow for expand/collapse</li>
+<li><strong>Learning Outcome level</strong> (e.g., "1 - Be able to prepare assessments of vocational skills, knowledge and understanding")</li>
+<li><strong>Criterion row:</strong>
+<ul>
+<li>Criterion number badge (e.g., "1.1", "1.2", "2.1") — <strong>GREEN filled</strong> = mapped to this assessment; <strong>GRAY</strong> = not mapped</li>
+<li>Criterion description text (full text, may wrap multiple lines with detailed sub-bullets)</li>
+</ul>
+</li>
+</ul>
+<p>Clicking a criterion badge adds/removes it from this assessment's criteria mapping.</p>
+
+<h3>4.7 Section: Sign-off Status</h3>
+<ul>
+<li>Heading: "Sign-off Status"</li>
+<li>Status badge: "X/4 Complete" (e.g., "1/4 Complete", "2/4 Complete")</li>
+<li><strong>"Next: {Role}"</strong> button — indicates next sign-off required (e.g., "Next: Assessor", "Next: IQA")</li>
+<li>Horizontal progress bar (blue/colored fill, proportional to completion, spans full width)</li>
+</ul>
+<p><strong>Four sign-off role cards</strong> (vertical stack, connected with a vertical line):</p>
+<table>
+<tr><th>Step #</th><th>Role</th><th>Icon</th><th>Unsigned State</th><th>Signed State</th></tr>
+<tr><td>1</td><td>Assessor</td><td>Person silhouette</td><td>Clock icon + "Awaiting sign off" + "Pending" badge</td><td>Avatar circle (initials) + Full name + "DD/MM/YYYY at HH:MM" + "✓ Signed off" green badge + "×" remove button</td></tr>
+<tr><td>2</td><td>IQA</td><td>Shield icon</td><td>Same as Assessor</td><td>Same as Assessor</td></tr>
+<tr><td>3</td><td>EQA</td><td>Graduation cap icon</td><td>Same as Assessor</td><td>Same as Assessor</td></tr>
+<tr><td>4</td><td>Learner</td><td>Person/user icon</td><td>Same as Assessor</td><td>Same as Assessor — card has <strong>purple/violet highlight border</strong> when signed</td></tr>
+</table>
+<p>Footer: "Assessment requires additional signatures" | "X of 4 roles completed"</p>
+<div class="note"><strong>Important:</strong> "Published" status is separate from sign-off. Assessments can be published (visible) before all sign-offs complete.</div>
+
+<h3>4.8 Section: Remarks</h3>
+<p><strong>Existing Remarks Thread:</strong></p>
+<ul>
+<li>Avatar circle (2-char initials, e.g., "RM") + Full name + Role badge (e.g., "Assessor" — green pill) + Timestamp (DD/MM/YYYY HH:MM) + Remark text</li>
+</ul>
+<p><strong>"Add a remark" Composer:</strong></p>
+<ul>
+<li>Label: "Add a remark" with speech bubble icon</li>
+<li>Rich text toolbar: <strong>B</strong> (Bold) | <em>I</em> (Italic) | <u>U</u> (Underline) | Bullet List | Numbered List</li>
+<li>Large text input area below toolbar</li>
+<li><strong>"✈ Submit Remark"</strong> button (paper-plane icon + text, bottom-right)</li>
+</ul>
+
+<hr>
+<h2>5. PROGRESS PAGE</h2>
+<p><strong>URL:</strong> <code>/c/{slug}/progress?currentEnrollmentId={id}</code></p>
+
+<h3>5.1 Header / Summary Card</h3>
+<ul>
+<li>Heading: "Course Progress"</li>
+<li>"X of Y criteria completed" (e.g., "52 of 56 criteria completed")</li>
+<li><strong>"🔄 Refresh"</strong> button (circular arrow + "Refresh" text)</li>
+<li>Large percentage (e.g., "93%") displayed bold/colored on right</li>
+<li>"Complete" label below percentage</li>
+<li>Full-width horizontal progress bar (blue fill, gray track)</li>
+<li>"Progress" label + percentage below bar</li>
+</ul>
+
+<h3>5.2 Units Section</h3>
+<ul>
+<li>Heading: "Units" | Subtext: "{X} items"</li>
+<li>Each unit card: Unit title (truncated) + Unit number + "X of Y" criteria count + Percentage + Mini progress bar</li>
+</ul>
+<p><strong>Example units:</strong></p>
+<ul>
+<li>"Assess occupational competence in the work environment" — Unit 02 — 15/15 — 100%</li>
+<li>"Assess vocational skills, knowledge and understanding" — Unit 03 — 16/16 — 100%</li>
+<li>"Understanding the principles and practices of assessment" — Unit 01 — 21/25 — 84%</li>
+</ul>
+
+<hr>
+<h2>6. PORTFOLIO PAGE</h2>
+<p><strong>URL:</strong> <code>/c/{slug}/portfolio?currentEnrollmentId={id}</code> | <strong>Subtitle:</strong> "Your portfolio evidence"</p>
+
+<h3>6.1 Toolbar</h3>
+<ul>
+<li>Helper text: "Select an evidence item to perform actions" (left-aligned)</li>
+<li><strong>"↑ Upload Evidence"</strong> button (top-right area)</li>
+<li><strong>"All Status"</strong> dropdown filter</li>
+<li><strong>"All Files"</strong> dropdown filter</li>
+<li><strong>"Date Sort"</strong> dropdown</li>
+<li>Grid view toggle + List view toggle</li>
+</ul>
+
+<h3>6.2 Evidence Items — Grouped by Time Period</h3>
+<p>Groups: "Last Month", "Last 6 Months", "August 2025", "July 2025", etc.</p>
+<p>Each file card shows: File type icon + Full file name + File size + Relative date + Viewer (eye icon, avatar + name) + Uploader (download icon, avatar + name)</p>
+<p><strong>Supported file types:</strong> .docx, .pdf, .m4a, .mp3, .png (and others)</p>
+
+<hr>
+<h2>7. COURSE DOCUMENTS PAGE</h2>
+<p><strong>URL:</strong> <code>/c/{slug}/course-documents?currentEnrollmentId={id}</code></p>
+<ul>
+<li>Toolbar: "Select a file to see actions" + "All Files" filter + Grid/List toggles (NO upload button — read-only)</li>
+<li>"Folders" section: Folder cards with icon + name + "Folder" label + uploader initial circle + name + time ago</li>
+<li>Individual files below: file type icon + name + size + time ago</li>
+<li>Example folders: "Policies", "BRITEthink User Guide - Dual Language"</li>
+</ul>
+
+<hr>
+<h2>8. PERSONAL DOCUMENTS PAGE</h2>
+<p><strong>URL:</strong> <code>/c/{slug}/personal-documents?currentEnrollmentId={id}</code></p>
+<ul>
+<li>Toolbar: "Select a file to see actions" + "All Files" filter + <strong>"↑ Upload Files"</strong> button + Grid/List toggles</li>
+<li>Empty state: Large document icon + "No personal documents found" + "No personal documents are available yet."</li>
+</ul>
+
+<hr>
+<h2>9. MATERIALS PAGE</h2>
+<p><strong>URL:</strong> <code>/c/{slug}/materials?currentEnrollmentId={id}</code></p>
+<ul>
+<li>Toolbar: "Select a file to see actions" + "All Files" filter + Grid/List toggles (no upload)</li>
+<li>Folders: "Unit 1 - Knowledge", "Unit 3 - Vocational Assessments", "Unit 2 - Occupational Assessments"</li>
+<li>Individual files: images, PDFs in grid</li>
+</ul>
+
+<hr>
+<h2>10. WORK HOURS LOG PAGE</h2>
+<p><strong>URL:</strong> <code>/c/{slug}/work-hours?currentEnrollmentId={id}</code></p>
+<ul>
+<li>Heading: "Work Hours Log" (left) + <strong>"+ New"</strong> button (right, dark/black filled pill)</li>
+<li>Date navigation: "‹ Previous Day" button + current date (e.g., "Thu Feb 19") with calendar icon (opens date picker) + "Next Day ›" button</li>
+<li>Empty state: "No time logs for this date" centered</li>
+</ul>
+
+<hr>
+<h2>11. GLOBAL UI PATTERNS &amp; DESIGN SYSTEM</h2>
+
+<h3>11.1 Color Palette</h3>
+<table>
+<tr><th>Element</th><th>Color</th></tr>
+<tr><td>Primary brand / CTA buttons</td><td>Teal (#00C7B7 approx)</td></tr>
+<tr><td>Page background</td><td>Light gray (#F5F5F5 / #FAFAFA)</td></tr>
+<tr><td>Cards</td><td>White with subtle box-shadow/border</td></tr>
+<tr><td>Text primary</td><td>Dark gray / near black (#333)</td></tr>
+<tr><td>Text secondary / labels</td><td>Medium gray (#666)</td></tr>
+<tr><td>Published button</td><td>Dark gray/charcoal filled pill</td></tr>
+<tr><td>Success / Signed off</td><td>Green (#22C55E)</td></tr>
+<tr><td>Pending / awaiting</td><td>Gray with clock icon</td></tr>
+<tr><td>Learner sign-off card</td><td>Purple/violet border highlight</td></tr>
+<tr><td>Criteria mapped badge</td><td>Green filled (#22C55E)</td></tr>
+<tr><td>Progress bars</td><td>Blue (#3B82F6 approx)</td></tr>
+</table>
+
+<h3>11.2 Button Styles</h3>
+<ul>
+<li><strong>Primary CTA:</strong> Teal background, white text, rounded pill</li>
+<li><strong>Secondary:</strong> White background, border, rounded rectangle or pill</li>
+<li><strong>Icon buttons:</strong> Transparent background, icon only, hover highlight</li>
+<li><strong>Toggle active:</strong> Dark background (near black) on active state</li>
+<li><strong>Status badge buttons:</strong> Dark/charcoal filled (Published)</li>
+</ul>
+
+<h3>11.3 Avatar System</h3>
+<ul>
+<li>Circular background with user's 2-character initials</li>
+<li>Each user appears to have a consistent background color per user</li>
+<li>Used in: sign-off cards, remark threads, file uploader/viewer rows</li>
+</ul>
+
+<h3>11.4 Time Display Patterns</h3>
+<ul>
+<li><strong>Cards / lists:</strong> Relative time (e.g., "3 months ago", "about 1 month ago", "7 months ago")</li>
+<li><strong>Detail view:</strong> Absolute (e.g., "15/01/2026 at 09:59", "27/11/2025 at 11:30")</li>
+</ul>
+
+<h3>11.5 Empty States</h3>
+<table>
+<tr><th>Context</th><th>Empty State Display</th></tr>
+<tr><td>Members section</td><td>"Unable to load members" text</td></tr>
+<tr><td>Attached Evidence</td><td>Paperclip icon + "No attached evidence" + helper text in dashed border box</td></tr>
+<tr><td>Personal Documents</td><td>File icon (large, centered) + "No personal documents found" + subtext</td></tr>
+<tr><td>Work Hours</td><td>"No time logs for this date" centered text</td></tr>
+<tr><td>Remarks</td><td>"No remarks yet" plain text</td></tr>
+</table>
+
+<h3>11.6 Auto-Save &amp; Persistence</h3>
+<ul>
+<li>Assessment forms auto-save — "Saved" status indicator appears in sticky toolbar</li>
+<li>"Published" toggle allows controlling visibility independently from sign-off workflow</li>
+</ul>
+
+<h3>11.7 Notifications &amp; Floating Elements</h3>
+<ul>
+<li>Notifications region accessible via keyboard shortcut <code>Alt+T</code></li>
+<li>Floating chat button — bottom-right corner, dark circle with chat icon (labeled "Chat")</li>
+</ul>
+
+<hr>
+<h2>12. COMPLETE URL REFERENCE</h2>
+<p><strong>Base:</strong> <code>https://www.britethink.co</code></p>
+<p><strong>All URLs include:</strong> <code>?currentEnrollmentId={uuid}</code></p>
+<table>
+<tr><th>Page</th><th>URL Pattern</th></tr>
+<tr><td>Home / Overview</td><td>/c/{course-slug}</td></tr>
+<tr><td>Assessments List</td><td>/c/{course-slug}/assessment</td></tr>
+<tr><td>Assessment Detail</td><td>/c/{course-slug}/assessment/{assessment-uuid}</td></tr>
+<tr><td>Progress</td><td>/c/{course-slug}/progress</td></tr>
+<tr><td>Portfolio (Evidence)</td><td>/c/{course-slug}/portfolio</td></tr>
+<tr><td>Course Documents</td><td>/c/{course-slug}/course-documents</td></tr>
+<tr><td>Personal Documents</td><td>/c/{course-slug}/personal-documents</td></tr>
+<tr><td>Materials</td><td>/c/{course-slug}/materials</td></tr>
+<tr><td>Work Hours Log</td><td>/c/{course-slug}/work-hours</td></tr>
+</table>
+
+<hr>
+<h2>13. ASSESSMENT SIGN-OFF WORKFLOW (Detailed)</h2>
+
+<p>Sequential 4-role sign-off process:</p>
+<ol>
+<li><strong>Learner</strong> — confirms they participated in / agree with the assessment</li>
+<li><strong>Assessor</strong> — confirms the assessment is complete and accurate</li>
+<li><strong>IQA</strong> (Internal Quality Assurer) — internal quality check/verification</li>
+<li><strong>EQA</strong> (External Quality Assurer) — external regulatory verification</li>
+</ol>
+
+<p>Workflow status tracking:</p>
+<ul>
+<li>Progress badge: "X/4 Complete"</li>
+<li>"Next: {Role}" button shows whose action is needed</li>
+<li>Horizontal progress bar fills proportionally</li>
+<li>Each role card updates from "Pending" to "Signed off" state when that person signs</li>
+<li>Signed state includes: initials avatar + name + timestamp + green badge + remove option</li>
+</ul>
+
+<hr>
+<h2>14. KEY OBSERVATIONS FOR REPLICATION</h2>
+<ol>
+<li>The assessment detail view uses a <strong>split-pane layout</strong> — the list panel stays visible on the left while the detail form is on the right, allowing quick navigation between assessments without losing context.</li>
+<li>All evidence upload/management is permission-based — not all roles can upload (the "Upload Evidence" button is disabled with a tooltip explaining the restriction).</li>
+<li>The criteria mapping system uses a <strong>hierarchical Unit → Learning Outcome → Criterion</strong> structure, with visual color-coding (green = mapped, gray = not mapped).</li>
+<li>The sign-off system is <strong>sequential and role-based</strong> — each role has a specific order and visual indicator (different icons: person, shield, graduation cap).</li>
+<li>Evidence is shared across the system — the same evidence uploaded to the portfolio appears in the evidence mapping section of each assessment.</li>
+<li>The "Published" status controls visibility but is independent of the sign-off workflow completion.</li>
+<li>File cards consistently show <strong>two user rows</strong> — one for viewer (eye icon) and one for uploader/downloader (download icon).</li>
+<li>Time grouping is used consistently across all list views: "Last Month", "Last 6 Months", then by "Month Year" for older items.</li>
+</ol>
+
+</body></html>

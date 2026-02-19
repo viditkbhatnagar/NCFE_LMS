@@ -7,7 +7,7 @@ import Enrolment from '@/models/Enrolment';
 
 export async function POST(request: Request) {
   try {
-    const { session, error } = await withAuth(['assessor']);
+    const { session, error } = await withAuth(['assessor', 'student']);
     if (error) return error;
 
     const formData = await request.formData();
@@ -46,7 +46,12 @@ export async function POST(request: Request) {
         { status: 404 }
       );
     }
-    if (enrollment.assessorId?.toString() !== session!.user.id) {
+    const user = session!.user;
+    const isOwner =
+      user.role === 'assessor'
+        ? enrollment.assessorId?.toString() === user.id
+        : enrollment.userId?.toString() === user.id;
+    if (!isOwner) {
       return NextResponse.json(
         { success: false, error: 'Forbidden' },
         { status: 403 }

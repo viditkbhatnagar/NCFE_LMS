@@ -18,7 +18,7 @@ interface SimpleUnit {
 }
 
 export default function PortfolioPage() {
-  const { qualification, currentEnrollmentId } = useAssessorCourse();
+  const { qualification, currentEnrollmentId, userRole } = useAssessorCourse();
 
   const [evidence, setEvidence] = useState<PortfolioEvidence[]>([]);
   const [units, setUnits] = useState<SimpleUnit[]>([]);
@@ -98,10 +98,14 @@ export default function PortfolioPage() {
           />
         </svg>
         <p className="text-lg font-medium text-gray-500 mb-1">
-          Select a learner to view their portfolio
+          {userRole === 'student'
+            ? 'No enrollment found'
+            : 'Select a learner to view their portfolio'}
         </p>
         <p className="text-sm text-gray-400">
-          Use the learner dropdown in the top bar
+          {userRole === 'student'
+            ? 'You do not have an active enrollment for this course'
+            : 'Use the learner dropdown in the top bar'}
         </p>
       </div>
     );

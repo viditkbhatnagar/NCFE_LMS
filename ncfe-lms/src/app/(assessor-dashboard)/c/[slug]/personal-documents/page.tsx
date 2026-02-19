@@ -6,12 +6,14 @@ import FileManagerToolbar from '@/components/assessor/FileManagerToolbar';
 import FileBreadcrumbs from '@/components/assessor/FileBreadcrumbs';
 import FileGrid from '@/components/assessor/FileGrid';
 import FileListView from '@/components/assessor/FileListView';
+import FileUploadModal from '@/components/assessor/FileUploadModal';
 import type { FileItem, FolderBreadcrumb } from '@/types';
 
 type ViewMode = 'grid' | 'list';
 
 export default function PersonalDocumentsPage() {
-  const { selectedLearner } = useAssessorCourse();
+  const { selectedLearner, userRole } = useAssessorCourse();
+  const isStudent = userRole === 'student';
 
   const [items, setItems] = useState<FileItem[]>([]);
   const [loading, setLoading] = useState(false);
@@ -19,12 +21,17 @@ export default function PersonalDocumentsPage() {
   const [breadcrumbs, setBreadcrumbs] = useState<FolderBreadcrumb[]>([]);
   const [viewMode, setViewMode] = useState<ViewMode>('grid');
   const [fileTypeFilter, setFileTypeFilter] = useState('');
+  const [showUploadModal, setShowUploadModal] = useState(false);
 
   const fetchItems = useCallback(async () => {
-    if (!selectedLearner) return;
+    // Students don't need selectedLearner — API auto-scopes to own docs
+    if (!isStudent && !selectedLearner) return;
     setLoading(true);
     try {
-      const params = new URLSearchParams({ userId: selectedLearner._id });
+      const params = new URLSearchParams();
+      if (!isStudent && selectedLearner) {
+        params.set('userId', selectedLearner._id);
+      }
       if (currentFolderId) params.set('folderId', currentFolderId);
       if (fileTypeFilter) params.set('fileType', fileTypeFilter);
 
@@ -36,13 +43,15 @@ export default function PersonalDocumentsPage() {
     } finally {
       setLoading(false);
     }
-  }, [selectedLearner?._id, currentFolderId, fileTypeFilter]);
+  }, [isStudent, selectedLearner?._id, currentFolderId, fileTypeFilter]);
 
-  // Reset state when learner changes
+  // Reset state when learner changes (assessor only)
   useEffect(() => {
-    setItems([]);
-    setCurrentFolderId(null);
-    setBreadcrumbs([]);
+    if (!isStudent) {
+      setItems([]);
+      setCurrentFolderId(null);
+      setBreadcrumbs([]);
+    }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [selectedLearner?._id]);
 
@@ -70,8 +79,8 @@ export default function PersonalDocumentsPage() {
     }
   };
 
-  // No learner selected
-  if (!selectedLearner) {
+  // Assessor with no learner selected
+  if (!isStudent && !selectedLearner) {
     return (
       <div className="flex flex-col items-center justify-center h-full text-gray-400">
         <svg className="w-16 h-16 mb-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -93,6 +102,7 @@ export default function PersonalDocumentsPage() {
           onFileTypeChange={setFileTypeFilter}
           viewMode={viewMode}
           onViewModeChange={setViewMode}
+          onUpload={isStudent ? () => setShowUploadModal(true) : undefined}
         />
       </div>
 
@@ -125,6 +135,19 @@ export default function PersonalDocumentsPage() {
           <FileListView items={items} onItemClick={handleItemClick} />
         )}
       </div>
+
+      {/* Upload modal (student only) */}
+      {isStudent && (
+        <FileUploadModal
+          isOpen={showUploadModal}
+          onClose={() => setShowUploadModal(false)}
+          uploadEndpoint="/api/v2/personal-documents"
+          extraFields={{
+            folderId: currentFolderId || '',
+          }}
+          onUploaded={fetchItems}
+        />
+      )}
     </div>
   );
 }

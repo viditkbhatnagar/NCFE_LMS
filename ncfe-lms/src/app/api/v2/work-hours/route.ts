@@ -7,7 +7,7 @@ import Enrolment from '@/models/Enrolment';
 
 export async function GET(request: Request) {
   try {
-    const { session, error } = await withAuth(['assessor']);
+    const { session, error } = await withAuth(['assessor', 'student']);
     if (error) return error;
 
     const { searchParams } = new URL(request.url);
@@ -24,20 +24,34 @@ export async function GET(request: Request) {
 
     await dbConnect();
 
-    // Ownership check
+    const user = session!.user;
+
+    // Ownership check based on role
     if (enrollmentId) {
       const enrollment = await Enrolment.findById(enrollmentId).lean();
-      if (!enrollment || enrollment.assessorId?.toString() !== session!.user.id) {
+      const isOwner =
+        user.role === 'student'
+          ? enrollment?.userId?.toString() === user.id
+          : enrollment?.assessorId?.toString() === user.id;
+      if (!enrollment || !isOwner) {
         return NextResponse.json(
           { success: false, error: 'Forbidden' },
           { status: 403 }
         );
       }
     } else if (learnerId) {
-      const hasEnrollment = await Enrolment.exists({
-        userId: learnerId,
-        assessorId: session!.user.id,
-      });
+      // Students can only query their own learnerId
+      if (user.role === 'student' && learnerId !== user.id) {
+        return NextResponse.json(
+          { success: false, error: 'Forbidden' },
+          { status: 403 }
+        );
+      }
+      const enrollmentFilter =
+        user.role === 'student'
+          ? { userId: learnerId }
+          : { userId: learnerId, assessorId: user.id };
+      const hasEnrollment = await Enrolment.exists(enrollmentFilter);
       if (!hasEnrollment) {
         return NextResponse.json(
           { success: false, error: 'Forbidden' },
@@ -76,7 +90,7 @@ export async function GET(request: Request) {
 
 export async function POST(request: Request) {
   try {
-    const { session, error } = await withAuth(['assessor']);
+    const { session, error } = await withAuth(['assessor', 'student']);
     if (error) return error;
 
     const body = await request.json();
@@ -90,7 +104,9 @@ export async function POST(request: Request) {
 
     await dbConnect();
 
-    // Verify enrollment belongs to this assessor
+    const user = session!.user;
+
+    // Verify enrollment ownership based on role
     const enrollment = await Enrolment.findById(parsed.data.enrollmentId).lean();
     if (!enrollment) {
       return NextResponse.json(
@@ -98,16 +114,26 @@ export async function POST(request: Request) {
         { status: 404 }
       );
     }
-    if (enrollment.assessorId?.toString() !== session!.user.id) {
+
+    const isOwner =
+      user.role === 'student'
+        ? enrollment.userId?.toString() === user.id
+        : enrollment.assessorId?.toString() === user.id;
+    if (!isOwner) {
       return NextResponse.json(
         { success: false, error: 'Forbidden' },
         { status: 403 }
       );
     }
 
+    // Students can only log hours for themselves
+    const learnerId =
+      user.role === 'student' ? user.id : parsed.data.learnerId;
+
     const entry = await WorkHoursLog.create({
       ...parsed.data,
-      recordedBy: session!.user.id,
+      learnerId,
+      recordedBy: user.id,
     });
 
     const populated = await WorkHoursLog.findById(entry._id)

@@ -11,7 +11,7 @@ export async function GET(
 ) {
   try {
     const { id } = await params;
-    const { session, error } = await withAuth(['assessor']);
+    const { session, error } = await withAuth(['assessor', 'student']);
     if (error) return error;
 
     await dbConnect();
@@ -27,12 +27,14 @@ export async function GET(
       );
     }
 
-    // Verify the assessor has access to the qualification this document belongs to
+    // Verify access based on role
     const Enrolment = (await import('@/models/Enrolment')).default;
-    const hasAccess = await Enrolment.exists({
-      qualificationId: doc.qualificationId,
-      assessorId: session!.user.id,
-    });
+    const user = session!.user;
+    const enrollmentFilter =
+      user.role === 'student'
+        ? { qualificationId: doc.qualificationId, userId: user.id }
+        : { qualificationId: doc.qualificationId, assessorId: user.id };
+    const hasAccess = await Enrolment.exists(enrollmentFilter);
     if (!hasAccess) {
       return NextResponse.json(
         { success: false, error: 'Forbidden' },

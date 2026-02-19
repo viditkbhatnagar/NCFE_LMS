@@ -142,7 +142,7 @@ export default function SearchResultsDropdown({
               {results.assessments.map((a) => (
                 <button
                   key={a._id}
-                  onClick={() => navigateTo(`${basePath}/assessments`)}
+                  onClick={() => navigateTo(`${basePath}/assessment`)}
                   className="w-full flex items-center gap-3 px-4 py-2 hover:bg-gray-50 transition-colors text-left"
                 >
                   <div className="w-7 h-7 rounded-full bg-blue-100 flex items-center justify-center shrink-0">

@@ -14,7 +14,7 @@ export async function GET(
 ) {
   try {
     const { id } = await params;
-    const { session, error } = await withAuth(['assessor']);
+    const { session, error } = await withAuth(['assessor', 'student']);
     if (error) return error;
 
     await dbConnect();
@@ -31,7 +31,36 @@ export async function GET(
       );
     }
 
-    if (assessment.assessorId.toString() !== session!.user.id) {
+    const userId = session!.user.id;
+    const userRole = session!.user.role;
+
+    if (userRole === 'student') {
+      // learnerId may be a populated object or a raw ObjectId/string
+      const rawLearner = assessment.learnerId;
+      if (!rawLearner) {
+        return NextResponse.json(
+          { success: false, error: 'Assessment not found' },
+          { status: 404 }
+        );
+      }
+      const learnerId =
+        typeof rawLearner === 'string'
+          ? rawLearner
+          : (rawLearner as { _id?: { toString(): string } })._id?.toString() ??
+            rawLearner.toString();
+      if (learnerId !== userId) {
+        return NextResponse.json(
+          { success: false, error: 'Forbidden' },
+          { status: 403 }
+        );
+      }
+      if (assessment.status !== 'published') {
+        return NextResponse.json(
+          { success: false, error: 'Assessment not found' },
+          { status: 404 }
+        );
+      }
+    } else if (assessment.assessorId.toString() !== userId) {
       return NextResponse.json(
         { success: false, error: 'Forbidden' },
         { status: 403 }

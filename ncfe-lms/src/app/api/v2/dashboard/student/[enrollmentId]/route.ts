@@ -9,56 +9,46 @@ import Enrolment from '@/models/Enrolment';
 
 export async function GET(
   request: Request,
-  { params }: { params: Promise<{ qualificationId: string }> }
+  { params }: { params: Promise<{ enrollmentId: string }> }
 ) {
   try {
-    const { qualificationId } = await params;
-    const { session, error } = await withAuth(['assessor']);
+    const { enrollmentId } = await params;
+    const { session, error } = await withAuth(['student']);
     if (error) return error;
 
     await dbConnect();
 
-    const url = new URL(request.url);
-    const filterEnrollmentId = url.searchParams.get('enrollmentId');
-
-    // All enrollments for this assessor + qualification
-    const enrollments = await Enrolment.find({
-      assessorId: session!.user.id,
-      qualificationId,
-    })
+    // Verify enrollment belongs to this student
+    const enrollment = await Enrolment.findById(enrollmentId)
       .populate('userId', 'name email')
+      .populate('assessorId', 'name email')
       .lean();
 
-    // If filtering by a specific enrollment, scope queries to that enrollment only
-    const scopedEnrollments = filterEnrollmentId
-      ? enrollments.filter((e) => String(e._id) === filterEnrollmentId)
-      : enrollments;
-    const enrollmentIds = scopedEnrollments.map((e) => String(e._id));
-    const scopedLearnerIds = scopedEnrollments.map((e) => {
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const u = e.userId as any;
-      return u?._id;
-    }).filter(Boolean);
-
-    // Build assessment query — scope by learner when filtering
-    const assessmentQuery: Record<string, unknown> = {
-      assessorId: session!.user.id,
-      qualificationId,
-    };
-    if (filterEnrollmentId && scopedLearnerIds.length > 0) {
-      assessmentQuery.learnerId = { $in: scopedLearnerIds };
+    if (!enrollment) {
+      return NextResponse.json(
+        { success: false, error: 'Enrollment not found' },
+        { status: 404 }
+      );
+    }
+    if (enrollment.userId?._id?.toString() !== session!.user.id) {
+      return NextResponse.json(
+        { success: false, error: 'Forbidden' },
+        { status: 403 }
+      );
     }
 
+    const qualificationId = enrollment.qualificationId;
+
     // Run all queries in parallel
-    const [recentAssessments, recentEvidence, recentMaterials, otherAssessorEnrollments] =
+    const [recentAssessments, recentEvidence, recentMaterials, allEnrollments] =
       await Promise.all([
-        Assessment.find(assessmentQuery)
+        Assessment.find({ learnerId: session!.user.id, qualificationId })
           .populate('learnerId', 'name')
           .sort({ date: -1 })
           .limit(5)
           .lean(),
 
-        Evidence.find({ enrolmentId: { $in: enrollmentIds } })
+        Evidence.find({ enrolmentId: enrollmentId })
           .sort({ uploadedAt: -1 })
           .limit(5)
           .lean(),
@@ -68,17 +58,16 @@ export async function GET(
           .limit(5)
           .lean(),
 
-        Enrolment.find({
-          qualificationId,
-          assessorId: { $exists: true, $ne: new mongoose.Types.ObjectId(session!.user.id) },
-        })
+        // All enrollments for this qualification (to find fellow learners + assessors)
+        Enrolment.find({ qualificationId })
+          .populate('userId', 'name email')
           .populate('assessorId', 'name email')
           .lean(),
       ]);
 
-    // Build unique other-assessors with learner counts
+    // Build assessors with learner counts
     const assessorMap = new Map<string, { name: string; email: string; count: number }>();
-    for (const e of otherAssessorEnrollments) {
+    for (const e of allEnrollments) {
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       const a = e.assessorId as any;
       if (!a || !a._id) continue;
@@ -91,15 +80,6 @@ export async function GET(
       }
     }
 
-    // Build enrollment ID → learner name map for evidence
-    const enrollmentLearnerMap = new Map<string, string>();
-    for (const e of enrollments) {
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const u = e.userId as any;
-      enrollmentLearnerMap.set(String(e._id), u.name);
-    }
-
-    // Serialize response
     const assessors = Array.from(assessorMap.entries()).map(([id, v]) => ({
       _id: id,
       name: v.name,
@@ -107,19 +87,30 @@ export async function GET(
       learnerCount: v.count,
     }));
 
-    const learners = enrollments.map((e) => {
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const u = e.userId as any;
-      return {
-        _id: String(u._id),
-        name: u.name,
-        email: u.email,
-        enrollmentId: String(e._id),
-        status: e.status,
-        cohortId: e.cohortId || '',
-      };
-    });
+    // Fellow learners (exclude self)
+    const learners = allEnrollments
+      .filter((e) => {
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        const u = e.userId as any;
+        return u && String(u._id) !== session!.user.id;
+      })
+      .map((e) => {
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        const u = e.userId as any;
+        return {
+          _id: String(u._id),
+          name: u.name,
+          enrollmentId: String(e._id),
+          status: e.status,
+          cohortId: e.cohortId || '',
+        };
+      });
 
+    // Student's own name for evidence learnerName
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const studentName = (enrollment.userId as any)?.name || '';
+
+    // Serialize response
     const assessmentsOut = recentAssessments.map((a) => {
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       const l = a.learnerId as any;
@@ -139,7 +130,7 @@ export async function GET(
       label: ev.label,
       status: ev.status,
       uploadedAt: ev.uploadedAt ? new Date(ev.uploadedAt).toISOString() : '',
-      learnerName: enrollmentLearnerMap.get(String(ev.enrolmentId)) || '',
+      learnerName: studentName,
     }));
 
     const materialsOut = recentMaterials.map((m) => ({
@@ -161,7 +152,7 @@ export async function GET(
       },
     });
   } catch (err) {
-    console.error('Error fetching assessor dashboard:', err);
+    console.error('Error fetching student dashboard:', err);
     return NextResponse.json(
       { success: false, error: 'Internal server error' },
       { status: 500 }

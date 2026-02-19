@@ -1,15 +1,17 @@
 'use client';
 
 import Link from 'next/link';
-import type { DashboardAssessor, DashboardLearner } from '@/types';
+import type { DashboardAssessor, DashboardLearner, UserRole } from '@/types';
 
 interface Props {
   assessors: DashboardAssessor[];
   learners: DashboardLearner[];
   slug: string;
+  userRole?: UserRole;
 }
 
-export default function HomeLearnerCard({ assessors, learners, slug }: Props) {
+export default function HomeLearnerCard({ assessors, learners, slug, userRole = 'assessor' }: Props) {
+  const isStudent = userRole === 'student';
   return (
     <div className="bg-white rounded-[8px] border border-gray-200">
       {/* Card header */}
@@ -23,7 +25,7 @@ export default function HomeLearnerCard({ assessors, learners, slug }: Props) {
               d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0z"
             />
           </svg>
-          <h3 className="font-semibold text-gray-900">My Learners</h3>
+          <h3 className="font-semibold text-gray-900">{isStudent ? 'Course Members' : 'My Learners'}</h3>
         </div>
         <Link
           href={`/c/${slug}/members`}
@@ -40,10 +42,10 @@ export default function HomeLearnerCard({ assessors, learners, slug }: Props) {
         {/* My Learners column */}
         <div>
           <p className="text-xs font-semibold text-gray-400 uppercase tracking-wide mb-3">
-            Learners ({learners.length})
+            {isStudent ? 'Fellow Learners' : 'Learners'} ({learners.length})
           </p>
           {learners.length === 0 && (
-            <p className="text-sm text-gray-400">No learners assigned</p>
+            <p className="text-sm text-gray-400">{isStudent ? 'No fellow learners' : 'No learners assigned'}</p>
           )}
           <div className="space-y-2">
             {learners.slice(0, 6).map((learner) => {
@@ -80,10 +82,10 @@ export default function HomeLearnerCard({ assessors, learners, slug }: Props) {
         {/* Other Assessors column */}
         <div>
           <p className="text-xs font-semibold text-gray-400 uppercase tracking-wide mb-3">
-            Other Assessors ({assessors.length})
+            {isStudent ? 'My Assessors' : 'Other Assessors'} ({assessors.length})
           </p>
           {assessors.length === 0 && (
-            <p className="text-sm text-gray-400">No other assessors on this course</p>
+            <p className="text-sm text-gray-400">{isStudent ? 'No assessors assigned' : 'No other assessors on this course'}</p>
           )}
           <div className="space-y-2">
             {assessors.slice(0, 6).map((assessor) => {

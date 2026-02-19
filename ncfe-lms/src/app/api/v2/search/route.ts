@@ -8,7 +8,7 @@ import User from '@/models/User';
 
 export async function GET(request: Request) {
   try {
-    const { session, error } = await withAuth(['assessor']);
+    const { session, error } = await withAuth(['assessor', 'student']);
     if (error) return error;
 
     const { searchParams } = new URL(request.url);
@@ -28,10 +28,15 @@ export async function GET(request: Request) {
     const escaped = q.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
     const regex = new RegExp(escaped, 'i');
 
-    // Build enrollment filter for scoping
-    const enrollmentFilter: Record<string, unknown> = {
-      assessorId: session!.user.id,
-    };
+    const user = session!.user;
+
+    // Build enrollment filter based on role
+    const enrollmentFilter: Record<string, unknown> = {};
+    if (user.role === 'student') {
+      enrollmentFilter.userId = user.id;
+    } else {
+      enrollmentFilter.assessorId = user.id;
+    }
     if (qualificationId) enrollmentFilter.qualificationId = qualificationId;
 
     const myEnrollments = await Enrolment.find(enrollmentFilter)
@@ -39,26 +44,61 @@ export async function GET(request: Request) {
       .lean();
 
     const enrollmentIds = myEnrollments.map((e) => String(e._id));
-    const learnerIds = myEnrollments.map(
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      (e) => String((e.userId as any)._id)
-    );
+
+    // For students: find fellow learners + assessors on same qualification
+    // For assessors: find learners in their enrollments
+    let memberSearchIds: string[];
+    if (user.role === 'student') {
+      // Get qualification IDs from student's enrollments
+      const qualIds = [...new Set(myEnrollments.map((e) => String(e.qualificationId)))];
+
+      // Find all enrollments for those qualifications (to get fellow learners + assessors)
+      const allEnrollments = await Enrolment.find({
+        qualificationId: { $in: qualIds },
+      })
+        .populate('userId', 'name email')
+        .populate('assessorId', 'name email')
+        .lean();
+
+      const idSet = new Set<string>();
+      for (const e of allEnrollments) {
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        const learner = e.userId as any;
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        const assessor = e.assessorId as any;
+        if (learner?._id) idSet.add(String(learner._id));
+        if (assessor?._id) idSet.add(String(assessor._id));
+      }
+      // Remove self from member search
+      idSet.delete(user.id);
+      memberSearchIds = [...idSet];
+    } else {
+      memberSearchIds = myEnrollments.map(
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        (e) => String((e.userId as any)._id)
+      );
+    }
+
+    // Build assessment filter based on role
+    const assessmentFilter: Record<string, unknown> = { title: regex };
+    if (user.role === 'student') {
+      assessmentFilter.learnerId = user.id;
+    } else {
+      assessmentFilter.assessorId = user.id;
+    }
+    if (qualificationId) assessmentFilter.qualificationId = qualificationId;
 
     // Parallel searches
     const [matchedUsers, matchedAssessments, matchedEvidence] = await Promise.all([
       User.find({
-        _id: { $in: learnerIds },
+        _id: { $in: memberSearchIds },
         $or: [{ name: regex }, { email: regex }],
       })
         .select('name email role')
         .limit(5)
         .lean(),
 
-      Assessment.find({
-        assessorId: session!.user.id,
-        ...(qualificationId ? { qualificationId } : {}),
-        title: regex,
-      })
+      Assessment.find(assessmentFilter)
         .populate('learnerId', 'name')
         .sort({ date: -1 })
         .limit(5)

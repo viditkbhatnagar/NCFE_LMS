@@ -22,8 +22,24 @@ export const authConfig: NextAuthConfig = {
         nextUrl.pathname === '/c';
 
       if (isOnDashboard) {
-        if (isLoggedIn) return true;
-        return false; // Redirect to sign-in
+        if (!isLoggedIn) return false; // Redirect to sign-in
+
+        // Redirect assessors/students away from old dashboard to /c
+        const role = (auth?.user as Record<string, unknown> | undefined)?.role;
+        const isOldDashboard = nextUrl.pathname.startsWith('/dashboard') ||
+          nextUrl.pathname.startsWith('/courses') ||
+          nextUrl.pathname.startsWith('/portfolio') ||
+          nextUrl.pathname.startsWith('/assessor') ||
+          nextUrl.pathname.startsWith('/messages') ||
+          nextUrl.pathname.startsWith('/notifications') ||
+          nextUrl.pathname.startsWith('/submissions') ||
+          nextUrl.pathname.startsWith('/progress');
+
+        if (isOldDashboard && (role === 'assessor' || role === 'student')) {
+          return Response.redirect(new URL('/c', nextUrl));
+        }
+
+        return true;
       }
 
       // Redirect logged-in users from auth pages to dashboard
@@ -33,7 +49,7 @@ export const authConfig: NextAuthConfig = {
 
       if (isOnAuthPage && isLoggedIn) {
         const role = (auth?.user as Record<string, unknown> | undefined)?.role;
-        if (role === 'assessor') {
+        if (role === 'assessor' || role === 'student') {
           return Response.redirect(new URL('/c', nextUrl));
         }
         return Response.redirect(new URL('/dashboard', nextUrl));

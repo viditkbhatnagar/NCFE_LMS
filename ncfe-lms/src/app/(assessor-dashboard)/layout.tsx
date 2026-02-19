@@ -16,12 +16,12 @@ export default async function AssessorDashboardLayout({
 
   const user = session.user as { name?: string | null; role?: UserRole; id?: string };
 
-  if (user.role !== 'assessor') {
+  if (user.role !== 'assessor' && user.role !== 'student') {
     redirect('/dashboard');
   }
 
   return (
-    <AssessorDashboardShell userName={user.name || 'User'}>
+    <AssessorDashboardShell userName={user.name || 'User'} userRole={user.role || 'student'}>
       {children}
     </AssessorDashboardShell>
   );

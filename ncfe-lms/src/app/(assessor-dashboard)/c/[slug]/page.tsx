@@ -72,13 +72,22 @@ const BookIcon = (
 );
 
 export default function CourseHomePage() {
-  const { qualification } = useAssessorCourse();
+  const { qualification, userRole, currentEnrollmentId } = useAssessorCourse();
   const [data, setData] = useState<AssessorHomeDashboard | null>(null);
   const [loading, setLoading] = useState(true);
 
   const fetchData = useCallback(async () => {
+    let url: string;
+    if (userRole === 'student' && currentEnrollmentId) {
+      url = `/api/v2/dashboard/student/${currentEnrollmentId}`;
+    } else {
+      const params = new URLSearchParams();
+      if (currentEnrollmentId) params.set('enrollmentId', currentEnrollmentId);
+      const qs = params.toString();
+      url = `/api/v2/dashboard/assessor/${qualification._id}${qs ? `?${qs}` : ''}`;
+    }
     try {
-      const res = await fetch(`/api/v2/dashboard/assessor/${qualification._id}`);
+      const res = await fetch(url);
       if (!res.ok) throw new Error(`HTTP ${res.status}`);
       const json = await res.json();
       if (json.success) setData(json.data);
@@ -87,7 +96,7 @@ export default function CourseHomePage() {
     } finally {
       setLoading(false);
     }
-  }, [qualification._id]);
+  }, [qualification._id, userRole, currentEnrollmentId]);
 
   useEffect(() => {
     fetchData();
@@ -138,6 +147,7 @@ export default function CourseHomePage() {
         assessors={data?.assessors ?? []}
         learners={data?.learners ?? []}
         slug={slug}
+        userRole={userRole}
       />
 
       {/* Row 2: Recent Assessments + Recent Evidence — two columns */}
@@ -146,7 +156,7 @@ export default function CourseHomePage() {
           title="Recent Assessments"
           icon={ClipboardIcon}
           items={(data?.recentAssessments ?? []).map(assessmentToCardItem)}
-          linkHref={`${basePath}/assessments`}
+          linkHref={`${basePath}/assessment`}
           linkLabel="View all"
           emptyText="No assessments yet"
         />

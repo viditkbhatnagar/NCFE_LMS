@@ -16,7 +16,7 @@ interface ProgressData {
 }
 
 export default function ProgressPage() {
-  const { currentEnrollmentId } = useAssessorCourse();
+  const { currentEnrollmentId, userRole } = useAssessorCourse();
 
   const [data, setData] = useState<ProgressData | null>(null);
   const [loading, setLoading] = useState(false);
@@ -68,11 +68,15 @@ export default function ProgressPage() {
           />
         </svg>
         <p className="text-lg font-medium text-gray-500 mb-1">
-          Select a learner to view their progress
+          {userRole === 'student'
+            ? 'No enrollment found for this course'
+            : 'Select a learner to view their progress'}
         </p>
-        <p className="text-sm text-gray-400">
-          Use the learner dropdown in the top bar
-        </p>
+        {userRole !== 'student' && (
+          <p className="text-sm text-gray-400">
+            Use the learner dropdown in the top bar
+          </p>
+        )}
       </div>
     );
   }

@@ -15,7 +15,8 @@ function formatDateParam(date: Date): string {
 }
 
 export default function WorkHoursPage() {
-  const { currentEnrollmentId, selectedLearner } = useAssessorCourse();
+  const { currentEnrollmentId, selectedLearner, userRole } = useAssessorCourse();
+  const isStudent = userRole === 'student';
 
   const [entries, setEntries] = useState<WorkHourEntryItem[]>([]);
   const [loading, setLoading] = useState(false);
@@ -87,15 +88,22 @@ export default function WorkHoursPage() {
   const totalH = Math.floor(totalMinutes / 60);
   const totalM = totalMinutes % 60;
 
-  // No learner selected
+  // No enrollment / no learner selected
   if (!currentEnrollmentId) {
     return (
       <div className="flex flex-col items-center justify-center h-full text-gray-400">
         <svg className="w-16 h-16 mb-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
         </svg>
-        <p className="text-lg font-medium text-gray-500 mb-1">Select a learner to view work hours</p>
-        <p className="text-sm text-gray-400">Use the learner dropdown in the top bar</p>
+        <p className="text-lg font-medium text-gray-500 mb-1">
+          {isStudent ? 'No enrollment found' : 'Select a learner to view work hours'}
+        </p>
+        {!isStudent && (
+          <p className="text-sm text-gray-400">Use the learner dropdown in the top bar</p>
+        )}
+        {isStudent && (
+          <p className="text-sm text-gray-400">You do not have an active enrollment for this course</p>
+        )}
       </div>
     );
   }

@@ -22,7 +22,7 @@ export default async function CourseLayout({ children, params }: Props) {
 
   const user = session.user as { id?: string; role?: UserRole; name?: string | null };
 
-  if (user.role !== 'assessor') {
+  if (user.role !== 'assessor' && user.role !== 'student') {
     redirect('/dashboard');
   }
 
@@ -41,12 +41,19 @@ export default async function CourseLayout({ children, params }: Props) {
     );
   }
 
-  const enrollments = await Enrolment.find({
-    assessorId: user.id,
-    qualificationId: qualification._id,
-  })
-    .populate('userId', 'name email')
-    .lean();
+  const enrollments = user.role === 'student'
+    ? await Enrolment.find({
+        userId: user.id,
+        qualificationId: qualification._id,
+      })
+        .populate('userId', 'name email')
+        .lean()
+    : await Enrolment.find({
+        assessorId: user.id,
+        qualificationId: qualification._id,
+      })
+        .populate('userId', 'name email')
+        .lean();
 
   const serializedQualification = {
     _id: qualification._id.toString(),
@@ -71,6 +78,7 @@ export default async function CourseLayout({ children, params }: Props) {
     <AssessorCourseProvider
       qualification={serializedQualification}
       enrollments={serializedEnrollments}
+      userRole={user.role || 'student'}
     >
       <AssessorSubHeader />
       <div className="flex-1 overflow-y-auto">

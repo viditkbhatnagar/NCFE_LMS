@@ -14,12 +14,12 @@ export async function GET(
 ) {
   try {
     const { enrollmentId } = await params;
-    const { session, error } = await withAuth(['assessor']);
+    const { session, error } = await withAuth(['assessor', 'student']);
     if (error) return error;
 
     await dbConnect();
 
-    // Verify enrollment belongs to this assessor
+    // Verify enrollment belongs to this user
     const enrollment = await Enrolment.findById(enrollmentId).lean();
     if (!enrollment) {
       return NextResponse.json(
@@ -27,7 +27,13 @@ export async function GET(
         { status: 404 }
       );
     }
-    if (enrollment.assessorId?.toString() !== session!.user.id) {
+
+    const isOwner =
+      session!.user.role === 'student'
+        ? enrollment.userId?.toString() === session!.user.id
+        : enrollment.assessorId?.toString() === session!.user.id;
+
+    if (!isOwner) {
       return NextResponse.json(
         { success: false, error: 'Forbidden' },
         { status: 403 }

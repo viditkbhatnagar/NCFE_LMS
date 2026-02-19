@@ -220,12 +220,13 @@ export default function Sidebar({ role, userName }: SidebarProps) {
         collapsed ? 'w-16' : 'w-64'
       }`}
     >
-      {/* Logo */}
+      {/* Logos */}
       <div className="flex items-center justify-between p-4 border-b border-secondary-light">
         {!collapsed && (
-          <div>
-            <h1 className="text-lg font-bold text-primary">NCFE LMS</h1>
-            <p className="text-xs text-gray-400">{roleLabel[role]} Portal</p>
+          <div className="flex items-center gap-2">
+            <img src="/skillhub-logo.jpeg" alt="Skill Hub" className="h-8 w-auto object-contain" />
+            <div className="h-5 w-px bg-gray-500" />
+            <img src="/ncfe-logo.jpg" alt="NCFE" className="h-5 w-auto object-contain brightness-0 invert" />
           </div>
         )}
         <button

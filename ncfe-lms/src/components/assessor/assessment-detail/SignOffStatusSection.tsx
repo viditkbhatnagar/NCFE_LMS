@@ -1,15 +1,24 @@
 'use client';
 
 import { useState } from 'react';
-import type { SignOffEntry, SignOffRole } from '@/types';
+import type { SignOffEntry, SignOffRole, UserRole } from '@/types';
 
 interface SignOffStatusSectionProps {
   signOffs: SignOffEntry[];
   assessmentId: string;
   onSignOff: () => void;
+  userRole?: UserRole;
 }
 
 const ROLE_ORDER: SignOffRole[] = ['assessor', 'iqa', 'eqa', 'learner'];
+
+// Map user roles to their corresponding sign-off roles
+const SIGN_OFF_ROLE_FOR_USER: Record<string, SignOffRole | null> = {
+  assessor: 'assessor',
+  student: 'learner',
+  iqa: 'iqa',
+  admin: null,
+};
 
 const ROLE_CONFIG: Record<SignOffRole, { label: string; icon: React.ReactNode }> = {
   assessor: {
@@ -51,6 +60,7 @@ export default function SignOffStatusSection({
   signOffs,
   assessmentId,
   onSignOff,
+  userRole = 'assessor',
 }: SignOffStatusSectionProps) {
   const [signingOff, setSigningOff] = useState(false);
 
@@ -67,6 +77,9 @@ export default function SignOffStatusSection({
   const nextRole = ROLE_ORDER.find(
     (role) => signOffMap[role]?.status !== 'signed_off'
   );
+
+  // Determine which sign-off role the current user can perform
+  const mySignOffRole = SIGN_OFF_ROLE_FOR_USER[userRole] || null;
 
   const [signOffError, setSignOffError] = useState<string | null>(null);
 
@@ -136,7 +149,7 @@ export default function SignOffStatusSection({
             const isSigned = so?.status === 'signed_off';
             const isRejected = so?.status === 'rejected';
             const isNext = role === nextRole;
-            const canSign = role === 'assessor' && isNext;
+            const canSign = mySignOffRole === role && isNext;
 
             return (
               <div key={role} className="relative flex items-start gap-3">

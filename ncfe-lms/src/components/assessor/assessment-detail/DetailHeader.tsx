@@ -8,6 +8,7 @@ interface DetailHeaderProps {
   signOffs: SignOffEntry[];
   saveStatus: 'saved' | 'saving' | 'unsaved';
   status: AssessmentStatus;
+  readOnly?: boolean;
   onDateChange: (date: string) => void;
   onTitleChange: (title: string) => void;
   onPublish: () => void;
@@ -57,6 +58,7 @@ export default function DetailHeader({
   signOffs,
   saveStatus,
   status,
+  readOnly = false,
   onDateChange,
   onTitleChange,
   onPublish,
@@ -79,7 +81,7 @@ export default function DetailHeader({
           </svg>
         </button>
 
-        <div className="flex items-center gap-1 bg-gray-100 rounded-[6px] px-2 py-1 shrink-0">
+        <div className={`flex items-center gap-1 bg-gray-100 rounded-[6px] px-2 py-1 shrink-0 ${readOnly ? 'opacity-60' : ''}`}>
           <svg className="w-3.5 h-3.5 text-gray-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
           </svg>
@@ -87,6 +89,7 @@ export default function DetailHeader({
             type="date"
             value={dateValue}
             onChange={(e) => onDateChange(e.target.value)}
+            disabled={readOnly}
             className="bg-transparent text-xs text-gray-700 border-none outline-none w-[100px]"
           />
         </div>
@@ -95,8 +98,9 @@ export default function DetailHeader({
           type="text"
           value={title}
           onChange={(e) => onTitleChange(e.target.value)}
-          placeholder="Assessment title..."
-          className="flex-1 border-none outline-none text-sm font-semibold text-gray-900 placeholder:text-gray-400 bg-transparent"
+          placeholder={readOnly ? '' : 'Assessment title...'}
+          readOnly={readOnly}
+          className={`flex-1 border-none outline-none text-sm font-semibold text-gray-900 placeholder:text-gray-400 bg-transparent ${readOnly ? 'cursor-default' : ''}`}
         />
       </div>
 
@@ -128,45 +132,49 @@ export default function DetailHeader({
           })}
         </div>
 
-        {/* Save status */}
-        <span
-          className={`text-xs ${
-            saveStatus === 'saved'
-              ? 'text-green-600'
-              : saveStatus === 'saving'
-              ? 'text-yellow-600'
-              : 'text-gray-400'
-          }`}
-        >
-          {saveStatus === 'saved' ? 'Saved' : saveStatus === 'saving' ? 'Saving...' : 'Unsaved'}
-        </span>
+        {/* Save status — hidden for read-only */}
+        {!readOnly && (
+          <span
+            className={`text-xs ${
+              saveStatus === 'saved'
+                ? 'text-green-600'
+                : saveStatus === 'saving'
+                ? 'text-yellow-600'
+                : 'text-gray-400'
+            }`}
+          >
+            {saveStatus === 'saved' ? 'Saved' : saveStatus === 'saving' ? 'Saving...' : 'Unsaved'}
+          </span>
+        )}
 
         <div className="flex-1" />
 
         {/* Status button */}
-        {status === 'draft' ? (
+        {!readOnly && status === 'draft' ? (
           <button
             onClick={onPublish}
             className="px-3 py-1 bg-primary text-white rounded-[6px] text-xs font-medium hover:bg-primary/90 transition-colors"
           >
             Send to learner
           </button>
-        ) : (
+        ) : status === 'published' ? (
           <span className="px-3 py-1 bg-gray-100 text-gray-500 rounded-[6px] text-xs font-medium">
             Published
           </span>
-        )}
+        ) : null}
 
-        {/* Delete */}
-        <button
-          onClick={onDelete}
-          className="p-1.5 rounded-[6px] hover:bg-red-50 text-gray-400 hover:text-red-600 transition-colors"
-          title="Delete assessment"
-        >
-          <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
-          </svg>
-        </button>
+        {/* Delete — hidden for read-only */}
+        {!readOnly && (
+          <button
+            onClick={onDelete}
+            className="p-1.5 rounded-[6px] hover:bg-red-50 text-gray-400 hover:text-red-600 transition-colors"
+            title="Delete assessment"
+          >
+            <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+            </svg>
+          </button>
+        )}
       </div>
     </div>
   );

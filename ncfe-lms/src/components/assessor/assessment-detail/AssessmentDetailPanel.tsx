@@ -16,12 +16,15 @@ import type {
   EvidenceMapEntry,
   SignOffEntry,
   RemarkEntry,
+  UserRole,
 } from '@/types';
 
 interface AssessmentDetailPanelProps {
   assessmentId: string;
   qualificationId: string;
   enrollmentId: string;
+  readOnly?: boolean;
+  userRole?: UserRole;
   onClose: () => void;
   onDeleted: () => void;
   onUpdated: () => void;
@@ -41,6 +44,8 @@ export default function AssessmentDetailPanel({
   assessmentId,
   qualificationId,
   enrollmentId,
+  readOnly = false,
+  userRole = 'assessor',
   onClose,
   onDeleted,
   onUpdated,
@@ -62,6 +67,7 @@ export default function AssessmentDetailPanel({
   // Auto-save hook
   const { saveStatus, scheduleUpdate, setSaveStatus } = useAutoSave<EditState>({
     saveFn: async (updates) => {
+      if (readOnly) return true;
       try {
         const res = await fetch(`/api/v2/assessments/${assessmentId}`, {
           method: 'PUT',
@@ -113,14 +119,16 @@ export default function AssessmentDetailPanel({
     fetchDetail();
   }, [fetchDetail]);
 
-  // Field update handlers
+  // Field update handlers — no-op when readOnly
   const updateField = <K extends keyof EditState>(key: K, value: EditState[K]) => {
+    if (readOnly) return;
     setEditState((prev) => ({ ...prev, [key]: value }));
     scheduleUpdate({ [key]: value } as Partial<EditState>);
   };
 
   // Publish handler
   const handlePublish = async () => {
+    if (readOnly) return;
     try {
       const res = await fetch(`/api/v2/assessments/${assessmentId}`, {
         method: 'PUT',
@@ -140,6 +148,7 @@ export default function AssessmentDetailPanel({
 
   // Delete handler
   const handleDelete = async () => {
+    if (readOnly) return;
     if (!window.confirm('Delete this assessment? This action cannot be undone.')) return;
 
     try {
@@ -176,6 +185,7 @@ export default function AssessmentDetailPanel({
         signOffs={signOffs}
         saveStatus={saveStatus}
         status={editState.status}
+        readOnly={readOnly}
         onDateChange={(date) => updateField('date', date)}
         onTitleChange={(title) => updateField('title', title)}
         onPublish={handlePublish}
@@ -189,6 +199,7 @@ export default function AssessmentDetailPanel({
         <AssessmentKindSelector
           value={editState.assessmentKind}
           onChange={(kind) => updateField('assessmentKind', kind)}
+          readOnly={readOnly}
         />
 
         {/* Section 2: Plan Intent */}
@@ -196,6 +207,7 @@ export default function AssessmentDetailPanel({
           label="Plan Intent"
           value={editState.planIntent}
           onChange={(value) => updateField('planIntent', value)}
+          readOnly={readOnly}
         />
 
         {/* Section 3: Plan Implementation */}
@@ -203,6 +215,7 @@ export default function AssessmentDetailPanel({
           label="Plan Implementation"
           value={editState.planImplementation}
           onChange={(value) => updateField('planImplementation', value)}
+          readOnly={readOnly}
         />
 
         {/* Divider */}
@@ -214,6 +227,7 @@ export default function AssessmentDetailPanel({
           enrollmentId={enrollmentId}
           evidenceMap={evidenceMap}
           onUpdated={refreshDetail}
+          readOnly={readOnly}
         />
 
         {/* Section 5: Criteria Mapping */}
@@ -222,6 +236,7 @@ export default function AssessmentDetailPanel({
           qualificationId={qualificationId}
           criteriaMap={criteriaMap}
           onUpdated={refreshDetail}
+          readOnly={readOnly}
         />
 
         {/* Divider */}
@@ -232,6 +247,7 @@ export default function AssessmentDetailPanel({
           signOffs={signOffs}
           assessmentId={assessmentId}
           onSignOff={refreshDetail}
+          userRole={userRole}
         />
 
         {/* Divider */}

@@ -9,6 +9,7 @@ interface EvidenceMappingSectionProps {
   enrollmentId: string;
   evidenceMap: EvidenceMapEntry[];
   onUpdated: () => void;
+  readOnly?: boolean;
 }
 
 export default function EvidenceMappingSection({
@@ -16,6 +17,7 @@ export default function EvidenceMappingSection({
   enrollmentId,
   evidenceMap,
   onUpdated,
+  readOnly = false,
 }: EvidenceMappingSectionProps) {
   const [showModal, setShowModal] = useState(false);
 
@@ -47,12 +49,21 @@ export default function EvidenceMappingSection({
         <h3 className="text-xs font-semibold text-gray-500 uppercase tracking-wider">
           Evidence Mapping
         </h3>
-        <button
-          onClick={() => setShowModal(true)}
-          className="text-xs font-medium text-primary hover:text-primary/80 transition-colors"
-        >
-          + Add Evidence
-        </button>
+        {!readOnly ? (
+          <button
+            onClick={() => setShowModal(true)}
+            className="text-xs font-medium text-primary hover:text-primary/80 transition-colors"
+          >
+            + Add Evidence
+          </button>
+        ) : (
+          <span
+            className="text-xs font-medium text-gray-400 cursor-not-allowed"
+            title="Evidence mapping is managed by your assessor"
+          >
+            + Add Evidence
+          </span>
+        )}
       </div>
 
       {evidenceMap.length === 0 ? (
@@ -81,31 +92,35 @@ export default function EvidenceMappingSection({
                 </p>
                 <p className="text-xs text-gray-500 truncate">{item.evidenceId.fileType}</p>
               </div>
-              <button
-                onClick={() => handleRemove(item.evidenceId._id)}
-                className="p-1 text-gray-400 hover:text-red-500 transition-colors shrink-0"
-                title="Remove"
-              >
-                <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-                </svg>
-              </button>
+              {!readOnly && (
+                <button
+                  onClick={() => handleRemove(item.evidenceId._id)}
+                  className="p-1 text-gray-400 hover:text-red-500 transition-colors shrink-0"
+                  title="Remove"
+                >
+                  <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                  </svg>
+                </button>
+              )}
             </div>
           ))}
         </div>
       )}
 
-      <EvidenceSelectionModal
-        isOpen={showModal}
-        onClose={() => setShowModal(false)}
-        assessmentId={assessmentId}
-        enrollmentId={enrollmentId}
-        currentEvidenceIds={currentEvidenceIds}
-        onSaved={() => {
-          setShowModal(false);
-          onUpdated();
-        }}
-      />
+      {!readOnly && (
+        <EvidenceSelectionModal
+          isOpen={showModal}
+          onClose={() => setShowModal(false)}
+          assessmentId={assessmentId}
+          enrollmentId={enrollmentId}
+          currentEvidenceIds={currentEvidenceIds}
+          onSaved={() => {
+            setShowModal(false);
+            onUpdated();
+          }}
+        />
+      )}
     </div>
   );
 }

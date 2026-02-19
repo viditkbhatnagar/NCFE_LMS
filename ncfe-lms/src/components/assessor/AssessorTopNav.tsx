@@ -4,14 +4,15 @@ import { useState, useRef, useEffect } from 'react';
 import { signOut } from 'next-auth/react';
 import { useAssessorCourseOptional } from '@/contexts/AssessorCourseContext';
 import SearchResultsDropdown from './SearchResults';
-import type { SearchResults } from '@/types';
+import type { SearchResults, UserRole } from '@/types';
 
 interface Props {
   userName: string;
+  userRole?: UserRole;
   onMenuToggle?: () => void;
 }
 
-export default function AssessorTopNav({ userName, onMenuToggle }: Props) {
+export default function AssessorTopNav({ userName, userRole = 'assessor', onMenuToggle }: Props) {
   const [dropdownOpen, setDropdownOpen] = useState(false);
   const dropdownRef = useRef<HTMLDivElement>(null);
 
@@ -114,14 +115,11 @@ export default function AssessorTopNav({ userName, onMenuToggle }: Props) {
         </button>
       )}
 
-      {/* Logo */}
-      <div className="flex items-center gap-2 mr-4">
-        <div className="w-8 h-8 rounded-full bg-primary flex items-center justify-center">
-          <span className="text-white font-bold text-sm">b</span>
-        </div>
-        <span className="font-bold text-lg text-gray-900 hidden sm:inline">
-          BRITEthink
-        </span>
+      {/* Logos */}
+      <div className="flex items-center gap-3 mr-4">
+        <img src="/skillhub-logo.jpeg" alt="Skill Hub" className="h-8 w-auto object-contain" />
+        <div className="hidden sm:block h-6 w-px bg-gray-200" />
+        <img src="/ncfe-logo.jpg" alt="NCFE" className="hidden sm:block h-6 w-auto object-contain" />
       </div>
 
       {/* Search Bar */}
@@ -196,7 +194,7 @@ export default function AssessorTopNav({ userName, onMenuToggle }: Props) {
                 </div>
                 <div>
                   <p className="font-semibold text-gray-900">Hi, {userName}!</p>
-                  <p className="text-xs text-gray-500">Assessor</p>
+                  <p className="text-xs text-gray-500">{userRole === 'student' ? 'Learner' : 'Assessor'}</p>
                 </div>
               </div>
             </div>

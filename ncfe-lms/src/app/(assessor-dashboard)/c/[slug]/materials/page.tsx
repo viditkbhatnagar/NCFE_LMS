@@ -32,7 +32,8 @@ function materialToFileItem(m: MaterialItem): FileItem {
 }
 
 export default function MaterialsPage() {
-  const { qualification } = useAssessorCourse();
+  const { qualification, userRole } = useAssessorCourse();
+  const readOnly = userRole === 'student';
 
   const [items, setItems] = useState<FileItem[]>([]);
   const [loading, setLoading] = useState(true);
@@ -150,8 +151,8 @@ export default function MaterialsPage() {
           onCategoryChange={setCategoryFilter}
           viewMode={viewMode}
           onViewModeChange={setViewMode}
-          onUpload={() => setShowUploadModal(true)}
-          onNewFolder={() => setShowFolderModal(true)}
+          onUpload={readOnly ? undefined : () => setShowUploadModal(true)}
+          onNewFolder={readOnly ? undefined : () => setShowFolderModal(true)}
         />
       </div>
 
@@ -182,15 +183,15 @@ export default function MaterialsPage() {
           <FileGrid
             items={items}
             onItemClick={handleItemClick}
-            onRename={handleRename}
-            onDelete={handleDelete}
+            onRename={readOnly ? undefined : handleRename}
+            onDelete={readOnly ? undefined : handleDelete}
           />
         ) : (
           <FileListView
             items={items}
             onItemClick={handleItemClick}
-            onRename={handleRename}
-            onDelete={handleDelete}
+            onRename={readOnly ? undefined : handleRename}
+            onDelete={readOnly ? undefined : handleDelete}
           />
         )}
       </div>

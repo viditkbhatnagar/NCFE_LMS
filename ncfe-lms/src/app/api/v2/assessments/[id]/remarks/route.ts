@@ -11,7 +11,7 @@ export async function GET(
 ) {
   try {
     const { id } = await params;
-    const { session, error } = await withAuth(['assessor']);
+    const { session, error } = await withAuth(['assessor', 'student']);
     if (error) return error;
 
     await dbConnect();
@@ -23,7 +23,16 @@ export async function GET(
         { status: 404 }
       );
     }
-    if (assessment.assessorId.toString() !== session!.user.id) {
+    const userId = session!.user.id;
+    const userRole = session!.user.role;
+    if (userRole === 'student') {
+      if (assessment.learnerId.toString() !== userId) {
+        return NextResponse.json(
+          { success: false, error: 'Forbidden' },
+          { status: 403 }
+        );
+      }
+    } else if (assessment.assessorId.toString() !== userId) {
       return NextResponse.json(
         { success: false, error: 'Forbidden' },
         { status: 403 }
@@ -51,7 +60,7 @@ export async function POST(
 ) {
   try {
     const { id } = await params;
-    const { session, error } = await withAuth(['assessor']);
+    const { session, error } = await withAuth(['assessor', 'student']);
     if (error) return error;
 
     const body = await request.json();
@@ -76,7 +85,16 @@ export async function POST(
         { status: 404 }
       );
     }
-    if (assessment.assessorId.toString() !== session!.user.id) {
+    const userId = session!.user.id;
+    const userRole = session!.user.role;
+    if (userRole === 'student') {
+      if (assessment.learnerId.toString() !== userId) {
+        return NextResponse.json(
+          { success: false, error: 'Forbidden' },
+          { status: 403 }
+        );
+      }
+    } else if (assessment.assessorId.toString() !== userId) {
       return NextResponse.json(
         { success: false, error: 'Forbidden' },
         { status: 403 }

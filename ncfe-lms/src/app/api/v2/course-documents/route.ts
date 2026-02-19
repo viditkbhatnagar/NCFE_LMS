@@ -4,10 +4,11 @@ import { withAuth } from '@/lib/route-guard';
 import { uploadFile } from '@/lib/upload';
 import { folderCreateSchema } from '@/lib/validators';
 import CourseDoc from '@/models/CourseDocument';
+import Enrolment from '@/models/Enrolment';
 
 export async function GET(request: Request) {
   try {
-    const { session, error } = await withAuth(['assessor']);
+    const { session, error } = await withAuth(['assessor', 'student']);
     if (error) return error;
 
     const { searchParams } = new URL(request.url);
@@ -23,6 +24,21 @@ export async function GET(request: Request) {
     }
 
     await dbConnect();
+
+    // Verify access based on role
+    const user = session!.user;
+    if (user.role === 'student') {
+      const hasEnrollment = await Enrolment.exists({
+        userId: user.id,
+        qualificationId,
+      });
+      if (!hasEnrollment) {
+        return NextResponse.json(
+          { success: false, error: 'Forbidden' },
+          { status: 403 }
+        );
+      }
+    }
 
     const query: Record<string, unknown> = {
       qualificationId,

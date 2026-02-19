@@ -9,8 +9,10 @@ import { groupByTimePeriod } from '@/lib/assessment-utils';
 import type { AssessmentListItem } from '@/types';
 
 export default function AssessmentsPage() {
-  const { qualification, enrollments, currentEnrollmentId, selectedLearner } =
+  const { qualification, enrollments, currentEnrollmentId, selectedLearner, userRole } =
     useAssessorCourse();
+
+  const readOnly = userRole === 'student';
 
   const [assessments, setAssessments] = useState<AssessmentListItem[]>([]);
   const [loading, setLoading] = useState(true);
@@ -21,10 +23,16 @@ export default function AssessmentsPage() {
   const fetchAssessments = useCallback(async () => {
     setLoading(true);
     try {
-      const params = new URLSearchParams({ qualificationId: qualification._id });
-      if (currentEnrollmentId) params.set('enrollmentId', currentEnrollmentId);
+      let url: string;
+      if (readOnly) {
+        url = `/api/v2/student/assessments?qualificationId=${qualification._id}`;
+      } else {
+        const params = new URLSearchParams({ qualificationId: qualification._id });
+        if (currentEnrollmentId) params.set('enrollmentId', currentEnrollmentId);
+        url = `/api/v2/assessments?${params}`;
+      }
 
-      const res = await fetch(`/api/v2/assessments?${params}`);
+      const res = await fetch(url);
       const json = await res.json();
       if (json.success) {
         setAssessments(json.data);
@@ -34,7 +42,7 @@ export default function AssessmentsPage() {
     } finally {
       setLoading(false);
     }
-  }, [qualification._id, currentEnrollmentId]);
+  }, [qualification._id, currentEnrollmentId, readOnly]);
 
   useEffect(() => {
     fetchAssessments();
@@ -94,13 +102,15 @@ export default function AssessmentsPage() {
         {/* Header */}
         <div className="flex items-center justify-between mb-6">
           <h1 className="text-2xl font-bold text-gray-900">Assessments</h1>
-          <button
-            onClick={handleCreate}
-            disabled={creating}
-            className="px-4 py-2 bg-primary text-white rounded-[6px] text-sm font-medium hover:bg-primary/90 transition-colors disabled:opacity-50"
-          >
-            {creating ? 'Creating...' : '+ Create an Assessment'}
-          </button>
+          {!readOnly && (
+            <button
+              onClick={handleCreate}
+              disabled={creating}
+              className="px-4 py-2 bg-primary text-white rounded-[6px] text-sm font-medium hover:bg-primary/90 transition-colors disabled:opacity-50"
+            >
+              {creating ? 'Creating...' : '+ Create an Assessment'}
+            </button>
+          )}
         </div>
 
         {/* Loading state */}
@@ -121,17 +131,23 @@ export default function AssessmentsPage() {
                 d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2"
               />
             </svg>
-            <p className="text-lg font-medium text-gray-500 mb-2">No assessments yet</p>
-            <p className="text-sm text-gray-400 mb-4">
-              Create your first assessment to get started
+            <p className="text-lg font-medium text-gray-500 mb-2">
+              {readOnly ? 'No assessments available' : 'No assessments yet'}
             </p>
-            <button
-              onClick={handleCreate}
-              disabled={creating}
-              className="px-4 py-2 bg-primary text-white rounded-[6px] text-sm font-medium hover:bg-primary/90 transition-colors disabled:opacity-50"
-            >
-              + Create an Assessment
-            </button>
+            <p className="text-sm text-gray-400 mb-4">
+              {readOnly
+                ? 'Your assessor has not yet created any assessments for you'
+                : 'Create your first assessment to get started'}
+            </p>
+            {!readOnly && (
+              <button
+                onClick={handleCreate}
+                disabled={creating}
+                className="px-4 py-2 bg-primary text-white rounded-[6px] text-sm font-medium hover:bg-primary/90 transition-colors disabled:opacity-50"
+              >
+                + Create an Assessment
+              </button>
+            )}
           </div>
         )}
 
@@ -164,6 +180,8 @@ export default function AssessmentsPage() {
             assessmentId={selectedAssessmentId}
             qualificationId={qualification._id}
             enrollmentId={panelEnrollmentId}
+            readOnly={readOnly}
+            userRole={userRole}
             onClose={() => setSelectedAssessmentId(null)}
             onDeleted={handleDeleted}
             onUpdated={fetchAssessments}
@@ -172,14 +190,16 @@ export default function AssessmentsPage() {
       )}
 
       {/* Learner selection modal */}
-      <LearnerSelectionModal
-        isOpen={showLearnerModal}
-        onClose={() => setShowLearnerModal(false)}
-        enrollments={enrollments}
-        onSelect={(enrollment) => {
-          createAssessment(enrollment._id, enrollment.userId._id);
-        }}
-      />
+      {!readOnly && (
+        <LearnerSelectionModal
+          isOpen={showLearnerModal}
+          onClose={() => setShowLearnerModal(false)}
+          enrollments={enrollments}
+          onSelect={(enrollment) => {
+            createAssessment(enrollment._id, enrollment.userId._id);
+          }}
+        />
+      )}
     </div>
   );
 }

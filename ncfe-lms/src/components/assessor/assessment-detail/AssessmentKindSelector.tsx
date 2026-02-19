@@ -6,6 +6,7 @@ import type { AssessmentKind } from '@/types';
 interface AssessmentKindSelectorProps {
   value: AssessmentKind | null;
   onChange: (kind: AssessmentKind) => void;
+  readOnly?: boolean;
 }
 
 const KIND_ICONS: Record<AssessmentKind, React.ReactNode> = {
@@ -57,7 +58,7 @@ const KINDS: AssessmentKind[] = [
   'witness_testimony',
 ];
 
-export default function AssessmentKindSelector({ value, onChange }: AssessmentKindSelectorProps) {
+export default function AssessmentKindSelector({ value, onChange, readOnly = false }: AssessmentKindSelectorProps) {
   return (
     <div className="space-y-2">
       <h3 className="text-xs font-semibold text-gray-500 uppercase tracking-wider">Assessment Type</h3>
@@ -69,12 +70,13 @@ export default function AssessmentKindSelector({ value, onChange }: AssessmentKi
           return (
             <button
               key={kind}
-              onClick={() => onChange(kind)}
+              onClick={() => !readOnly && onChange(kind)}
+              disabled={readOnly && !isSelected}
               className={`flex items-center gap-1.5 px-2.5 py-2 rounded-[6px] border text-xs font-medium transition-all ${
                 isSelected
                   ? 'border-blue-500 text-blue-600 bg-blue-50'
                   : 'border-gray-200 text-gray-600 hover:border-gray-300 hover:bg-gray-50'
-              }`}
+              } ${readOnly ? 'cursor-default' : ''} ${readOnly && !isSelected ? 'opacity-40' : ''}`}
             >
               <span className={isSelected ? 'text-blue-500' : 'text-gray-400'}>
                 {KIND_ICONS[kind]}

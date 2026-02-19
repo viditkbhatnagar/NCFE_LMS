@@ -2,6 +2,7 @@
 
 import { createContext, useContext, useState, useEffect, type ReactNode } from 'react';
 import { useSearchParams, useRouter, usePathname } from 'next/navigation';
+import type { UserRole } from '@/types';
 
 interface Learner {
   _id: string;
@@ -30,6 +31,7 @@ interface AssessorCourseContextType {
   currentEnrollmentId: string | null;
   selectedLearner: Learner | null;
   setCurrentEnrollmentId: (id: string) => void;
+  userRole: UserRole;
 }
 
 const AssessorCourseContext = createContext<AssessorCourseContextType | null>(null);
@@ -50,34 +52,44 @@ export function useAssessorCourseOptional(): AssessorCourseContextType | null {
 interface ProviderProps {
   qualification: Qualification;
   enrollments: Enrollment[];
+  userRole: UserRole;
   children: ReactNode;
 }
 
-export function AssessorCourseProvider({ qualification, enrollments, children }: ProviderProps) {
+export function AssessorCourseProvider({ qualification, enrollments, userRole, children }: ProviderProps) {
   const searchParams = useSearchParams();
   const router = useRouter();
   const pathname = usePathname();
 
+  const paramEnrollmentId = searchParams.get('currentEnrollmentId');
+  // Default to null (All Learners) for assessors, first enrollment for students
   const initialEnrollmentId =
-    searchParams.get('currentEnrollmentId') ||
-    (enrollments.length > 0 ? enrollments[0]._id : null);
+    paramEnrollmentId ||
+    (userRole === 'student' && enrollments.length > 0 ? enrollments[0]._id : null);
 
   const [currentEnrollmentId, setCurrentEnrollmentIdState] = useState<string | null>(initialEnrollmentId);
 
   const selectedLearner = enrollments.find((e) => e._id === currentEnrollmentId)?.userId || null;
 
   const setCurrentEnrollmentId = (id: string) => {
-    setCurrentEnrollmentIdState(id);
+    const enrollId = id || null; // empty string → null (All Learners)
+    setCurrentEnrollmentIdState(enrollId);
     const params = new URLSearchParams(searchParams.toString());
-    params.set('currentEnrollmentId', id);
-    router.replace(`${pathname}?${params.toString()}`);
+    if (enrollId) {
+      params.set('currentEnrollmentId', enrollId);
+    } else {
+      params.delete('currentEnrollmentId');
+    }
+    const qs = params.toString();
+    router.replace(qs ? `${pathname}?${qs}` : pathname);
   };
 
   useEffect(() => {
-    if (!currentEnrollmentId && enrollments.length > 0) {
+    // Only auto-select first enrollment for students (assessors default to "All Learners")
+    if (userRole === 'student' && !currentEnrollmentId && enrollments.length > 0) {
       setCurrentEnrollmentIdState(enrollments[0]._id);
     }
-  }, [enrollments, currentEnrollmentId]);
+  }, [enrollments, currentEnrollmentId, userRole]);
 
   return (
     <AssessorCourseContext.Provider
@@ -87,6 +99,7 @@ export function AssessorCourseProvider({ qualification, enrollments, children }:
         currentEnrollmentId,
         selectedLearner,
         setCurrentEnrollmentId,
+        userRole,
       }}
     >
       {children}

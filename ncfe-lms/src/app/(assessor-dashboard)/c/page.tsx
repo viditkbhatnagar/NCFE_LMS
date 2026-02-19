@@ -1,17 +1,23 @@
 'use client';
 
 import { useState, useEffect } from 'react';
+import { useSession } from 'next-auth/react';
 import Link from 'next/link';
-import type { AssessorCourse } from '@/types';
+import type { AssessorCourse, UserRole } from '@/types';
 
 export default function CourseSelector() {
+  const { data: session } = useSession();
+  const userRole = (session?.user as { role?: UserRole } | undefined)?.role || 'student';
   const [courses, setCourses] = useState<AssessorCourse[]>([]);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     async function fetchCourses() {
       try {
-        const res = await fetch('/api/v2/assessor/courses');
+        const endpoint = userRole === 'student'
+          ? '/api/v2/student/courses'
+          : '/api/v2/assessor/courses';
+        const res = await fetch(endpoint);
         const json = await res.json();
         if (json.success) setCourses(json.data);
       } catch (err) {
@@ -20,8 +26,8 @@ export default function CourseSelector() {
         setLoading(false);
       }
     }
-    fetchCourses();
-  }, []);
+    if (session) fetchCourses();
+  }, [session, userRole]);
 
   if (loading) {
     return (
@@ -51,7 +57,9 @@ export default function CourseSelector() {
               d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332.477-4.5 1.253"
             />
           </svg>
-          <p className="text-lg font-medium text-gray-500">No courses assigned</p>
+          <p className="text-lg font-medium text-gray-500">
+            {userRole === 'student' ? 'No courses enrolled' : 'No courses assigned'}
+          </p>
           <p className="text-sm text-gray-400 mt-1">
             Contact your administrator to get enrolled
           </p>
@@ -87,9 +95,11 @@ export default function CourseSelector() {
               {course.title}
             </h3>
             <p className="text-xs text-gray-400 mb-3">{course.code}</p>
-            <p className="text-sm text-gray-500">
-              {course.learnerCount} learner{course.learnerCount !== 1 ? 's' : ''}
-            </p>
+            {userRole !== 'student' && (
+              <p className="text-sm text-gray-500">
+                {course.learnerCount} learner{course.learnerCount !== 1 ? 's' : ''}
+              </p>
+            )}
           </Link>
         ))}
       </div>

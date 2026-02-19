@@ -1,43 +1,55 @@
 import { NextResponse } from 'next/server';
 import dbConnect from '@/lib/db';
 import { withAuth } from '@/lib/route-guard';
+import { uploadFile } from '@/lib/upload';
 import PersonalDocument from '@/models/PersonalDocument';
 import Enrolment from '@/models/Enrolment';
 
 export async function GET(request: Request) {
   try {
-    const { session, error } = await withAuth(['assessor']);
+    const { session, error } = await withAuth(['assessor', 'student']);
     if (error) return error;
 
     const { searchParams } = new URL(request.url);
-    const userId = searchParams.get('userId');
     const folderId = searchParams.get('folderId');
     const fileType = searchParams.get('fileType');
 
-    if (!userId) {
-      return NextResponse.json(
-        { success: false, error: 'userId is required' },
-        { status: 400 }
-      );
-    }
-
     await dbConnect();
 
-    // Verify this learner belongs to the assessor's enrollments
-    const enrollment = await Enrolment.findOne({
-      userId,
-      assessorId: session!.user.id,
-    }).lean();
+    const user = session!.user;
+    let targetUserId: string;
 
-    if (!enrollment) {
-      return NextResponse.json(
-        { success: false, error: 'Learner not found in your enrollments' },
-        { status: 403 }
-      );
+    if (user.role === 'student') {
+      // Students always see their own documents
+      targetUserId = user.id;
+    } else {
+      // Assessors must specify which learner's docs to view
+      const userId = searchParams.get('userId');
+      if (!userId) {
+        return NextResponse.json(
+          { success: false, error: 'userId is required' },
+          { status: 400 }
+        );
+      }
+
+      // Verify this learner belongs to the assessor's enrollments
+      const enrollment = await Enrolment.findOne({
+        userId,
+        assessorId: user.id,
+      }).lean();
+
+      if (!enrollment) {
+        return NextResponse.json(
+          { success: false, error: 'Learner not found in your enrollments' },
+          { status: 403 }
+        );
+      }
+
+      targetUserId = userId;
     }
 
     const query: Record<string, unknown> = {
-      userId,
+      userId: targetUserId,
       folderId: folderId || null,
     };
 
@@ -65,6 +77,92 @@ export async function GET(request: Request) {
     return NextResponse.json(
       { success: false, error: 'Internal server error' },
       { status: 500 }
+    );
+  }
+}
+
+export async function POST(request: Request) {
+  try {
+    const { session, error } = await withAuth(['assessor', 'student']);
+    if (error) return error;
+
+    await dbConnect();
+
+    const formData = await request.formData();
+    const file = formData.get('file') as File | null;
+    const folderId = formData.get('folderId') as string | null;
+
+    if (!file) {
+      return NextResponse.json(
+        { success: false, error: 'No file provided' },
+        { status: 400 }
+      );
+    }
+
+    const user = session!.user;
+    let targetUserId: string;
+
+    if (user.role === 'student') {
+      targetUserId = user.id;
+    } else {
+      const userId = formData.get('userId') as string | null;
+      if (!userId) {
+        return NextResponse.json(
+          { success: false, error: 'userId is required' },
+          { status: 400 }
+        );
+      }
+
+      // Verify this learner belongs to the assessor's enrollments
+      const enrollment = await Enrolment.findOne({
+        userId,
+        assessorId: user.id,
+      }).lean();
+
+      if (!enrollment) {
+        return NextResponse.json(
+          { success: false, error: 'Forbidden' },
+          { status: 403 }
+        );
+      }
+
+      targetUserId = userId;
+    }
+
+    const { filePath, fileName, fileType, fileSize } = await uploadFile(
+      file,
+      targetUserId
+    );
+
+    const doc = await PersonalDocument.create({
+      userId: targetUserId,
+      fileName,
+      fileUrl: filePath,
+      fileType,
+      fileSize,
+      folderId: folderId || null,
+      isFolder: false,
+      uploadedBy: user.id,
+    });
+
+    const populated = await PersonalDocument.findById(doc._id)
+      .populate('uploadedBy', 'name email')
+      .lean();
+
+    return NextResponse.json(
+      { success: true, data: populated },
+      { status: 201 }
+    );
+  } catch (err: unknown) {
+    console.error('Error creating personal document:', err);
+    const isValidation =
+      err instanceof Error &&
+      (err.message.includes('50MB') || err.message.includes('not allowed'));
+    const message = isValidation ? err.message : 'Internal server error';
+    const status = isValidation ? 400 : 500;
+    return NextResponse.json(
+      { success: false, error: message },
+      { status }
     );
   }
 }
