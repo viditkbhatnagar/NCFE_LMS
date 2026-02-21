@@ -22,11 +22,10 @@ export default async function DashboardPage() {
           Welcome back, {name}
         </h1>
         <p className="text-text-secondary mt-1">
-          Here&apos;s an overview of your {role === 'student' ? 'learning' : 'quality assurance'} activity
+          Here&apos;s an overview of your {role === 'iqa' ? 'quality assurance' : 'admin'} activity
         </p>
       </div>
 
-      {role === 'student' && <StudentDashboardContent />}
       {role === 'iqa' && <IQADashboardContent />}
     </div>
   );
