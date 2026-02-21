@@ -3,7 +3,7 @@
 import type { TeamMember } from '@/types';
 
 const ROLE_BADGE: Record<string, { label: string; className: string }> = {
-  assessor: { label: 'Assessor', className: 'bg-blue-100 text-blue-700' },
+  assessor: { label: 'Assessor', className: 'bg-brand-100 text-brand-700' },
   iqa: { label: 'IQA', className: 'bg-purple-100 text-purple-700' },
   admin: { label: 'Admin', className: 'bg-orange-100 text-orange-700' },
   student: { label: 'Learner', className: 'bg-green-100 text-green-700' },

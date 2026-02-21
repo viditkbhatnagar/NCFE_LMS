@@ -17,7 +17,7 @@ export default function FileBreadcrumbs({
     <nav className="flex items-center gap-1 text-sm mb-4">
       <button
         onClick={() => onNavigate(null)}
-        className={`hover:text-blue-600 transition-colors ${
+        className={`hover:text-brand-600 transition-colors ${
           path.length === 0 ? 'text-gray-900 font-medium' : 'text-gray-500'
         }`}
       >
@@ -30,7 +30,7 @@ export default function FileBreadcrumbs({
           </svg>
           <button
             onClick={() => onNavigate(crumb._id)}
-            className={`hover:text-blue-600 transition-colors ${
+            className={`hover:text-brand-600 transition-colors ${
               i === path.length - 1 ? 'text-gray-900 font-medium' : 'text-gray-500'
             }`}
           >

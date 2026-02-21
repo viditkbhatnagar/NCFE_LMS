@@ -6,6 +6,9 @@ export interface IPersonalDocument extends Document {
   fileUrl: string;
   fileType: string;
   fileSize: number;
+  storageProvider?: 'local' | 's3';
+  storageBucket?: string;
+  storageKey?: string;
   folderId: mongoose.Types.ObjectId | null;
   isFolder: boolean;
   uploadedBy: mongoose.Types.ObjectId;
@@ -38,6 +41,19 @@ const PersonalDocumentSchema = new Schema<IPersonalDocument>(
     fileSize: {
       type: Number,
       default: 0,
+    },
+    storageProvider: {
+      type: String,
+      enum: ['local', 's3'],
+      default: undefined,
+    },
+    storageBucket: {
+      type: String,
+      trim: true,
+    },
+    storageKey: {
+      type: String,
+      trim: true,
     },
     folderId: {
       type: Schema.Types.ObjectId,

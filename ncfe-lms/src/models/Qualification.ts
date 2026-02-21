@@ -84,7 +84,6 @@ QualificationSchema.pre('validate', async function () {
   }
 });
 
-QualificationSchema.index({ slug: 1 });
 
 const Qualification: Model<IQualification> =
   mongoose.models.Qualification ||

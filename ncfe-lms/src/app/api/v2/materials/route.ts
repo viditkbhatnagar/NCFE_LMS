@@ -60,7 +60,15 @@ export async function GET(request: Request) {
       .sort({ isFolder: -1, title: 1 })
       .lean();
 
-    return NextResponse.json({ success: true, data: materials });
+    const data = materials.map((material) => {
+      if (material.isFolder) return material;
+      return {
+        ...material,
+        fileUrl: `/api/v2/materials/${material._id.toString()}/download`,
+      };
+    });
+
+    return NextResponse.json({ success: true, data });
   } catch (err) {
     console.error('Error fetching materials:', err);
     return NextResponse.json(
@@ -136,7 +144,15 @@ export async function POST(request: Request) {
       );
     }
 
-    const { filePath, fileName, fileType, fileSize } = await uploadFile(
+    const {
+      filePath,
+      fileName,
+      fileType,
+      fileSize,
+      storageProvider,
+      storageBucket,
+      storageKey,
+    } = await uploadFile(
       file,
       qualificationId
     );
@@ -157,6 +173,9 @@ export async function POST(request: Request) {
       fileName,
       fileType: mappedFileType,
       fileSize,
+      storageProvider,
+      storageBucket,
+      storageKey,
       category: category || 'guidance',
       folderId: folderId || null,
       isFolder: false,
@@ -167,10 +186,14 @@ export async function POST(request: Request) {
       .populate('uploadedBy', 'name email')
       .lean();
 
-    return NextResponse.json(
-      { success: true, data: populated },
-      { status: 201 }
-    );
+    const responseData = populated
+      ? {
+          ...populated,
+          fileUrl: `/api/v2/materials/${populated._id.toString()}/download`,
+        }
+      : populated;
+
+    return NextResponse.json({ success: true, data: responseData }, { status: 201 });
   } catch (err: unknown) {
     console.error('Error creating material:', err);
     const message =

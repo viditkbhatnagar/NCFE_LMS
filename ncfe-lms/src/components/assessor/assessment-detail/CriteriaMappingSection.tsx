@@ -2,6 +2,7 @@
 
 import { useState } from 'react';
 import CriteriaMappingModal from '@/components/assessor/CriteriaMappingModal';
+import CurriculumViewModal from '@/components/assessor/CurriculumViewModal';
 import type { CriteriaMapEntry } from '@/types';
 
 interface CriteriaMappingSectionProps {
@@ -20,6 +21,7 @@ export default function CriteriaMappingSection({
   readOnly = false,
 }: CriteriaMappingSectionProps) {
   const [showModal, setShowModal] = useState(false);
+  const [showCurriculum, setShowCurriculum] = useState(false);
 
   // Group criteria by unit → LO
   const grouped: Record<string, { unit: { _id: string; unitReference: string; title: string }; los: Record<string, { lo: { loNumber: string; description: string }; criteria: CriteriaMapEntry[] }> }> = {};
@@ -48,18 +50,26 @@ export default function CriteriaMappingSection({
           <h3 className="text-xs font-semibold text-gray-500 uppercase tracking-wider">
             Criteria Mapping
           </h3>
-          <span className="px-2 py-0.5 rounded-full text-xs font-medium bg-blue-50 text-blue-600">
+          <span className="px-2 py-0.5 rounded-full text-xs font-medium bg-brand-50 text-brand-600">
             {criteriaMap.length} mapped
           </span>
         </div>
-        {!readOnly && (
+        <div className="flex items-center gap-3">
           <button
-            onClick={() => setShowModal(true)}
+            onClick={() => setShowCurriculum(true)}
             className="text-xs font-medium text-primary hover:text-primary/80 transition-colors"
           >
-            Edit Mapping
+            View Full Curriculum
           </button>
-        )}
+          {!readOnly && (
+            <button
+              onClick={() => setShowModal(true)}
+              className="text-xs font-medium text-primary hover:text-primary/80 transition-colors"
+            >
+              Edit Mapping
+            </button>
+          )}
+        </div>
       </div>
 
       {criteriaMap.length === 0 ? (
@@ -73,20 +83,22 @@ export default function CriteriaMappingSection({
         <div className="space-y-3">
           {Object.values(grouped).map(({ unit, los }) => (
             <div key={unit._id}>
-              <p className="text-xs font-semibold text-blue-600 mb-1">
+              <p className="text-xs font-semibold text-brand-600 mb-1">
                 {unit.unitReference} - {unit.title}
               </p>
               {Object.entries(los).map(([loId, { lo, criteria }]) => (
                 <div key={loId} className="ml-3 mb-2">
                   <p className="text-xs text-gray-500 mb-1">{lo.loNumber}: {lo.description}</p>
-                  <div className="flex flex-wrap gap-1.5">
+                  <div className="space-y-1">
                     {criteria.map((c) => (
-                      <span
-                        key={c._id}
-                        className="px-2 py-0.5 rounded-full text-xs font-medium bg-green-50 text-green-700"
-                      >
-                        {c.criteriaId.acNumber}
-                      </span>
+                      <div key={c._id} className="flex items-start gap-1.5">
+                        <span className="px-2 py-0.5 rounded-full text-xs font-medium bg-green-50 text-green-700 shrink-0">
+                          {c.criteriaId.acNumber}
+                        </span>
+                        <span className="text-xs text-gray-600 pt-0.5">
+                          {c.criteriaId.description}
+                        </span>
+                      </div>
                     ))}
                   </div>
                 </div>
@@ -109,6 +121,12 @@ export default function CriteriaMappingSection({
           }}
         />
       )}
+
+      <CurriculumViewModal
+        isOpen={showCurriculum}
+        onClose={() => setShowCurriculum(false)}
+        qualificationId={qualificationId}
+      />
     </div>
   );
 }

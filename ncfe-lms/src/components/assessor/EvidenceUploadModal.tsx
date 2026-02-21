@@ -98,7 +98,7 @@ export default function EvidenceUploadModal({
             type="file"
             accept=".pdf,.doc,.docx,.jpg,.jpeg,.png,.mp4"
             onChange={(e) => setFile(e.target.files?.[0] || null)}
-            className="block w-full text-sm text-gray-500 file:mr-3 file:py-1.5 file:px-3 file:rounded-md file:border-0 file:text-sm file:font-medium file:bg-blue-50 file:text-blue-700 hover:file:bg-blue-100"
+            className="block w-full text-sm text-gray-500 file:mr-3 file:py-1.5 file:px-3 file:rounded-md file:border-0 file:text-sm file:font-medium file:bg-brand-50 file:text-brand-700 hover:file:bg-brand-100"
           />
           <p className="text-xs text-gray-400 mt-1">
             PDF, Word, Images, MP4 — max 50MB
@@ -115,7 +115,7 @@ export default function EvidenceUploadModal({
             value={label}
             onChange={(e) => setLabel(e.target.value)}
             placeholder="e.g. Observation recording — Unit 3"
-            className="w-full border border-gray-200 rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/30"
+            className="w-full border border-gray-200 rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500/30"
           />
         </div>
 
@@ -129,7 +129,7 @@ export default function EvidenceUploadModal({
             onChange={(e) => setDescription(e.target.value)}
             rows={2}
             placeholder="Optional notes about this evidence"
-            className="w-full border border-gray-200 rounded-md px-3 py-2 text-sm resize-none focus:outline-none focus:ring-2 focus:ring-blue-500/30"
+            className="w-full border border-gray-200 rounded-md px-3 py-2 text-sm resize-none focus:outline-none focus:ring-2 focus:ring-brand-500/30"
           />
         </div>
 
@@ -141,7 +141,7 @@ export default function EvidenceUploadModal({
           <select
             value={unitId}
             onChange={(e) => setUnitId(e.target.value)}
-            className="w-full border border-gray-200 rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/30"
+            className="w-full border border-gray-200 rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500/30"
           >
             <option value="">— Not linked to a unit —</option>
             {units.map((u) => (
@@ -166,7 +166,7 @@ export default function EvidenceUploadModal({
         <button
           onClick={handleSubmit}
           disabled={uploading}
-          className="px-4 py-2 bg-blue-600 text-white rounded-md text-sm font-medium hover:bg-blue-700 transition-colors disabled:opacity-50"
+          className="px-4 py-2 bg-brand-600 text-white rounded-md text-sm font-medium hover:bg-brand-700 transition-colors disabled:opacity-50"
         >
           {uploading ? 'Uploading...' : 'Upload'}
         </button>

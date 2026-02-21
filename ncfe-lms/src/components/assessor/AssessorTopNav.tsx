@@ -4,6 +4,7 @@ import { useState, useRef, useEffect } from 'react';
 import { signOut } from 'next-auth/react';
 import { useAssessorCourseOptional } from '@/contexts/AssessorCourseContext';
 import SearchResultsDropdown from './SearchResults';
+import NotificationBell from '@/components/shared/NotificationBell';
 import type { SearchResults, UserRole } from '@/types';
 
 interface Props {
@@ -159,6 +160,11 @@ export default function AssessorTopNav({ userName, userRole = 'assessor', onMenu
             />
           )}
         </div>
+      </div>
+
+      {/* Notifications */}
+      <div className="ml-4">
+        <NotificationBell />
       </div>
 
       {/* User Avatar Dropdown */}

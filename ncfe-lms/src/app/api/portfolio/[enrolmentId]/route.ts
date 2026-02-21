@@ -84,6 +84,7 @@ export async function GET(
         .filter((e) => e.unitId.toString() === unit._id.toString())
         .map((e) => ({
           ...e.toObject(),
+          fileUrl: `/api/v2/evidence/${e._id.toString()}/download`,
           mappings: mappingsByEvidence[e._id.toString()] || [],
         }));
 

@@ -4,6 +4,7 @@ import { withAuth } from '@/lib/route-guard';
 import { remarkActionSchema } from '@/lib/validators';
 import Assessment from '@/models/Assessment';
 import Remark from '@/models/Remark';
+import { createNotification } from '@/lib/notifications';
 
 export async function GET(
   request: Request,
@@ -110,6 +111,25 @@ export async function POST(
     const populated = await Remark.findById(remark._id)
       .populate('createdBy', 'name email')
       .lean();
+
+    // Notify the other party about the new remark
+    const userName = session!.user.name || 'A user';
+    const assessmentTitle = assessment.title || 'an assessment';
+    const recipientId =
+      userRole === 'student'
+        ? assessment.assessorId?.toString()
+        : assessment.learnerId?.toString();
+
+    if (recipientId) {
+      createNotification({
+        userId: recipientId,
+        type: 'remark_added',
+        title: 'New Remark',
+        message: `${userName} commented on assessment "${assessmentTitle}"`,
+        entityType: 'Assessment',
+        entityId: id,
+      });
+    }
 
     return NextResponse.json(
       { success: true, data: populated },

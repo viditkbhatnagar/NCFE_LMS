@@ -63,7 +63,7 @@ export async function POST(request: Request) {
       );
     }
 
-    // Upload file to disk
+    // Upload file using configured storage provider
     const uploadResult = await uploadFile(file, session!.user.id);
 
     // Create evidence document
@@ -74,6 +74,9 @@ export async function POST(request: Request) {
       fileName: uploadResult.fileName,
       fileType: uploadResult.fileType,
       fileSize: uploadResult.fileSize,
+      storageProvider: uploadResult.storageProvider,
+      storageBucket: uploadResult.storageBucket,
+      storageKey: uploadResult.storageKey,
       label,
       description,
       status: 'draft',
@@ -87,10 +90,10 @@ export async function POST(request: Request) {
       newValue: { label, unitId, enrolmentId },
     });
 
-    return NextResponse.json(
-      { success: true, data: evidence },
-      { status: 201 }
-    );
+    const responsePayload = evidence.toObject();
+    responsePayload.fileUrl = `/api/v2/evidence/${evidence._id.toString()}/download`;
+
+    return NextResponse.json({ success: true, data: responsePayload }, { status: 201 });
   } catch (err) {
     console.error('Error uploading evidence:', err);
     const message = err instanceof Error ? err.message : 'Internal server error';

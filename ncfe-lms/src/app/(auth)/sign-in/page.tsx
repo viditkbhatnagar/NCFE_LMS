@@ -57,16 +57,8 @@ export default function SignInPage() {
   };
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-background px-4">
-      <div className="w-full max-w-md">
-        {/* Logos */}
-        <div className="flex items-center justify-center gap-4 mb-8">
-          <img src="/skillhub-logo.jpeg" alt="Skill Hub" className="h-12 w-auto object-contain" />
-          <div className="h-8 w-px bg-gray-200" />
-          <img src="/ncfe-logo.jpg" alt="NCFE" className="h-8 w-auto object-contain" />
-        </div>
-
-        <Card padding="lg">
+    <>
+      <Card padding="lg">
           <div className="text-center mb-6">
             <h2 className="text-xl font-semibold text-text-primary">Welcome back</h2>
             <p className="text-sm text-text-secondary mt-1">Sign in to your account to continue</p>
@@ -140,8 +132,7 @@ export default function SignInPage() {
               Sign up
             </Link>
           </p>
-        </Card>
-      </div>
-    </div>
+      </Card>
+    </>
   );
 }

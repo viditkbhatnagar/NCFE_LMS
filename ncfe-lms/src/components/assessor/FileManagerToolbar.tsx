@@ -33,7 +33,7 @@ export default function FileManagerToolbar({
       <select
         value={fileTypeFilter}
         onChange={(e) => onFileTypeChange(e.target.value)}
-        className="border border-gray-200 rounded-md px-3 py-1.5 text-sm text-gray-700 bg-white focus:outline-none focus:ring-2 focus:ring-blue-500/30"
+        className="border border-gray-200 rounded-md px-3 py-1.5 text-sm text-gray-700 bg-white focus:outline-none focus:ring-2 focus:ring-brand-500/30"
       >
         <option value="">All Files</option>
         <option value="pdf">PDF</option>
@@ -47,7 +47,7 @@ export default function FileManagerToolbar({
         <select
           value={categoryFilter || ''}
           onChange={(e) => onCategoryChange(e.target.value)}
-          className="border border-gray-200 rounded-md px-3 py-1.5 text-sm text-gray-700 bg-white focus:outline-none focus:ring-2 focus:ring-blue-500/30"
+          className="border border-gray-200 rounded-md px-3 py-1.5 text-sm text-gray-700 bg-white focus:outline-none focus:ring-2 focus:ring-brand-500/30"
         >
           <option value="">All Categories</option>
           <option value="manual">Manual</option>
@@ -62,7 +62,7 @@ export default function FileManagerToolbar({
       {onUpload && (
         <button
           onClick={onUpload}
-          className="flex items-center gap-1.5 px-4 py-1.5 bg-blue-600 text-white rounded-md text-sm font-medium hover:bg-blue-700 transition-colors"
+          className="flex items-center gap-1.5 px-4 py-1.5 bg-brand-600 text-white rounded-md text-sm font-medium hover:bg-brand-700 transition-colors"
         >
           <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12" />

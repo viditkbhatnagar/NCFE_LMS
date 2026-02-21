@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server';
 import dbConnect from '@/lib/db';
 import { withAuth } from '@/lib/route-guard';
 import Enrolment from '@/models/Enrolment';
+import '@/models/Qualification';
 
 export async function GET() {
   try {

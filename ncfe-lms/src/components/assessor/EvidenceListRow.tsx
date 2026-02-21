@@ -4,7 +4,7 @@ import type { PortfolioEvidence } from '@/types';
 
 const STATUS_COLORS: Record<string, string> = {
   draft: 'bg-gray-100 text-gray-600',
-  submitted: 'bg-blue-50 text-blue-700',
+  submitted: 'bg-brand-50 text-brand-700',
   assessed: 'bg-green-50 text-green-700',
 };
 

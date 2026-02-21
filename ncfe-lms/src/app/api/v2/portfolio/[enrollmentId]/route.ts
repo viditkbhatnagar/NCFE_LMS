@@ -88,7 +88,7 @@ export async function GET(
         fileName: e.fileName,
         fileType: e.fileType,
         fileSize: e.fileSize || 0,
-        fileUrl: e.fileUrl,
+        fileUrl: `/api/v2/evidence/${e._id.toString()}/download`,
         label: e.label,
         description: e.description || '',
         status: e.status,

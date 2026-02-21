@@ -158,6 +158,9 @@ export interface FileItem {
   fileUrl: string;
   fileType: string;
   fileSize: number;
+  storageProvider?: 'local' | 's3';
+  storageBucket?: string;
+  storageKey?: string;
   isFolder: boolean;
   folderId: string | null;
   uploadedBy: { _id: string; name: string; email: string };
@@ -196,6 +199,9 @@ export interface PortfolioEvidence {
   fileType: string;
   fileSize: number;
   fileUrl: string;
+  storageProvider?: 'local' | 's3';
+  storageBucket?: string;
+  storageKey?: string;
   label: string;
   description: string;
   status: EvidenceStatus;

@@ -76,14 +76,14 @@ export default function WorkHourEntryForm({
   };
 
   return (
-    <div className="bg-white border border-blue-200 rounded-lg px-4 py-3">
+    <div className="bg-white border border-brand-200 rounded-lg px-4 py-3">
       <div className="flex items-center gap-3 mb-3">
-        <div className="w-9 h-9 rounded-full flex items-center justify-center text-xs font-bold text-white bg-blue-600 shrink-0">
+        <div className="w-9 h-9 rounded-full flex items-center justify-center text-xs font-bold text-white bg-brand-600 shrink-0">
           {initials}
         </div>
         <div>
           <span className="text-sm font-medium text-gray-900">{learnerName}</span>
-          <span className="ml-2 text-[10px] font-medium px-1.5 py-0.5 rounded-full bg-blue-50 text-blue-700">
+          <span className="ml-2 text-[10px] font-medium px-1.5 py-0.5 rounded-full bg-brand-50 text-brand-700">
             {isEdit ? 'Edit Entry' : 'New Entry'}
           </span>
         </div>
@@ -96,7 +96,7 @@ export default function WorkHourEntryForm({
           onChange={(e) => setNotes(e.target.value)}
           rows={2}
           placeholder="Optional notes here"
-          className="w-full border border-gray-200 rounded-md px-3 py-2 text-sm resize-none focus:outline-none focus:ring-2 focus:ring-blue-500/30"
+          className="w-full border border-gray-200 rounded-md px-3 py-2 text-sm resize-none focus:outline-none focus:ring-2 focus:ring-brand-500/30"
         />
 
         {/* Time inputs + actions */}
@@ -108,7 +108,7 @@ export default function WorkHourEntryForm({
               max={24}
               value={hours}
               onChange={(e) => setHours(Math.max(0, Math.min(24, parseInt(e.target.value) || 0)))}
-              className="w-14 border border-gray-200 rounded-md px-2 py-1.5 text-sm text-center focus:outline-none focus:ring-2 focus:ring-blue-500/30"
+              className="w-14 border border-gray-200 rounded-md px-2 py-1.5 text-sm text-center focus:outline-none focus:ring-2 focus:ring-brand-500/30"
             />
             <span className="text-xs text-gray-500">h</span>
           </div>
@@ -119,7 +119,7 @@ export default function WorkHourEntryForm({
               max={59}
               value={minutes}
               onChange={(e) => setMinutes(Math.max(0, Math.min(59, parseInt(e.target.value) || 0)))}
-              className="w-14 border border-gray-200 rounded-md px-2 py-1.5 text-sm text-center focus:outline-none focus:ring-2 focus:ring-blue-500/30"
+              className="w-14 border border-gray-200 rounded-md px-2 py-1.5 text-sm text-center focus:outline-none focus:ring-2 focus:ring-brand-500/30"
             />
             <span className="text-xs text-gray-500">m</span>
           </div>
@@ -138,7 +138,7 @@ export default function WorkHourEntryForm({
           <button
             onClick={handleSubmit}
             disabled={saving}
-            className="p-1.5 rounded hover:bg-blue-50 text-blue-600 hover:text-blue-700 transition-colors disabled:opacity-50"
+            className="p-1.5 rounded hover:bg-brand-50 text-brand-600 hover:text-brand-700 transition-colors disabled:opacity-50"
             title="Save"
           >
             <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">

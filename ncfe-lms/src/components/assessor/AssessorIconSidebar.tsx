@@ -113,7 +113,7 @@ export default function AssessorIconSidebar({ isOpen, onClose, userRole }: Props
   const visibleIcons = slug ? navIcons : navIcons.filter((item) => item.path === '');
 
   const sidebarContent = (
-    <aside className="w-[65px] bg-[#1A1A2E] flex flex-col items-center py-3 gap-1 shrink-0 h-full">
+    <aside className="w-[65px] bg-secondary flex flex-col items-center py-3 gap-1 shrink-0 h-full">
       {visibleIcons.map((item) => {
         const href = `${basePath}${item.path}`;
         const isActive =

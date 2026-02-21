@@ -16,7 +16,7 @@ import type {
 const STATUS_BADGE: Record<string, string> = {
   draft: 'bg-gray-100 text-gray-600',
   published: 'bg-green-100 text-green-700',
-  submitted: 'bg-blue-100 text-blue-700',
+  submitted: 'bg-brand-100 text-brand-700',
   assessed: 'bg-purple-100 text-purple-700',
 };
 

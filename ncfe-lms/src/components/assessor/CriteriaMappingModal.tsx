@@ -115,7 +115,7 @@ export default function CriteriaMappingModal({
       {/* Status bar */}
       <div className="flex items-center justify-between mb-4 pb-3 border-b border-gray-100">
         <span className="text-sm text-gray-600">
-          <span className="font-semibold text-blue-600">{selectedIds.size}</span> of{' '}
+          <span className="font-semibold text-brand-600">{selectedIds.size}</span> of{' '}
           {totalCriteria} criteria mapped
         </span>
       </div>
@@ -175,7 +175,7 @@ export default function CriteriaMappingModal({
                           >
                             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
                           </svg>
-                          <span className="px-1.5 py-0.5 rounded text-xs font-medium bg-blue-50 text-blue-600">
+                          <span className="px-1.5 py-0.5 rounded text-xs font-medium bg-brand-50 text-brand-600">
                             {lo.loNumber}
                           </span>
                           <span className="text-xs text-gray-700 text-left flex-1 truncate">
@@ -217,7 +217,7 @@ export default function CriteriaMappingModal({
                                   {ac.description}
                                 </span>
                                 {isChecked && (
-                                  <span className="px-1.5 py-0.5 rounded text-xs font-medium bg-blue-50 text-blue-600">
+                                  <span className="px-1.5 py-0.5 rounded text-xs font-medium bg-brand-50 text-brand-600">
                                     Mapped
                                   </span>
                                 )}

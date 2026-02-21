@@ -10,14 +10,14 @@ interface SignOffStatusSectionProps {
   userRole?: UserRole;
 }
 
-const ROLE_ORDER: SignOffRole[] = ['assessor', 'iqa', 'eqa', 'learner'];
+const ROLE_ORDER: SignOffRole[] = ['assessor', 'learner', 'iqa', 'eqa'];
 
 // Map user roles to their corresponding sign-off roles
 const SIGN_OFF_ROLE_FOR_USER: Record<string, SignOffRole | null> = {
   assessor: 'assessor',
   student: 'learner',
   iqa: 'iqa',
-  admin: null,
+  admin: 'eqa',
 };
 
 const ROLE_CONFIG: Record<SignOffRole, { label: string; icon: React.ReactNode }> = {
@@ -73,13 +73,27 @@ export default function SignOffStatusSection({
     (role) => signOffMap[role]?.status === 'signed_off'
   ).length;
 
-  // Find next role in sequence
-  const nextRole = ROLE_ORDER.find(
-    (role) => signOffMap[role]?.status !== 'signed_off'
-  );
-
   // Determine which sign-off role the current user can perform
   const mySignOffRole = SIGN_OFF_ROLE_FOR_USER[userRole] || null;
+
+  // Determine if a role can sign off right now:
+  // - Assessor & Learner can sign off independently (no prerequisites)
+  // - IQA requires both Assessor AND Learner to have signed off
+  // - EQA requires IQA to have signed off
+  const canRoleSignOff = (role: SignOffRole): boolean => {
+    if (signOffMap[role]?.status === 'signed_off') return false;
+    if (role === 'assessor' || role === 'learner') return true;
+    if (role === 'iqa') {
+      return (
+        signOffMap['assessor']?.status === 'signed_off' &&
+        signOffMap['learner']?.status === 'signed_off'
+      );
+    }
+    if (role === 'eqa') {
+      return signOffMap['iqa']?.status === 'signed_off';
+    }
+    return false;
+  };
 
   const [signOffError, setSignOffError] = useState<string | null>(null);
 
@@ -90,7 +104,7 @@ export default function SignOffStatusSection({
       const res = await fetch(`/api/v2/assessments/${assessmentId}/sign-off`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ role: nextRole, status: 'signed_off' }),
+        body: JSON.stringify({ role: mySignOffRole, status: 'signed_off' }),
       });
       if (res.ok) {
         onSignOff();
@@ -115,14 +129,9 @@ export default function SignOffStatusSection({
           Sign-off Status
         </h3>
         <div className="flex items-center gap-2">
-          <span className="px-2 py-0.5 rounded-full text-xs font-medium bg-blue-50 text-blue-600">
+          <span className="px-2 py-0.5 rounded-full text-xs font-medium bg-brand-50 text-brand-600">
             {completedCount}/4 Complete
           </span>
-          {nextRole && (
-            <span className="px-2 py-0.5 rounded-full text-xs font-medium bg-gray-100 text-gray-600">
-              Next: {ROLE_CONFIG[nextRole].label}
-            </span>
-          )}
         </div>
       </div>
 
@@ -148,8 +157,8 @@ export default function SignOffStatusSection({
             const so = signOffMap[role];
             const isSigned = so?.status === 'signed_off';
             const isRejected = so?.status === 'rejected';
-            const isNext = role === nextRole;
-            const canSign = mySignOffRole === role && isNext;
+            const isReady = canRoleSignOff(role);
+            const canSign = mySignOffRole === role && isReady;
 
             return (
               <div key={role} className="relative flex items-start gap-3">
@@ -187,7 +196,7 @@ export default function SignOffStatusSection({
                       ? `Signed off${so.signedOffAt ? ` on ${new Date(so.signedOffAt).toLocaleDateString('en-GB')}` : ''}`
                       : isRejected
                       ? 'Rejected'
-                      : isNext
+                      : isReady
                       ? 'Awaiting sign off'
                       : 'Pending'}
                   </p>

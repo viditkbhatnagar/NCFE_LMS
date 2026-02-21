@@ -8,8 +8,8 @@ export default async function DashboardPage() {
 
   const role = (session.user as { role?: UserRole }).role || 'student';
 
-  // Redirect assessors to the new BRITEthink dashboard
-  if (role === 'assessor') {
+  // Redirect assessors and students to the new BRITEthink dashboard
+  if (role === 'assessor' || role === 'student') {
     redirect('/c');
   }
 

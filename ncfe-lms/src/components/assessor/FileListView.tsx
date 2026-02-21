@@ -78,7 +78,7 @@ export default function FileListView({ items, onItemClick, onRename, onDelete }:
                         onBlur={() => handleRename(item._id)}
                         onClick={(e) => e.stopPropagation()}
                         autoFocus
-                        className="text-sm font-medium text-gray-900 border border-blue-500 rounded px-1 py-0.5 focus:outline-none"
+                        className="text-sm font-medium text-gray-900 border border-brand-500 rounded px-1 py-0.5 focus:outline-none"
                       />
                     ) : (
                       <span className="text-sm font-medium text-gray-900 truncate">{item.fileName}</span>

@@ -4,6 +4,7 @@ import { withAuth } from '@/lib/route-guard';
 import { uploadFile } from '@/lib/upload';
 import Evidence from '@/models/Evidence';
 import Enrolment from '@/models/Enrolment';
+import { createNotification } from '@/lib/notifications';
 
 export async function POST(request: Request) {
   try {
@@ -60,7 +61,15 @@ export async function POST(request: Request) {
 
     // Upload file using the shared utility, keyed under the learner's userId
     const learnerId = enrollment.userId.toString();
-    const { filePath, fileName, fileType, fileSize } = await uploadFile(
+    const {
+      filePath,
+      fileName,
+      fileType,
+      fileSize,
+      storageProvider,
+      storageBucket,
+      storageKey,
+    } = await uploadFile(
       file,
       learnerId
     );
@@ -72,21 +81,41 @@ export async function POST(request: Request) {
       fileName,
       fileType,
       fileSize,
+      storageProvider,
+      storageBucket,
+      storageKey,
       label: label.trim(),
       description,
       uploadedAt: new Date(),
       status: 'submitted',
     });
 
+    const evidenceId = evidence._id.toString();
+
+    // Notify the learner when assessor uploads evidence
+    if (user.role === 'assessor') {
+      const learnerId = enrollment.userId?.toString();
+      if (learnerId) {
+        createNotification({
+          userId: learnerId,
+          type: 'evidence_uploaded',
+          title: 'New Evidence',
+          message: `Your assessor uploaded evidence: ${label.trim()}`,
+          entityType: 'Evidence',
+          entityId: evidenceId,
+        });
+      }
+    }
+
     return NextResponse.json(
       {
         success: true,
         data: {
-          _id: evidence._id.toString(),
+          _id: evidenceId,
           fileName: evidence.fileName,
           fileType: evidence.fileType,
           fileSize: evidence.fileSize,
-          fileUrl: evidence.fileUrl,
+          fileUrl: `/api/v2/evidence/${evidenceId}/download`,
           label: evidence.label,
           status: evidence.status,
         },

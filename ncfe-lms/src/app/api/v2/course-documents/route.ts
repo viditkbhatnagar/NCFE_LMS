@@ -63,7 +63,15 @@ export async function GET(request: Request) {
       .sort({ isFolder: -1, fileName: 1 })
       .lean();
 
-    return NextResponse.json({ success: true, data: docs });
+    const data = docs.map((doc) => {
+      if (doc.isFolder) return doc;
+      return {
+        ...doc,
+        fileUrl: `/api/v2/course-documents/${doc._id.toString()}/download`,
+      };
+    });
+
+    return NextResponse.json({ success: true, data });
   } catch (err) {
     console.error('Error fetching course documents:', err);
     return NextResponse.json(
@@ -130,7 +138,15 @@ export async function POST(request: Request) {
       );
     }
 
-    const { filePath, fileName, fileType, fileSize } = await uploadFile(
+    const {
+      filePath,
+      fileName,
+      fileType,
+      fileSize,
+      storageProvider,
+      storageBucket,
+      storageKey,
+    } = await uploadFile(
       file,
       qualificationId
     );
@@ -141,6 +157,9 @@ export async function POST(request: Request) {
       fileUrl: filePath,
       fileType,
       fileSize,
+      storageProvider,
+      storageBucket,
+      storageKey,
       folderId: folderId || null,
       isFolder: false,
       uploadedBy: session!.user.id,
@@ -150,10 +169,14 @@ export async function POST(request: Request) {
       .populate('uploadedBy', 'name email')
       .lean();
 
-    return NextResponse.json(
-      { success: true, data: populated },
-      { status: 201 }
-    );
+    const responseData = populated
+      ? {
+          ...populated,
+          fileUrl: `/api/v2/course-documents/${populated._id.toString()}/download`,
+        }
+      : populated;
+
+    return NextResponse.json({ success: true, data: responseData }, { status: 201 });
   } catch (err: unknown) {
     console.error('Error creating course document:', err);
     const message =

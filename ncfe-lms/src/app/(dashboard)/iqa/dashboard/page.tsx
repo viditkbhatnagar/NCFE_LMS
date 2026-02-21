@@ -68,7 +68,7 @@ export default function IQADashboardPage() {
               <span className="text-sm font-medium text-text-primary">Create Sampling Plan</span>
             </Link>
             <Link href="/iqa/decisions" className="flex items-center gap-3 p-3 rounded-[6px] hover:bg-gray-50 transition-colors">
-              <div className="w-8 h-8 rounded bg-blue-100 flex items-center justify-center">
+              <div className="w-8 h-8 rounded bg-brand-100 flex items-center justify-center">
                 <svg className="w-4 h-4 text-info" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4" />
                 </svg>

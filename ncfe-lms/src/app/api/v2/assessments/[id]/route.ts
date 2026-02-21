@@ -7,6 +7,10 @@ import AssessmentCriteriaMap from '@/models/AssessmentCriteriaMap';
 import AssessmentEvidenceMap from '@/models/AssessmentEvidenceMap';
 import SignOff from '@/models/SignOff';
 import Remark from '@/models/Remark';
+import { createNotification } from '@/lib/notifications';
+import '@/models/AssessmentCriteria'; // register schema for populate
+import '@/models/Unit'; // register schema for nested populate
+import '@/models/LearningOutcome'; // register schema for nested populate
 
 export async function GET(
   request: Request,
@@ -148,8 +152,24 @@ export async function PUT(
       );
     }
 
+    const previousStatus = assessment.status;
     Object.assign(assessment, validation.data);
     await assessment.save();
+
+    // Notify learner when assessment is published
+    if (previousStatus === 'draft' && assessment.status === 'published') {
+      const learnerId = assessment.learnerId?.toString();
+      if (learnerId) {
+        createNotification({
+          userId: learnerId,
+          type: 'assessment_published',
+          title: 'Assessment Published',
+          message: `Assessment "${assessment.title}" is now available for review`,
+          entityType: 'Assessment',
+          entityId: assessment._id.toString(),
+        });
+      }
+    }
 
     return NextResponse.json({ success: true, data: assessment });
   } catch (err) {

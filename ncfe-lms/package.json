@@ -8,9 +8,13 @@
     "start": "next start",
     "lint": "eslint",
     "seed": "npx tsx scripts/seed.ts",
-    "seed:reset": "npx tsx scripts/seed.ts --reset"
+    "seed:reset": "npx tsx scripts/seed.ts --reset",
+    "seed:uat": "npx tsx scripts/seed-uat.ts",
+    "seed:uat:reset": "npx tsx scripts/seed-uat.ts --reset"
   },
   "dependencies": {
+    "@aws-sdk/client-s3": "^3.806.0",
+    "@aws-sdk/s3-request-presigner": "^3.806.0",
     "bcryptjs": "^3.0.3",
     "mongoose": "^9.2.1",
     "next": "16.1.6",

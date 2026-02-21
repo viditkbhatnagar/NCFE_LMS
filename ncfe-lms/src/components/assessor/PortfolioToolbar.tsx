@@ -33,7 +33,7 @@ export default function PortfolioToolbar({
       {/* Upload button */}
       <button
         onClick={onUploadClick}
-        className="flex items-center gap-1.5 px-4 py-2 bg-blue-600 text-white rounded-md text-sm font-medium hover:bg-blue-700 transition-colors"
+        className="flex items-center gap-1.5 px-4 py-2 bg-brand-600 text-white rounded-md text-sm font-medium hover:bg-brand-700 transition-colors"
       >
         <svg
           className="w-4 h-4"
@@ -57,7 +57,7 @@ export default function PortfolioToolbar({
       <select
         value={status}
         onChange={(e) => onStatusChange(e.target.value as EvidenceStatus | '')}
-        className="border border-gray-200 rounded-md px-3 py-1.5 text-sm text-gray-700 bg-white focus:outline-none focus:ring-2 focus:ring-blue-500/30"
+        className="border border-gray-200 rounded-md px-3 py-1.5 text-sm text-gray-700 bg-white focus:outline-none focus:ring-2 focus:ring-brand-500/30"
       >
         <option value="">All Statuses</option>
         <option value="draft">Draft</option>
@@ -69,7 +69,7 @@ export default function PortfolioToolbar({
       <select
         value={fileType}
         onChange={(e) => onFileTypeChange(e.target.value)}
-        className="border border-gray-200 rounded-md px-3 py-1.5 text-sm text-gray-700 bg-white focus:outline-none focus:ring-2 focus:ring-blue-500/30"
+        className="border border-gray-200 rounded-md px-3 py-1.5 text-sm text-gray-700 bg-white focus:outline-none focus:ring-2 focus:ring-brand-500/30"
       >
         <option value="">All Types</option>
         <option value="pdf">PDF</option>

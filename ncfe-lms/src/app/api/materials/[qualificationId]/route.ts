@@ -9,7 +9,7 @@ export async function GET(
 ) {
   try {
     const { qualificationId } = await params;
-    const { session, error } = await withAuth();
+    const { error } = await withAuth();
 
     if (error) {
       return error;
@@ -36,9 +36,18 @@ export async function GET(
       .populate('qualificationId', 'title')
       .populate('uploadedBy', 'name email');
 
+    const data = materials.map((material) => {
+      const obj = material.toObject();
+      if (obj.isFolder) return obj;
+      return {
+        ...obj,
+        fileUrl: `/api/v2/materials/${obj._id.toString()}/download`,
+      };
+    });
+
     return NextResponse.json({
       success: true,
-      data: materials,
+      data,
     });
   } catch (err) {
     console.error('Error fetching learning materials:', err);

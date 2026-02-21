@@ -18,7 +18,7 @@ export default function CriterionCard({
       onClick={onClick}
       className={`w-full text-left p-3 rounded-md border transition-all flex items-start gap-2 ${
         isSelected
-          ? 'border-blue-500 bg-blue-50 shadow-sm'
+          ? 'border-brand-500 bg-brand-50 shadow-sm'
           : 'border-transparent hover:bg-gray-50 hover:border-gray-200'
       }`}
     >

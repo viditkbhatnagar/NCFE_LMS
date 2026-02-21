@@ -47,7 +47,7 @@ export default function NewFolderModal({ isOpen, onClose, onConfirm }: NewFolder
             }}
             placeholder="e.g. Unit 3 Documents"
             autoFocus
-            className="w-full border border-gray-200 rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/30"
+            className="w-full border border-gray-200 rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500/30"
           />
           {error && <p className="text-sm text-red-600 mt-1">{error}</p>}
         </div>

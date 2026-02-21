@@ -20,7 +20,7 @@ export default function AssessmentCard({ assessment, isSelected, onClick }: Asse
       onClick={onClick}
       className={`w-full text-left bg-white rounded-[8px] shadow-sm transition-all hover:shadow-md ${
         isDraft ? 'border-2 border-dashed border-gray-300' : 'border border-gray-200'
-      } ${isSelected ? 'ring-2 ring-blue-500 border-blue-500' : ''}`}
+      } ${isSelected ? 'ring-2 ring-brand-500 border-brand-500' : ''}`}
     >
       {/* Colored top bar */}
       {config && (

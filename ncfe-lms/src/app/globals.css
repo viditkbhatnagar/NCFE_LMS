@@ -1,21 +1,37 @@
 @import "tailwindcss";
 
 @theme inline {
-  --color-primary: #4CAF50;
-  --color-primary-dark: #388E3C;
-  --color-primary-light: #C8E6C9;
-  --color-secondary: #1A1A2E;
-  --color-secondary-light: #2D2D44;
-  --color-background: #F5F5F5;
+  --color-primary: #1F7C88;
+  --color-primary-dark: #11646F;
+  --color-primary-light: #D4EEF1;
+  --color-secondary: #0E646F;
+  --color-secondary-light: #1A7A86;
+  --color-background: #F6FBFB;
   --color-card: #FFFFFF;
-  --color-success: #4CAF50;
+  --color-success: #24B974;
   --color-warning: #FF9800;
   --color-error: #F44336;
-  --color-info: #2196F3;
-  --color-text-primary: #1A1A2E;
+  --color-info: #1F7C88;
+  --color-text-primary: #11646F;
   --color-text-secondary: #6B7280;
   --color-text-muted: #9CA3AF;
   --color-border: #E5E7EB;
+
+  --color-accent: #FA7E5C;
+  --color-accent-dark: #E05B36;
+  --color-accent-light: #FFE8E0;
+
+  --color-brand-50: #F0F9FA;
+  --color-brand-100: #D4EEF1;
+  --color-brand-200: #A8DDE3;
+  --color-brand-300: #6EC4CE;
+  --color-brand-400: #3DAAB7;
+  --color-brand-500: #1F7C88;
+  --color-brand-600: #11646F;
+  --color-brand-700: #0E546D;
+  --color-brand-800: #0B555F;
+  --color-brand-900: #083E45;
+
   --font-sans: "Inter", system-ui, -apple-system, sans-serif;
 }
 

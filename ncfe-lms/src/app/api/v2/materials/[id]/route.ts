@@ -53,7 +53,15 @@ export async function PUT(
       .populate('uploadedBy', 'name email')
       .lean();
 
-    return NextResponse.json({ success: true, data: material });
+    const responseData =
+      material && !material.isFolder
+        ? {
+            ...material,
+            fileUrl: `/api/v2/materials/${material._id.toString()}/download`,
+          }
+        : material;
+
+    return NextResponse.json({ success: true, data: responseData });
   } catch (err) {
     console.error('Error updating material:', err);
     return NextResponse.json(
@@ -71,7 +79,11 @@ async function deleteRecursive(folderId: string) {
       if (child.isFolder) {
         await deleteRecursive(child._id.toString());
       } else if (child.fileUrl) {
-        await deleteFile(child.fileUrl);
+        await deleteFile(child.fileUrl, {
+          storageProvider: child.storageProvider as 'local' | 's3' | undefined,
+          storageBucket: child.storageBucket,
+          storageKey: child.storageKey,
+        });
       }
     } catch (err) {
       errors.push(err instanceof Error ? err : new Error(String(err)));
@@ -117,7 +129,11 @@ export async function DELETE(
     if (material.isFolder) {
       await deleteRecursive(id);
     } else if (material.fileUrl) {
-      await deleteFile(material.fileUrl);
+      await deleteFile(material.fileUrl, {
+        storageProvider: material.storageProvider as 'local' | 's3' | undefined,
+        storageBucket: material.storageBucket,
+        storageKey: material.storageKey,
+      });
     }
 
     await LearningMaterial.findByIdAndDelete(id);

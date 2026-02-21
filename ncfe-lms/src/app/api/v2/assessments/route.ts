@@ -6,6 +6,8 @@ import Assessment from '@/models/Assessment';
 import AssessmentCriteriaMap from '@/models/AssessmentCriteriaMap';
 import SignOff from '@/models/SignOff';
 import Enrolment from '@/models/Enrolment';
+import { createNotification } from '@/lib/notifications';
+import User from '@/models/User';
 import type { SignOffRole } from '@/types';
 
 export async function GET(request: Request) {
@@ -149,6 +151,21 @@ export async function POST(request: Request) {
         .lean();
 
       signOffs = await SignOff.find({ assessmentId: assessment._id }).lean();
+
+      // Notify learner about new assessment
+      const learnerId = enrollment.userId?.toString();
+      if (learnerId) {
+        const assessor = await User.findById(session!.user.id, 'name').lean();
+        const assessorName = assessor?.name || 'Your assessor';
+        createNotification({
+          userId: learnerId,
+          type: 'assessment_created',
+          title: 'New Assessment',
+          message: `${assessorName} created a new assessment: ${validation.data.title}`,
+          entityType: 'Assessment',
+          entityId: assessment._id.toString(),
+        });
+      }
     } catch (txErr) {
       await dbSession.abortTransaction();
       throw txErr;

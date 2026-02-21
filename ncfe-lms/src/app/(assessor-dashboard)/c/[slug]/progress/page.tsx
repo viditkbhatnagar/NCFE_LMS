@@ -106,7 +106,7 @@ export default function ProgressPage() {
         <div className="flex h-full min-w-[900px] bg-white border border-gray-200 rounded-lg overflow-hidden">
           {loading ? (
             <div className="flex-1 flex items-center justify-center">
-              <div className="w-6 h-6 border-2 border-blue-500 border-t-transparent rounded-full animate-spin" />
+              <div className="w-6 h-6 border-2 border-brand-500 border-t-transparent rounded-full animate-spin" />
             </div>
           ) : (
             <>

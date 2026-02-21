@@ -145,9 +145,9 @@ export default function SearchResultsDropdown({
                   onClick={() => navigateTo(`${basePath}/assessment`)}
                   className="w-full flex items-center gap-3 px-4 py-2 hover:bg-gray-50 transition-colors text-left"
                 >
-                  <div className="w-7 h-7 rounded-full bg-blue-100 flex items-center justify-center shrink-0">
+                  <div className="w-7 h-7 rounded-full bg-brand-100 flex items-center justify-center shrink-0">
                     <svg
-                      className="w-3.5 h-3.5 text-blue-600"
+                      className="w-3.5 h-3.5 text-brand-600"
                       fill="none"
                       viewBox="0 0 24 24"
                       stroke="currentColor"

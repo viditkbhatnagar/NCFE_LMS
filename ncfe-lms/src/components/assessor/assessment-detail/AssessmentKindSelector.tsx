@@ -74,11 +74,11 @@ export default function AssessmentKindSelector({ value, onChange, readOnly = fal
               disabled={readOnly && !isSelected}
               className={`flex items-center gap-1.5 px-2.5 py-2 rounded-[6px] border text-xs font-medium transition-all ${
                 isSelected
-                  ? 'border-blue-500 text-blue-600 bg-blue-50'
+                  ? 'border-brand-500 text-brand-600 bg-brand-50'
                   : 'border-gray-200 text-gray-600 hover:border-gray-300 hover:bg-gray-50'
               } ${readOnly ? 'cursor-default' : ''} ${readOnly && !isSelected ? 'opacity-40' : ''}`}
             >
-              <span className={isSelected ? 'text-blue-500' : 'text-gray-400'}>
+              <span className={isSelected ? 'text-brand-500' : 'text-gray-400'}>
                 {KIND_ICONS[kind]}
               </span>
               <span className="truncate">{config.label}</span>

@@ -2,10 +2,12 @@ import { NextResponse } from 'next/server';
 import dbConnect from '@/lib/db';
 import { withAuth } from '@/lib/route-guard';
 import { createAuditLog } from '@/lib/audit';
+import { createNotification } from '@/lib/notifications';
 import Submission from '@/models/Submission';
 import Evidence from '@/models/Evidence';
 import EvidenceMapping from '@/models/EvidenceMapping';
 import Enrolment from '@/models/Enrolment';
+import Unit from '@/models/Unit';
 
 export async function GET(request: Request) {
   try {
@@ -157,6 +159,22 @@ export async function POST(request: Request) {
       entityId: submission._id.toString(),
       newValue: { unitId, evidenceCount: evidenceIds.length, attemptNumber },
     });
+
+    // Notify assessor about new submission
+    const assessorId = enrolment.assessorId?.toString();
+    if (assessorId) {
+      const unit = await Unit.findById(unitId, 'unitReference title').lean();
+      const unitRef = unit?.unitReference || unit?.title || 'a unit';
+      const learnerName = session!.user.name || 'A learner';
+      createNotification({
+        userId: assessorId,
+        type: 'submission_created',
+        title: 'New Submission',
+        message: `${learnerName} submitted work for ${unitRef}`,
+        entityType: 'Submission',
+        entityId: submission._id.toString(),
+      });
+    }
 
     return NextResponse.json(
       { success: true, data: submission },

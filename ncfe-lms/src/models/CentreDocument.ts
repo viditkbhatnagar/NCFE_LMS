@@ -4,6 +4,9 @@ export interface ICentreDocument extends Document {
   title: string;
   category: 'sampling_plan' | 'iqa_report' | 'cpd_record' | 'action_plan' | 'other';
   fileUrl: string;
+  storageProvider?: 'local' | 's3';
+  storageBucket?: string;
+  storageKey?: string;
   description: string;
   centreId: mongoose.Types.ObjectId;
   uploadedBy: mongoose.Types.ObjectId;
@@ -26,6 +29,19 @@ const CentreDocumentSchema = new Schema<ICentreDocument>(
     fileUrl: {
       type: String,
       required: [true, 'File URL is required'],
+      trim: true,
+    },
+    storageProvider: {
+      type: String,
+      enum: ['local', 's3'],
+      default: undefined,
+    },
+    storageBucket: {
+      type: String,
+      trim: true,
+    },
+    storageKey: {
+      type: String,
       trim: true,
     },
     description: {

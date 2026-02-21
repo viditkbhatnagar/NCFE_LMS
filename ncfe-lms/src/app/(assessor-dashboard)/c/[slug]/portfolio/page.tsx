@@ -133,7 +133,7 @@ export default function PortfolioPage() {
       <div className="flex-1 overflow-y-auto">
         {loading ? (
           <div className="flex justify-center py-12">
-            <div className="w-6 h-6 border-2 border-blue-500 border-t-transparent rounded-full animate-spin" />
+            <div className="w-6 h-6 border-2 border-brand-500 border-t-transparent rounded-full animate-spin" />
           </div>
         ) : evidence.length === 0 ? (
           <div className="flex flex-col items-center py-16 text-gray-400">

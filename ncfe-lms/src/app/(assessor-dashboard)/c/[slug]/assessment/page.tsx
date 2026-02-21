@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { useAssessorCourse } from '@/contexts/AssessorCourseContext';
 import AssessmentCard from '@/components/assessor/AssessmentCard';
 import LearnerSelectionModal from '@/components/assessor/LearnerSelectionModal';
@@ -14,11 +14,55 @@ export default function AssessmentsPage() {
 
   const readOnly = userRole === 'student';
 
+  const SIDEBAR_W = 65;
+  const TOP_NAV_H = 56;
+  const MIN_PANEL_W = 380;
+
   const [assessments, setAssessments] = useState<AssessmentListItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [selectedAssessmentId, setSelectedAssessmentId] = useState<string | null>(null);
   const [showLearnerModal, setShowLearnerModal] = useState(false);
   const [creating, setCreating] = useState(false);
+  const [panelW, setPanelW] = useState<number | null>(null);
+  const [isDesktop, setIsDesktop] = useState(false);
+
+  const panelRef = useRef<HTMLDivElement>(null);
+
+  // Detect desktop breakpoint
+  useEffect(() => {
+    const check = () => setIsDesktop(window.innerWidth >= 1024);
+    check();
+    window.addEventListener('resize', check);
+    return () => window.removeEventListener('resize', check);
+  }, []);
+
+  // Drag-to-resize handler
+  const handleResizeStart = useCallback(
+    (e: React.MouseEvent) => {
+      e.preventDefault();
+      const startX = e.clientX;
+      const startW = panelW ?? window.innerWidth - SIDEBAR_W;
+
+      const onMove = (ev: MouseEvent) => {
+        const dx = startX - ev.clientX;
+        const newW = Math.max(MIN_PANEL_W, Math.min(window.innerWidth - SIDEBAR_W, startW + dx));
+        setPanelW(newW);
+      };
+
+      const onUp = () => {
+        document.body.style.cursor = '';
+        document.body.style.userSelect = '';
+        window.removeEventListener('mousemove', onMove);
+        window.removeEventListener('mouseup', onUp);
+      };
+
+      document.body.style.cursor = 'col-resize';
+      document.body.style.userSelect = 'none';
+      window.addEventListener('mousemove', onMove);
+      window.addEventListener('mouseup', onUp);
+    },
+    [panelW],
+  );
 
   const fetchAssessments = useCallback(async () => {
     setLoading(true);
@@ -172,9 +216,24 @@ export default function AssessmentsPage() {
           ))}
       </div>
 
-      {/* Right: Detail panel — full-screen on mobile, inline on desktop */}
+      {/* Right: Detail panel — full-screen on mobile, overlay on desktop */}
       {selectedAssessmentId && panelEnrollmentId && (
-        <div className="fixed inset-0 z-50 bg-white lg:relative lg:inset-auto lg:z-auto lg:w-[420px] lg:border-l lg:border-gray-200 h-full overflow-hidden shrink-0">
+        <div
+          ref={panelRef}
+          className="fixed z-40 bg-white overflow-hidden"
+          style={
+            isDesktop
+              ? { top: TOP_NAV_H, right: 0, bottom: 0, width: panelW ?? `calc(100vw - ${SIDEBAR_W}px)` }
+              : { inset: 0 }
+          }
+        >
+          {/* Resize handle (desktop only) */}
+          {isDesktop && (
+            <div
+              className="absolute left-0 top-0 bottom-0 w-1.5 cursor-col-resize hover:bg-primary/20 active:bg-primary/30 z-10 transition-colors"
+              onMouseDown={handleResizeStart}
+            />
+          )}
           <AssessmentDetailPanel
             key={selectedAssessmentId}
             assessmentId={selectedAssessmentId}

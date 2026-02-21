@@ -19,7 +19,7 @@ export default function UnitCard({ unit, isSelected, onClick }: UnitCardProps) {
       onClick={onClick}
       className={`w-full text-left p-3 rounded-md border transition-all ${
         isSelected
-          ? 'border-blue-500 bg-blue-50 shadow-sm'
+          ? 'border-brand-500 bg-brand-50 shadow-sm'
           : 'border-transparent hover:bg-gray-50 hover:border-gray-200'
       }`}
     >
@@ -37,7 +37,7 @@ export default function UnitCard({ unit, isSelected, onClick }: UnitCardProps) {
       </div>
       <div className="h-1 bg-gray-200 rounded-full overflow-hidden">
         <div
-          className="h-full bg-blue-400 rounded-full"
+          className="h-full bg-brand-400 rounded-full"
           style={{ width: `${pct}%` }}
         />
       </div>

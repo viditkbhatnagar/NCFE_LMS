@@ -25,12 +25,12 @@ export default function ProgressSummaryCard({
         </p>
         <div className="mt-2 h-1.5 bg-gray-100 rounded-full overflow-hidden">
           <div
-            className="h-full bg-blue-500 rounded-full transition-all duration-500"
+            className="h-full bg-brand-500 rounded-full transition-all duration-500"
             style={{ width: `${pct}%` }}
           />
         </div>
       </div>
-      <span className="shrink-0 px-3 py-1 rounded-full text-sm font-semibold bg-blue-50 text-blue-700">
+      <span className="shrink-0 px-3 py-1 rounded-full text-sm font-semibold bg-brand-50 text-brand-700">
         {pct}% Complete
       </span>
     </div>

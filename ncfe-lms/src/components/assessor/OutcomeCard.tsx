@@ -23,11 +23,11 @@ export default function OutcomeCard({
       onClick={onClick}
       className={`w-full text-left p-3 rounded-md border transition-all ${
         isSelected
-          ? 'border-blue-500 bg-blue-50 shadow-sm'
+          ? 'border-brand-500 bg-brand-50 shadow-sm'
           : 'border-transparent hover:bg-gray-50 hover:border-gray-200'
       }`}
     >
-      <p className="text-[10px] font-semibold text-blue-500 uppercase mb-0.5">
+      <p className="text-[10px] font-semibold text-brand-500 uppercase mb-0.5">
         LO {lo.loNumber}
       </p>
       <p className="text-sm text-gray-800 line-clamp-2 mb-2">
@@ -41,7 +41,7 @@ export default function OutcomeCard({
       </div>
       <div className="h-1 bg-gray-200 rounded-full overflow-hidden">
         <div
-          className="h-full bg-blue-400 rounded-full"
+          className="h-full bg-brand-400 rounded-full"
           style={{ width: `${pct}%` }}
         />
       </div>

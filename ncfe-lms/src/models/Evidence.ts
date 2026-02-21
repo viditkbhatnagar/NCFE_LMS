@@ -7,6 +7,9 @@ export interface IEvidence extends Document {
   fileName: string;
   fileType: string;
   fileSize: number;
+  storageProvider?: 'local' | 's3';
+  storageBucket?: string;
+  storageKey?: string;
   label: string;
   description: string;
   uploadedAt: Date;
@@ -43,6 +46,19 @@ const EvidenceSchema = new Schema<IEvidence>(
     },
     fileSize: {
       type: Number,
+    },
+    storageProvider: {
+      type: String,
+      enum: ['local', 's3'],
+      default: undefined,
+    },
+    storageBucket: {
+      type: String,
+      trim: true,
+    },
+    storageKey: {
+      type: String,
+      trim: true,
     },
     label: {
       type: String,

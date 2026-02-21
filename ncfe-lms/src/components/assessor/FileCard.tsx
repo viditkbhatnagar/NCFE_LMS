@@ -151,7 +151,7 @@ export default function FileCard({ item, onClick, onRename, onDelete }: FileCard
             }}
             onBlur={handleRename}
             autoFocus
-            className="w-full text-sm font-semibold text-gray-900 border border-blue-500 rounded px-1 py-0.5 focus:outline-none"
+            className="w-full text-sm font-semibold text-gray-900 border border-brand-500 rounded px-1 py-0.5 focus:outline-none"
           />
         </div>
       ) : (

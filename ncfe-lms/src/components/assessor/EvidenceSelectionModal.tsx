@@ -12,11 +12,6 @@ interface EvidenceItem {
   status: string;
 }
 
-interface PortfolioUnit {
-  unit: { _id: string; unitReference: string; title: string };
-  evidence: EvidenceItem[];
-}
-
 interface EvidenceSelectionModalProps {
   isOpen: boolean;
   onClose: () => void;
@@ -47,16 +42,21 @@ export default function EvidenceSelectionModal({
     const fetchEvidence = async () => {
       setLoading(true);
       try {
-        const res = await fetch(`/api/portfolio/${enrollmentId}`);
+        const res = await fetch(`/api/v2/portfolio/${enrollmentId}`);
         if (!res.ok) throw new Error(`HTTP ${res.status}`);
         const json = await res.json();
         if (json.success) {
-          const flattened = json.data.portfolio.flatMap((p: PortfolioUnit) =>
-            p.evidence.map((e: EvidenceItem) => ({
-              ...e,
-              unitName: `${p.unit.unitReference} - ${p.unit.title}`,
-            }))
-          );
+          const flattened = (json.data as Array<Record<string, unknown>>).map((e: Record<string, unknown>) => ({
+            _id: e._id as string,
+            fileName: e.fileName as string,
+            fileType: e.fileType as string,
+            label: e.label as string,
+            description: (e.description as string) || '',
+            status: e.status as string,
+            unitName: e.unitId
+              ? `${(e.unitId as Record<string, string>).unitReference} - ${(e.unitId as Record<string, string>).title}`
+              : 'No unit',
+          }));
           setAllEvidence(flattened);
         }
       } catch (err) {
@@ -121,14 +121,14 @@ export default function EvidenceSelectionModal({
                 key={evidence._id}
                 onClick={() => toggleEvidence(evidence._id)}
                 className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-[6px] transition-colors text-left ${
-                  isChecked ? 'bg-blue-50 border border-blue-200' : 'hover:bg-gray-50 border border-transparent'
+                  isChecked ? 'bg-brand-50 border border-brand-200' : 'hover:bg-gray-50 border border-transparent'
                 }`}
               >
                 {/* Checkbox */}
                 <div
                   className={`w-4 h-4 rounded border-2 flex items-center justify-center shrink-0 transition-colors ${
                     isChecked
-                      ? 'bg-blue-500 border-blue-500'
+                      ? 'bg-brand-500 border-brand-500'
                       : 'border-gray-300'
                   }`}
                 >
@@ -158,7 +158,7 @@ export default function EvidenceSelectionModal({
                     evidence.status === 'assessed'
                       ? 'bg-green-50 text-green-700'
                       : evidence.status === 'submitted'
-                      ? 'bg-blue-50 text-blue-700'
+                      ? 'bg-brand-50 text-brand-700'
                       : 'bg-gray-100 text-gray-600'
                   }`}
                 >

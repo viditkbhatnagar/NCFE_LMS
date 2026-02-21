@@ -69,10 +69,14 @@ export async function GET(
       mappingsByEvidence[key].push(mapping);
     }
 
-    const evidenceWithMappings = evidenceDocs.map((e) => ({
-      ...e.toObject(),
-      mappings: mappingsByEvidence[e._id.toString()] || [],
-    }));
+    const evidenceWithMappings = evidenceDocs.map((e) => {
+      const evidenceObj = e.toObject();
+      return {
+        ...evidenceObj,
+        fileUrl: `/api/v2/evidence/${e._id.toString()}/download`,
+        mappings: mappingsByEvidence[e._id.toString()] || [],
+      };
+    });
 
     return NextResponse.json({
       success: true,

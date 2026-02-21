@@ -9,6 +9,9 @@ export interface ILearningMaterial extends Document {
   fileName: string;
   fileType: 'pdf' | 'pptx' | 'video' | 'template' | 'other' | '';
   fileSize: number;
+  storageProvider?: 'local' | 's3';
+  storageBucket?: string;
+  storageKey?: string;
   category: 'manual' | 'slides' | 'video' | 'guidance' | 'template' | '';
   folderId: mongoose.Types.ObjectId | null;
   isFolder: boolean;
@@ -55,6 +58,19 @@ const LearningMaterialSchema = new Schema<ILearningMaterial>(
     fileSize: {
       type: Number,
       default: 0,
+    },
+    storageProvider: {
+      type: String,
+      enum: ['local', 's3'],
+      default: undefined,
+    },
+    storageBucket: {
+      type: String,
+      trim: true,
+    },
+    storageKey: {
+      type: String,
+      trim: true,
     },
     category: {
       type: String,

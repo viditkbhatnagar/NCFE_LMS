@@ -42,7 +42,14 @@ export async function GET(
       );
     }
 
-    return NextResponse.json({ success: true, data: doc });
+    const responseData = doc.isFolder
+      ? doc
+      : {
+          ...doc,
+          fileUrl: `/api/v2/course-documents/${doc._id.toString()}/download`,
+        };
+
+    return NextResponse.json({ success: true, data: responseData });
   } catch (err) {
     console.error('Error fetching course document:', err);
     return NextResponse.json(
@@ -100,7 +107,15 @@ export async function PUT(
       .populate('uploadedBy', 'name email')
       .lean();
 
-    return NextResponse.json({ success: true, data: doc });
+    const responseData =
+      doc && !doc.isFolder
+        ? {
+            ...doc,
+            fileUrl: `/api/v2/course-documents/${doc._id.toString()}/download`,
+          }
+        : doc;
+
+    return NextResponse.json({ success: true, data: responseData });
   } catch (err) {
     console.error('Error updating course document:', err);
     return NextResponse.json(
@@ -116,7 +131,11 @@ async function deleteRecursive(folderId: string) {
     if (child.isFolder) {
       await deleteRecursive(child._id.toString());
     } else if (child.fileUrl) {
-      await deleteFile(child.fileUrl);
+      await deleteFile(child.fileUrl, {
+        storageProvider: child.storageProvider as 'local' | 's3' | undefined,
+        storageBucket: child.storageBucket,
+        storageKey: child.storageKey,
+      });
     }
   }
   await CourseDoc.deleteMany({ folderId });
@@ -156,7 +175,11 @@ export async function DELETE(
     if (doc.isFolder) {
       await deleteRecursive(id);
     } else if (doc.fileUrl) {
-      await deleteFile(doc.fileUrl);
+      await deleteFile(doc.fileUrl, {
+        storageProvider: doc.storageProvider as 'local' | 's3' | undefined,
+        storageBucket: doc.storageBucket,
+        storageKey: doc.storageKey,
+      });
     }
 
     await CourseDoc.findByIdAndDelete(id);

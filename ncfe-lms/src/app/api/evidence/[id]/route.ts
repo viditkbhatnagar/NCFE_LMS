@@ -5,6 +5,28 @@ import { createAuditLog } from '@/lib/audit';
 import { deleteFile } from '@/lib/upload';
 import Evidence from '@/models/Evidence';
 import EvidenceMapping from '@/models/EvidenceMapping';
+import Enrolment from '@/models/Enrolment';
+
+async function hasEvidenceAccess(
+  user: { id: string; role: string },
+  enrolmentId: unknown
+) {
+  if (user.role === 'iqa' || user.role === 'admin') return true;
+  if (!enrolmentId) return false;
+
+  const enrollment = await Enrolment.findById(enrolmentId).lean();
+  if (!enrollment) return false;
+
+  if (user.role === 'student') {
+    return enrollment.userId?.toString() === user.id;
+  }
+
+  if (user.role === 'assessor') {
+    return enrollment.assessorId?.toString() === user.id;
+  }
+
+  return false;
+}
 
 export async function GET(
   request: Request,
@@ -12,7 +34,7 @@ export async function GET(
 ) {
   try {
     const { id } = await params;
-    const { session, error } = await withAuth();
+    const { session, error } = await withAuth(['student', 'assessor', 'iqa', 'admin']);
 
     if (error) {
       return error;
@@ -31,6 +53,14 @@ export async function GET(
       );
     }
 
+    const canAccess = await hasEvidenceAccess(session!.user, evidence.enrolmentId);
+    if (!canAccess) {
+      return NextResponse.json(
+        { success: false, error: 'Forbidden' },
+        { status: 403 }
+      );
+    }
+
     const mappings = await EvidenceMapping.find({
       evidenceId: id,
       status: 'active',
@@ -38,10 +68,13 @@ export async function GET(
       .populate('learningOutcomeId')
       .populate('unitId');
 
+    const evidenceData = evidence.toObject();
+    evidenceData.fileUrl = `/api/v2/evidence/${id}/download`;
+
     return NextResponse.json({
       success: true,
       data: {
-        evidence,
+        evidence: evidenceData,
         mappings,
       },
     });
@@ -60,7 +93,7 @@ export async function PUT(
 ) {
   try {
     const { id } = await params;
-    const { session, error } = await withAuth();
+    const { session, error } = await withAuth(['student', 'assessor', 'iqa', 'admin']);
 
     if (error) {
       return error;
@@ -74,6 +107,14 @@ export async function PUT(
       return NextResponse.json(
         { success: false, error: 'Evidence not found' },
         { status: 404 }
+      );
+    }
+
+    const canAccess = await hasEvidenceAccess(session!.user, evidence.enrolmentId);
+    if (!canAccess) {
+      return NextResponse.json(
+        { success: false, error: 'Forbidden' },
+        { status: 403 }
       );
     }
 
@@ -122,7 +163,7 @@ export async function DELETE(
 ) {
   try {
     const { id } = await params;
-    const { session, error } = await withAuth();
+    const { session, error } = await withAuth(['student', 'assessor', 'iqa', 'admin']);
 
     if (error) {
       return error;
@@ -139,6 +180,14 @@ export async function DELETE(
       );
     }
 
+    const canAccess = await hasEvidenceAccess(session!.user, evidence.enrolmentId);
+    if (!canAccess) {
+      return NextResponse.json(
+        { success: false, error: 'Forbidden' },
+        { status: 403 }
+      );
+    }
+
     if (evidence.status !== 'draft') {
       return NextResponse.json(
         { success: false, error: 'Only draft evidence can be deleted' },
@@ -147,7 +196,11 @@ export async function DELETE(
     }
 
     // Delete the physical file
-    await deleteFile(evidence.fileUrl);
+    await deleteFile(evidence.fileUrl, {
+      storageProvider: evidence.storageProvider as 'local' | 's3' | undefined,
+      storageBucket: evidence.storageBucket,
+      storageKey: evidence.storageKey,
+    });
 
     // Delete associated mappings
     await EvidenceMapping.deleteMany({ evidenceId: id });

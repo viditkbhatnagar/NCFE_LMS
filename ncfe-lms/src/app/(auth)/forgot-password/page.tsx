@@ -21,18 +21,11 @@ export default function ForgotPasswordPage() {
   };
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-background px-4">
-      <div className="w-full max-w-md">
-        <div className="flex items-center justify-center gap-4 mb-8">
-          <img src="/skillhub-logo.jpeg" alt="Skill Hub" className="h-12 w-auto object-contain" />
-          <div className="h-8 w-px bg-gray-200" />
-          <img src="/ncfe-logo.jpg" alt="NCFE" className="h-8 w-auto object-contain" />
-        </div>
-
-        <Card padding="lg">
+    <>
+      <Card padding="lg">
           {submitted ? (
             <div className="text-center">
-              <div className="w-12 h-12 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-4">
+              <div className="w-12 h-12 bg-primary-light rounded-full flex items-center justify-center mx-auto mb-4">
                 <svg className="w-6 h-6 text-primary" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
                 </svg>
@@ -79,8 +72,7 @@ export default function ForgotPasswordPage() {
               </p>
             </>
           )}
-        </Card>
-      </div>
-    </div>
+      </Card>
+    </>
   );
 }

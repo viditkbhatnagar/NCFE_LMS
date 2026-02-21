@@ -71,7 +71,15 @@ export async function GET(request: Request) {
       .sort({ isFolder: -1, fileName: 1 })
       .lean();
 
-    return NextResponse.json({ success: true, data: docs });
+    const data = docs.map((doc) => {
+      if (doc.isFolder) return doc;
+      return {
+        ...doc,
+        fileUrl: `/api/v2/personal-documents/${doc._id.toString()}/download`,
+      };
+    });
+
+    return NextResponse.json({ success: true, data });
   } catch (err) {
     console.error('Error fetching personal documents:', err);
     return NextResponse.json(
@@ -129,7 +137,15 @@ export async function POST(request: Request) {
       targetUserId = userId;
     }
 
-    const { filePath, fileName, fileType, fileSize } = await uploadFile(
+    const {
+      filePath,
+      fileName,
+      fileType,
+      fileSize,
+      storageProvider,
+      storageBucket,
+      storageKey,
+    } = await uploadFile(
       file,
       targetUserId
     );
@@ -140,6 +156,9 @@ export async function POST(request: Request) {
       fileUrl: filePath,
       fileType,
       fileSize,
+      storageProvider,
+      storageBucket,
+      storageKey,
       folderId: folderId || null,
       isFolder: false,
       uploadedBy: user.id,
@@ -149,10 +168,14 @@ export async function POST(request: Request) {
       .populate('uploadedBy', 'name email')
       .lean();
 
-    return NextResponse.json(
-      { success: true, data: populated },
-      { status: 201 }
-    );
+    const responseData = populated
+      ? {
+          ...populated,
+          fileUrl: `/api/v2/personal-documents/${populated._id.toString()}/download`,
+        }
+      : populated;
+
+    return NextResponse.json({ success: true, data: responseData }, { status: 201 });
   } catch (err: unknown) {
     console.error('Error creating personal document:', err);
     const isValidation =
