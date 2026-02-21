@@ -125,7 +125,16 @@ export async function POST(request: Request) {
     const qualificationId = formData.get('qualificationId') as string | null;
     const folderId = formData.get('folderId') as string | null;
 
-    if (!file) {
+    // Check if file was pre-uploaded via presigned URL
+    const preUploadedKey = formData.get('storageKey') as string | null;
+    const preUploadedBucket = formData.get('storageBucket') as string | null;
+    const preUploadedFileName = formData.get('fileName') as string | null;
+    const preUploadedFileType = formData.get('fileType') as string | null;
+    const preUploadedFileSize = formData.get('fileSize') as string | null;
+
+    const isPreUploaded = !!preUploadedKey;
+
+    if (!file && !isPreUploaded) {
       return NextResponse.json(
         { success: false, error: 'No file provided' },
         { status: 400 }
@@ -138,18 +147,27 @@ export async function POST(request: Request) {
       );
     }
 
-    const {
-      filePath,
-      fileName,
-      fileType,
-      fileSize,
-      storageProvider,
-      storageBucket,
-      storageKey,
-    } = await uploadFile(
-      file,
-      qualificationId
-    );
+    let filePath: string, fileName: string, fileType: string, fileSize: number;
+    let storageProvider: string, storageBucket: string | undefined, storageKey: string | undefined;
+
+    if (isPreUploaded) {
+      filePath = `s3://${preUploadedBucket}/${preUploadedKey}`;
+      fileName = preUploadedFileName || 'unknown';
+      fileType = preUploadedFileType || 'application/octet-stream';
+      fileSize = Number(preUploadedFileSize) || 0;
+      storageProvider = 's3';
+      storageBucket = preUploadedBucket || undefined;
+      storageKey = preUploadedKey || undefined;
+    } else {
+      const result = await uploadFile(file!, qualificationId);
+      filePath = result.filePath;
+      fileName = result.fileName;
+      fileType = result.fileType;
+      fileSize = result.fileSize;
+      storageProvider = result.storageProvider;
+      storageBucket = result.storageBucket;
+      storageKey = result.storageKey;
+    }
 
     const doc = await CourseDoc.create({
       qualificationId,

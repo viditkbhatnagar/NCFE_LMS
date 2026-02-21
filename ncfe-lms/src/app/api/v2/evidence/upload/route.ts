@@ -18,7 +18,16 @@ export async function POST(request: Request) {
     const description = (formData.get('description') as string) || '';
     const unitId = formData.get('unitId') as string | null;
 
-    if (!file) {
+    // Check if file was pre-uploaded via presigned URL
+    const preUploadedKey = formData.get('storageKey') as string | null;
+    const preUploadedBucket = formData.get('storageBucket') as string | null;
+    const preUploadedFileName = formData.get('fileName') as string | null;
+    const preUploadedFileType = formData.get('fileType') as string | null;
+    const preUploadedFileSize = formData.get('fileSize') as string | null;
+
+    const isPreUploaded = !!preUploadedKey;
+
+    if (!file && !isPreUploaded) {
       return NextResponse.json(
         { success: false, error: 'No file provided' },
         { status: 400 }
@@ -59,20 +68,30 @@ export async function POST(request: Request) {
       );
     }
 
-    // Upload file using the shared utility, keyed under the learner's userId
-    const learnerId = enrollment.userId.toString();
-    const {
-      filePath,
-      fileName,
-      fileType,
-      fileSize,
-      storageProvider,
-      storageBucket,
-      storageKey,
-    } = await uploadFile(
-      file,
-      learnerId
-    );
+    let filePath: string, fileName: string, fileType: string, fileSize: number;
+    let storageProvider: string, storageBucket: string | undefined, storageKey: string | undefined;
+
+    if (isPreUploaded) {
+      // File already uploaded to S3 via presigned URL
+      filePath = `s3://${preUploadedBucket}/${preUploadedKey}`;
+      fileName = preUploadedFileName || 'unknown';
+      fileType = preUploadedFileType || 'application/octet-stream';
+      fileSize = Number(preUploadedFileSize) || 0;
+      storageProvider = 's3';
+      storageBucket = preUploadedBucket || undefined;
+      storageKey = preUploadedKey || undefined;
+    } else {
+      // Upload file using the shared utility
+      const learnerId = enrollment.userId.toString();
+      const result = await uploadFile(file!, learnerId);
+      filePath = result.filePath;
+      fileName = result.fileName;
+      fileType = result.fileType;
+      fileSize = result.fileSize;
+      storageProvider = result.storageProvider;
+      storageBucket = result.storageBucket;
+      storageKey = result.storageKey;
+    }
 
     const evidence = await Evidence.create({
       enrolmentId,

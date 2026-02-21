@@ -17,6 +17,15 @@ interface EvidenceUploadModalProps {
   onUploaded: () => void;
 }
 
+const ACCEPT_EXTENSIONS = '.pdf,.doc,.docx,.pptx,.xlsx,.csv,.txt,.jpg,.jpeg,.png,.gif,.webp,.mp4,.mov,.avi,.webm,.mkv,.mp3,.wav,.zip';
+
+function formatFileSize(bytes: number): string {
+  if (bytes < 1024) return `${bytes} B`;
+  if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
+  if (bytes < 1024 * 1024 * 1024) return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
+  return `${(bytes / (1024 * 1024 * 1024)).toFixed(2)} GB`;
+}
+
 export default function EvidenceUploadModal({
   isOpen,
   onClose,
@@ -29,8 +38,11 @@ export default function EvidenceUploadModal({
   const [description, setDescription] = useState('');
   const [unitId, setUnitId] = useState('');
   const [uploading, setUploading] = useState(false);
+  const [progress, setProgress] = useState(0);
+  const [uploadPhase, setUploadPhase] = useState('');
   const [error, setError] = useState('');
   const fileRef = useRef<HTMLInputElement>(null);
+  const xhrRef = useRef<XMLHttpRequest | null>(null);
 
   const reset = () => {
     setFile(null);
@@ -38,12 +50,46 @@ export default function EvidenceUploadModal({
     setDescription('');
     setUnitId('');
     setError('');
+    setProgress(0);
+    setUploadPhase('');
+    if (xhrRef.current) {
+      xhrRef.current.abort();
+      xhrRef.current = null;
+    }
     if (fileRef.current) fileRef.current.value = '';
   };
 
   const handleClose = () => {
     reset();
     onClose();
+  };
+
+  const uploadToS3WithProgress = (presignedUrl: string, file: File): Promise<void> => {
+    return new Promise((resolve, reject) => {
+      const xhr = new XMLHttpRequest();
+      xhrRef.current = xhr;
+
+      xhr.upload.addEventListener('progress', (e) => {
+        if (e.lengthComputable) {
+          setProgress(Math.round((e.loaded / e.total) * 100));
+        }
+      });
+
+      xhr.addEventListener('load', () => {
+        if (xhr.status >= 200 && xhr.status < 300) {
+          resolve();
+        } else {
+          reject(new Error(`Upload failed with status ${xhr.status}`));
+        }
+      });
+
+      xhr.addEventListener('error', () => reject(new Error('Upload failed')));
+      xhr.addEventListener('abort', () => reject(new Error('Upload cancelled')));
+
+      xhr.open('PUT', presignedUrl);
+      xhr.setRequestHeader('Content-Type', file.type || 'application/octet-stream');
+      xhr.send(file);
+    });
   };
 
   const handleSubmit = async () => {
@@ -58,13 +104,46 @@ export default function EvidenceUploadModal({
 
     setUploading(true);
     setError('');
+    setProgress(0);
+
     try {
+      // Step 1: Get presigned URL
+      setUploadPhase('Preparing upload...');
+      const presignRes = await fetch('/api/v2/upload/presign', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          fileName: file.name,
+          contentType: file.type,
+          fileSize: file.size,
+        }),
+      });
+      const presignJson = await presignRes.json();
+
+      if (!presignJson.success) {
+        setError(presignJson.error || 'Failed to prepare upload');
+        return;
+      }
+
+      const { presignedUrl, storageKey, storageBucket } = presignJson.data;
+
+      // Step 2: Upload directly to S3
+      setUploadPhase('Uploading file...');
+      await uploadToS3WithProgress(presignedUrl, file);
+
+      // Step 3: Save metadata
+      setUploadPhase('Saving...');
+      setProgress(100);
       const fd = new FormData();
-      fd.append('file', file);
       fd.append('enrolmentId', enrollmentId);
       fd.append('label', label.trim());
       fd.append('description', description);
       if (unitId) fd.append('unitId', unitId);
+      fd.append('storageKey', storageKey);
+      fd.append('storageBucket', storageBucket);
+      fd.append('fileName', file.name);
+      fd.append('fileType', file.type);
+      fd.append('fileSize', String(file.size));
 
       const res = await fetch('/api/v2/evidence/upload', {
         method: 'POST',
@@ -78,10 +157,12 @@ export default function EvidenceUploadModal({
 
       onUploaded();
       handleClose();
-    } catch {
+    } catch (err) {
+      if (err instanceof Error && err.message === 'Upload cancelled') return;
       setError('Upload failed. Please try again.');
     } finally {
       setUploading(false);
+      xhrRef.current = null;
     }
   };
 
@@ -96,13 +177,18 @@ export default function EvidenceUploadModal({
           <input
             ref={fileRef}
             type="file"
-            accept=".pdf,.doc,.docx,.jpg,.jpeg,.png,.mp4"
+            accept={ACCEPT_EXTENSIONS}
             onChange={(e) => setFile(e.target.files?.[0] || null)}
             className="block w-full text-sm text-gray-500 file:mr-3 file:py-1.5 file:px-3 file:rounded-md file:border-0 file:text-sm file:font-medium file:bg-brand-50 file:text-brand-700 hover:file:bg-brand-100"
           />
           <p className="text-xs text-gray-400 mt-1">
-            PDF, Word, Images, MP4 — max 50MB
+            PDF, Word, Images, Videos, Audio, ZIP — max 2GB
           </p>
+          {file && (
+            <p className="text-xs text-gray-500 mt-1">
+              Selected: {file.name} ({formatFileSize(file.size)})
+            </p>
+          )}
         </div>
 
         {/* Label */}
@@ -151,6 +237,22 @@ export default function EvidenceUploadModal({
             ))}
           </select>
         </div>
+
+        {/* Progress bar */}
+        {uploading && (
+          <div>
+            <div className="flex items-center justify-between text-xs text-gray-500 mb-1">
+              <span>{uploadPhase}</span>
+              <span>{progress}%</span>
+            </div>
+            <div className="w-full bg-gray-100 rounded-full h-2 overflow-hidden">
+              <div
+                className="bg-brand-600 h-2 rounded-full transition-all duration-300"
+                style={{ width: `${progress}%` }}
+              />
+            </div>
+          </div>
+        )}
 
         {error && <p className="text-sm text-red-600">{error}</p>}
       </div>

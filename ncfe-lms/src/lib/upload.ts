@@ -11,18 +11,36 @@ import {
 import { getSignedUrl } from '@aws-sdk/s3-request-presigner';
 
 const UPLOAD_DIR = path.join(process.cwd(), 'public', 'uploads');
-const MAX_FILE_SIZE = 50 * 1024 * 1024; // 50MB
+const MAX_FILE_SIZE = 2 * 1024 * 1024 * 1024; // 2GB
 const ALLOWED_TYPES = [
   'application/pdf',
   'application/msword',
   'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
   'application/vnd.openxmlformats-officedocument.presentationml.presentation',
+  'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+  'text/csv',
+  'text/plain',
   'image/jpeg',
   'image/png',
+  'image/gif',
+  'image/webp',
   'video/mp4',
+  'video/quicktime',
+  'video/x-msvideo',
+  'video/webm',
+  'video/x-matroska',
+  'audio/mpeg',
+  'audio/wav',
+  'application/zip',
 ];
 
-const ALLOWED_EXTENSIONS = ['.pdf', '.doc', '.docx', '.pptx', '.jpg', '.jpeg', '.png', '.mp4'];
+const ALLOWED_EXTENSIONS = [
+  '.pdf', '.doc', '.docx', '.pptx', '.xlsx', '.csv', '.txt',
+  '.jpg', '.jpeg', '.png', '.gif', '.webp',
+  '.mp4', '.mov', '.avi', '.webm', '.mkv',
+  '.mp3', '.wav',
+  '.zip',
+];
 
 export type StorageProvider = 'local' | 's3';
 
@@ -260,6 +278,45 @@ export async function getFileDownloadUrl(
     }),
     { expiresIn }
   );
+}
+
+export interface PresignedUploadResult {
+  presignedUrl: string;
+  storageKey: string;
+  storageBucket: string;
+  storageProvider: 's3';
+}
+
+export async function createPresignedUploadUrl(
+  fileName: string,
+  contentType: string,
+  ownerId: string
+): Promise<PresignedUploadResult> {
+  const ext = path.extname(fileName).toLowerCase();
+  if (!ALLOWED_EXTENSIONS.includes(ext)) {
+    throw new Error(`File type ${ext} is not allowed. Allowed: ${ALLOWED_EXTENSIONS.join(', ')}`);
+  }
+
+  const { bucket, region } = getS3Config();
+  const key = buildS3Key(ownerId, ext);
+  const s3 = getS3Client(region);
+
+  const presignedUrl = await getSignedUrl(
+    s3,
+    new PutObjectCommand({
+      Bucket: bucket,
+      Key: key,
+      ContentType: contentType || 'application/octet-stream',
+    }),
+    { expiresIn: 3600 } // 1 hour to complete upload
+  );
+
+  return {
+    presignedUrl,
+    storageKey: key,
+    storageBucket: bucket,
+    storageProvider: 's3',
+  };
 }
 
 export { ALLOWED_TYPES, ALLOWED_EXTENSIONS, MAX_FILE_SIZE };
