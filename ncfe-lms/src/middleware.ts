@@ -16,6 +16,7 @@ export const config = {
     '/submissions/:path*',
     '/progress/:path*',
     '/c/:path*',
+    '/admin/:path*',
     '/sign-in',
     '/sign-up',
     '/forgot-password',

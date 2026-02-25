@@ -35,7 +35,9 @@ export default function SignInPage() {
           const sessionRes = await fetch('/api/auth/session');
           const session = await sessionRes.json();
           const role = session?.user?.role;
-          if (role === 'assessor' || role === 'student') {
+          if (role === 'admin') {
+            router.push('/admin/dashboard');
+          } else if (role === 'assessor' || role === 'student') {
             router.push('/c');
           } else {
             router.push('/dashboard');

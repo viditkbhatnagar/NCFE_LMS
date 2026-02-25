@@ -22,7 +22,9 @@ export async function GET(
     await dbConnect();
 
     // Verify enrollment belongs to this assessor
-    const enrollment = await Enrolment.findById(enrollmentId).lean();
+    const enrollment = await Enrolment.findById(enrollmentId)
+      .populate('userId', 'name email')
+      .lean();
     if (!enrollment) {
       return NextResponse.json(
         { success: false, error: 'Enrollment not found' },
@@ -30,10 +32,16 @@ export async function GET(
       );
     }
     const user = session!.user;
+    // userId is populated (object with _id), assessorId is not (raw ObjectId)
+    const rawUserId = enrollment.userId as unknown;
+    const enrollmentUserId =
+      rawUserId && typeof rawUserId === 'object' && '_id' in (rawUserId as Record<string, unknown>)
+        ? String((rawUserId as Record<string, unknown>)._id)
+        : String(rawUserId ?? '');
     const isOwner =
       user.role === 'assessor'
         ? enrollment.assessorId?.toString() === user.id
-        : enrollment.userId?.toString() === user.id;
+        : enrollmentUserId === user.id;
     if (!isOwner) {
       return NextResponse.json(
         { success: false, error: 'Forbidden' },
@@ -104,7 +112,13 @@ export async function GET(
       };
     });
 
-    return NextResponse.json({ success: true, data });
+    // Include uploader (student) info from enrollment
+    const populatedUser = enrollment.userId as unknown as { name?: string; email?: string } | null;
+    const uploadedBy = populatedUser && populatedUser.name
+      ? { name: populatedUser.name, email: populatedUser.email || '' }
+      : null;
+
+    return NextResponse.json({ success: true, data, uploadedBy });
   } catch (err) {
     console.error('Error fetching v2 portfolio:', err);
     return NextResponse.json(

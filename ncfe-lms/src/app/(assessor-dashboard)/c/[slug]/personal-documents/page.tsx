@@ -7,6 +7,7 @@ import FileBreadcrumbs from '@/components/assessor/FileBreadcrumbs';
 import FileGrid from '@/components/assessor/FileGrid';
 import FileListView from '@/components/assessor/FileListView';
 import FileUploadModal from '@/components/assessor/FileUploadModal';
+import FilePreviewModal from '@/components/assessor/FilePreviewModal';
 import type { FileItem, FolderBreadcrumb } from '@/types';
 
 type ViewMode = 'grid' | 'list';
@@ -22,6 +23,7 @@ export default function PersonalDocumentsPage() {
   const [viewMode, setViewMode] = useState<ViewMode>('grid');
   const [fileTypeFilter, setFileTypeFilter] = useState('');
   const [showUploadModal, setShowUploadModal] = useState(false);
+  const [previewItem, setPreviewItem] = useState<FileItem | null>(null);
 
   const fetchItems = useCallback(async () => {
     // Students don't need selectedLearner — API auto-scopes to own docs
@@ -79,6 +81,16 @@ export default function PersonalDocumentsPage() {
     }
   };
 
+  const handlePreview = (item: FileItem) => {
+    if (!item.isFolder) setPreviewItem(item);
+  };
+
+  const handleDownload = (item: FileItem) => {
+    if (!item.isFolder) {
+      window.open(`/api/v2/personal-documents/${item._id}/download`, '_blank');
+    }
+  };
+
   // Assessor with no learner selected
   if (!isStudent && !selectedLearner) {
     return (
@@ -130,9 +142,19 @@ export default function PersonalDocumentsPage() {
             <p className="text-sm text-gray-400">No personal documents are available yet.</p>
           </div>
         ) : viewMode === 'grid' ? (
-          <FileGrid items={items} onItemClick={handleItemClick} />
+          <FileGrid
+            items={items}
+            onItemClick={handleItemClick}
+            onPreview={handlePreview}
+            onDownload={handleDownload}
+          />
         ) : (
-          <FileListView items={items} onItemClick={handleItemClick} />
+          <FileListView
+            items={items}
+            onItemClick={handleItemClick}
+            onPreview={handlePreview}
+            onDownload={handleDownload}
+          />
         )}
       </div>
 
@@ -146,6 +168,21 @@ export default function PersonalDocumentsPage() {
             folderId: currentFolderId || '',
           }}
           onUploaded={fetchItems}
+        />
+      )}
+
+      {previewItem && (
+        <FilePreviewModal
+          isOpen={!!previewItem}
+          onClose={() => setPreviewItem(null)}
+          downloadUrl={`/api/v2/personal-documents/${previewItem._id}/download`}
+          fileName={previewItem.fileName}
+          fileType={previewItem.fileType}
+          metadata={{
+            size: previewItem.fileSize,
+            uploadedAt: previewItem.createdAt,
+            uploader: previewItem.uploadedBy ? { name: previewItem.uploadedBy.name, email: previewItem.uploadedBy.email } : undefined,
+          }}
         />
       )}
     </div>

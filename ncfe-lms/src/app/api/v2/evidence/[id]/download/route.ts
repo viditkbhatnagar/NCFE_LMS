@@ -47,15 +47,24 @@ export async function GET(
       }
     }
 
+    const { searchParams } = new URL(request.url);
+    const isPreview = searchParams.get('preview') === 'true';
+
     const url = await getFileDownloadUrl(evidence.fileUrl, {
       storageProvider: evidence.storageProvider as 'local' | 's3' | undefined,
       storageBucket: evidence.storageBucket,
       storageKey: evidence.storageKey,
-      fileName: evidence.fileName,
+      // Omit fileName for preview mode so the browser displays inline
+      fileName: isPreview ? undefined : evidence.fileName,
     });
 
-    const redirectTarget = url.startsWith('http') ? url : new URL(url, request.url).toString();
-    return NextResponse.redirect(redirectTarget);
+    const resolvedUrl = url.startsWith('http') ? url : new URL(url, request.url).toString();
+
+    if (searchParams.get('json') === 'true') {
+      return NextResponse.json({ success: true, url: resolvedUrl });
+    }
+
+    return NextResponse.redirect(resolvedUrl);
   } catch (err) {
     console.error('Error generating evidence download URL:', err);
     return NextResponse.json(

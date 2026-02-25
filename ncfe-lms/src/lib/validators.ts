@@ -89,7 +89,7 @@ export const assessmentCreateSchema = z.object({
     .default(null),
   planIntent: z.string().optional().default(''),
   planImplementation: z.string().optional().default(''),
-  status: z.enum(['draft', 'published']).optional().default('draft'),
+  status: z.enum(['draft', 'published', 'published_modified']).optional().default('draft'),
   learnerId: z.string().min(1, 'Learner ID is required'),
   enrollmentId: z.string().min(1, 'Enrollment ID is required'),
 });
@@ -133,7 +133,7 @@ export const assessmentUpdateSchema = z.object({
     .optional(),
   planIntent: z.string().optional(),
   planImplementation: z.string().optional(),
-  status: z.enum(['draft', 'published']).optional(),
+  status: z.enum(['draft', 'published', 'published_modified']).optional(),
 });
 
 export const criteriaMappingUpdateSchema = z.object({
@@ -176,4 +176,82 @@ export const workHoursUpdateSchema = z.object({
   minutes: z.number().int().min(0).max(59).optional(),
   notes: z.string().optional(),
   date: z.string().or(z.date()).optional(),
+});
+
+// ── Admin CRUD validators ────────────────────────────────────────────────────
+
+export const qualificationCreateSchema = z.object({
+  title: z.string().min(3, 'Title is required'),
+  level: z.number().int().min(1).max(8),
+  code: z.string().min(1, 'Qualification code is required'),
+  awardingBody: z.string().optional().default('NCFE/CACHE'),
+  description: z.string().optional().default(''),
+  status: z.enum(['active', 'inactive']).optional().default('active'),
+});
+
+export const qualificationUpdateSchema = qualificationCreateSchema.partial();
+
+export const unitCreateSchema = z.object({
+  unitReference: z.string().min(1, 'Unit reference is required'),
+  title: z.string().min(1, 'Unit title is required'),
+  description: z.string().optional().default(''),
+  qualificationId: z.string().min(1, 'Qualification ID is required'),
+});
+
+export const unitUpdateSchema = unitCreateSchema.partial().omit({ qualificationId: true });
+
+export const learningOutcomeCreateSchema = z.object({
+  unitId: z.string().min(1, 'Unit ID is required'),
+  loNumber: z.string().min(1, 'LO number is required'),
+  description: z.string().min(1, 'Description is required'),
+});
+
+export const learningOutcomeUpdateSchema = learningOutcomeCreateSchema.partial().omit({ unitId: true });
+
+export const assessmentCriteriaAdminCreateSchema = z.object({
+  learningOutcomeId: z.string().min(1),
+  unitId: z.string().min(1),
+  qualificationId: z.string().min(1),
+  acNumber: z.string().min(1, 'AC number is required'),
+  description: z.string().min(1, 'Description is required'),
+  evidenceRequirements: z.string().optional().default(''),
+});
+
+export const assessmentCriteriaAdminUpdateSchema = assessmentCriteriaAdminCreateSchema
+  .partial()
+  .omit({ learningOutcomeId: true, unitId: true, qualificationId: true });
+
+export const adminUserCreateSchema = z.object({
+  name: z.string().min(2, 'Name must be at least 2 characters'),
+  email: z.string().email('Invalid email'),
+  password: z.string().min(8, 'Password must be at least 8 characters'),
+  role: z.enum(['student', 'assessor', 'iqa', 'admin']),
+  phone: z.string().optional(),
+  status: z.enum(['active', 'inactive']).optional().default('active'),
+});
+
+export const adminUserUpdateSchema = z.object({
+  name: z.string().min(2).optional(),
+  email: z.string().email().optional(),
+  role: z.enum(['student', 'assessor', 'iqa', 'admin']).optional(),
+  phone: z.string().optional(),
+  status: z.enum(['active', 'inactive']).optional(),
+});
+
+export const adminPasswordResetSchema = z.object({
+  newPassword: z.string().min(8, 'Password must be at least 8 characters'),
+});
+
+export const adminEnrolmentCreateSchema = z.object({
+  userId: z.string().min(1, 'Student ID is required'),
+  qualificationId: z.string().min(1, 'Qualification ID is required'),
+  assessorId: z.string().optional(),
+  cohortId: z.string().optional(),
+  status: z.enum(['enrolled', 'in_progress', 'completed', 'withdrawn']).optional().default('enrolled'),
+});
+
+export const adminEnrolmentUpdateSchema = z.object({
+  assessorId: z.string().optional(),
+  cohortId: z.string().optional(),
+  status: z.enum(['enrolled', 'in_progress', 'completed', 'withdrawn']).optional(),
 });

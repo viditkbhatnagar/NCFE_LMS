@@ -1,7 +1,9 @@
 'use client';
 
 import { useState } from 'react';
+import { useAssessorCourse } from '@/contexts/AssessorCourseContext';
 import EvidenceSelectionModal from '@/components/assessor/EvidenceSelectionModal';
+import FilePreviewModal from '@/components/assessor/FilePreviewModal';
 import type { EvidenceMapEntry } from '@/types';
 
 interface EvidenceMappingSectionProps {
@@ -19,7 +21,9 @@ export default function EvidenceMappingSection({
   onUpdated,
   readOnly = false,
 }: EvidenceMappingSectionProps) {
+  const { selectedLearner } = useAssessorCourse();
   const [showModal, setShowModal] = useState(false);
+  const [previewEvidence, setPreviewEvidence] = useState<EvidenceMapEntry['evidenceId'] | null>(null);
 
   const currentEvidenceIds = evidenceMap.map((m) => m.evidenceId._id);
 
@@ -92,17 +96,40 @@ export default function EvidenceMappingSection({
                 </p>
                 <p className="text-xs text-gray-500 truncate">{item.evidenceId.fileType}</p>
               </div>
-              {!readOnly && (
+              <div className="flex items-center gap-1 shrink-0">
                 <button
-                  onClick={() => handleRemove(item.evidenceId._id)}
-                  className="p-1 text-gray-400 hover:text-red-500 transition-colors shrink-0"
-                  title="Remove"
+                  onClick={() => setPreviewEvidence(item.evidenceId)}
+                  className="p-1 text-gray-400 hover:text-primary transition-colors"
+                  title="Preview"
                 >
                   <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
                   </svg>
                 </button>
-              )}
+                <a
+                  href={`/api/v2/evidence/${item.evidenceId._id}/download`}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="p-1 text-gray-400 hover:text-primary transition-colors"
+                  title="Download"
+                >
+                  <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
+                  </svg>
+                </a>
+                {!readOnly && (
+                  <button
+                    onClick={() => handleRemove(item.evidenceId._id)}
+                    className="p-1 text-gray-400 hover:text-red-500 transition-colors"
+                    title="Remove"
+                  >
+                    <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                    </svg>
+                  </button>
+                )}
+              </div>
             </div>
           ))}
         </div>
@@ -118,6 +145,24 @@ export default function EvidenceMappingSection({
           onSaved={() => {
             setShowModal(false);
             onUpdated();
+          }}
+        />
+      )}
+
+      {previewEvidence && (
+        <FilePreviewModal
+          isOpen={!!previewEvidence}
+          onClose={() => setPreviewEvidence(null)}
+          downloadUrl={`/api/v2/evidence/${previewEvidence._id}/download`}
+          fileName={previewEvidence.fileName}
+          fileType={previewEvidence.fileType}
+          label={previewEvidence.label}
+          metadata={{
+            size: previewEvidence.fileSize,
+            uploadedAt: previewEvidence.uploadedAt,
+            status: previewEvidence.status,
+            description: previewEvidence.description,
+            ...(selectedLearner ? { uploader: { name: selectedLearner.name, email: selectedLearner.email } } : {}),
           }}
         />
       )}

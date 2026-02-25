@@ -19,13 +19,23 @@ export const authConfig: NextAuthConfig = {
         nextUrl.pathname.startsWith('/submissions') ||
         nextUrl.pathname.startsWith('/progress') ||
         nextUrl.pathname.startsWith('/c/') ||
-        nextUrl.pathname === '/c';
+        nextUrl.pathname === '/c' ||
+        nextUrl.pathname.startsWith('/admin');
 
       if (isOnDashboard) {
         if (!isLoggedIn) return false; // Redirect to sign-in
 
-        // Redirect assessors/students away from old dashboard to /c
         const role = (auth?.user as Record<string, unknown> | undefined)?.role;
+
+        // Protect /admin/* routes: only admin can access
+        if (nextUrl.pathname.startsWith('/admin')) {
+          if (role !== 'admin') {
+            return Response.redirect(new URL('/dashboard', nextUrl));
+          }
+          return true;
+        }
+
+        // Redirect assessors/students away from old dashboard to /c
         const isOldDashboard = nextUrl.pathname.startsWith('/dashboard') ||
           nextUrl.pathname.startsWith('/courses') ||
           nextUrl.pathname.startsWith('/portfolio') ||
@@ -39,6 +49,11 @@ export const authConfig: NextAuthConfig = {
           return Response.redirect(new URL('/c', nextUrl));
         }
 
+        // Redirect admin away from old dashboard to /admin/dashboard
+        if (isOldDashboard && role === 'admin') {
+          return Response.redirect(new URL('/admin/dashboard', nextUrl));
+        }
+
         return true;
       }
 
@@ -49,6 +64,9 @@ export const authConfig: NextAuthConfig = {
 
       if (isOnAuthPage && isLoggedIn) {
         const role = (auth?.user as Record<string, unknown> | undefined)?.role;
+        if (role === 'admin') {
+          return Response.redirect(new URL('/admin/dashboard', nextUrl));
+        }
         if (role === 'assessor' || role === 'student') {
           return Response.redirect(new URL('/c', nextUrl));
         }

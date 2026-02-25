@@ -157,6 +157,13 @@ export default function DetailHeader({
           >
             Send to learner
           </button>
+        ) : !readOnly && status === 'published_modified' ? (
+          <button
+            onClick={onPublish}
+            className="px-3 py-1 bg-amber-500 text-white rounded-[6px] text-xs font-medium hover:bg-amber-600 transition-colors"
+          >
+            Send update to learner
+          </button>
         ) : status === 'published' ? (
           <span className="px-3 py-1 bg-gray-100 text-gray-500 rounded-[6px] text-xs font-medium">
             Published

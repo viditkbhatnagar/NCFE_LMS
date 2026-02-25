@@ -58,7 +58,7 @@ export async function GET(
           { status: 403 }
         );
       }
-      if (assessment.status !== 'published') {
+      if (assessment.status !== 'published' && assessment.status !== 'published_modified') {
         return NextResponse.json(
           { success: false, error: 'Assessment not found' },
           { status: 404 }
@@ -153,10 +153,26 @@ export async function PUT(
     }
 
     const previousStatus = assessment.status;
+    const isStatusChangeOnly = Object.keys(validation.data).length === 1 && 'status' in validation.data;
+
+    // Auto-transition: editing a published assessment marks it as modified
+    if (
+      (previousStatus === 'published' || previousStatus === 'published_modified') &&
+      !isStatusChangeOnly
+    ) {
+      validation.data.status = 'published_modified';
+    }
+
     Object.assign(assessment, validation.data);
+
+    // Handle publish transitions
+    if (assessment.status === 'published' && previousStatus !== 'published') {
+      assessment.publishCount = (assessment.publishCount || 0) + 1;
+    }
+
     await assessment.save();
 
-    // Notify learner when assessment is published
+    // Notify learner when assessment is first published
     if (previousStatus === 'draft' && assessment.status === 'published') {
       const learnerId = assessment.learnerId?.toString();
       if (learnerId) {
@@ -165,6 +181,21 @@ export async function PUT(
           type: 'assessment_published',
           title: 'Assessment Published',
           message: `Assessment "${assessment.title}" is now available for review`,
+          entityType: 'Assessment',
+          entityId: assessment._id.toString(),
+        });
+      }
+    }
+
+    // Notify learner when a published assessment is re-published after edits
+    if (previousStatus === 'published_modified' && assessment.status === 'published') {
+      const learnerId = assessment.learnerId?.toString();
+      if (learnerId) {
+        createNotification({
+          userId: learnerId,
+          type: 'assessment_updated',
+          title: 'Assessment Updated',
+          message: `Assessment "${assessment.title}" has been updated — please review the changes`,
           entityType: 'Assessment',
           entityId: assessment._id.toString(),
         });

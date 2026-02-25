@@ -18,7 +18,7 @@ export type AssessmentKind =
   | 'work_product'
   | 'witness_testimony';
 
-export type AssessmentStatus = 'draft' | 'published';
+export type AssessmentStatus = 'draft' | 'published' | 'published_modified';
 export type SignOffRole = 'assessor' | 'iqa' | 'eqa' | 'learner';
 export type SignOffStatus = 'pending' | 'signed_off' | 'rejected';
 
@@ -42,6 +42,7 @@ export interface AssessmentListItem {
   enrollmentId: { _id: string; cohortId: string };
   qualificationId: string;
   criteriaCount: number;
+  publishCount: number;
   signOffs: Array<{ role: SignOffRole; status: SignOffStatus }>;
   createdAt: string;
   updatedAt: string;
@@ -86,9 +87,11 @@ export interface EvidenceMapEntry {
     _id: string;
     fileName: string;
     fileType: string;
+    fileSize?: number;
     label: string;
     description: string;
     status: string;
+    uploadedAt?: string;
   };
 }
 
@@ -315,6 +318,27 @@ export interface SearchResults {
   members: SearchResultMember[];
   assessments: SearchResultAssessment[];
   evidence: SearchResultEvidence[];
+}
+
+// Admin dashboard types
+export interface AdminDashboardStats {
+  totalUsers: number;
+  totalCourses: number;
+  totalEnrolments: number;
+  studentCount: number;
+  assessorCount: number;
+  iqaCount: number;
+  activeEnrolments: number;
+  recentAuditLogs: AuditLogEntry[];
+}
+
+export interface AuditLogEntry {
+  _id: string;
+  userId: string | null;
+  action: string;
+  entityType: string;
+  entityId: string | null;
+  timestamp: string;
 }
 
 // Phase 5: Course selector type

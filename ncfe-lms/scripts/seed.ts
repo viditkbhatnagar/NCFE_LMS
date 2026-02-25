@@ -326,15 +326,25 @@ async function seed() {
 
   // ─── 4. Users ─────────────────────────────────────────────────────────────────
   console.log('\nSeeding Users...');
-  const password = 'Password123!';
   const saltRounds = 12;
-  const hashedPassword = await bcrypt.hash(password, saltRounds);
+
+  // Hash different passwords for different user groups
+  const testPassword = await bcrypt.hash('Password123!', saltRounds);
+  const adminPassword = await bcrypt.hash('passwordadmin', saltRounds);
+  const realAssessorPassword = await bcrypt.hash('password123', saltRounds);
+  const realStudentPassword = await bcrypt.hash('password', saltRounds);
 
   const usersData = [
-    { name: 'Jane Smith', email: 'student@test.com', role: 'student' },
-    { name: 'Emma Thompson', email: 'student2@test.com', role: 'student' },
-    { name: 'John Davies', email: 'assessor@test.com', role: 'assessor' },
-    { name: 'Sarah Williams', email: 'iqa@test.com', role: 'iqa' },
+    // Test users
+    { name: 'Jane Smith', email: 'student@test.com', role: 'student', pw: testPassword },
+    { name: 'Emma Thompson', email: 'student2@test.com', role: 'student', pw: testPassword },
+    { name: 'Sarah Williams', email: 'iqa@test.com', role: 'iqa', pw: testPassword },
+    // Real users
+    { name: 'Jyothi', email: 'jyothi@learnerseducation.com', role: 'assessor', pw: realAssessorPassword },
+    { name: 'Vidit Bhatnagar', email: 'bhatnagar007vidit@gmail.com', role: 'student', pw: realStudentPassword },
+    { name: 'Intern', email: 'intern@learnerseducation.com', role: 'student', pw: realStudentPassword },
+    // Admin
+    { name: 'Admin User', email: 'admin@learnerseducation.com', role: 'admin', pw: adminPassword },
   ];
 
   const createdUsers: Record<string, mongoose.Document> = {};
@@ -346,7 +356,7 @@ async function seed() {
       const result = await User.collection.insertOne({
         name: userData.name,
         email: userData.email,
-        passwordHash: hashedPassword,
+        passwordHash: userData.pw,
         role: userData.role,
         centreId: centre._id,
         status: 'active',
@@ -359,16 +369,17 @@ async function seed() {
       console.log(`  User already exists: ${userData.name} (${userData.email})`);
     }
 
-    // Use a unique key: role for unique roles, email prefix for students
-    const key = userData.email === 'student2@test.com' ? 'student2' : userData.role;
-    createdUsers[key] = user!;
+    // Use email as key for easy lookup
+    createdUsers[userData.email] = user!;
   }
 
   // ─── 5. Enrolments ──────────────────────────────────────────────────────────
   console.log('\nSeeding Enrolments...');
-  const studentUser = createdUsers['student'];
-  const student2User = createdUsers['student2'];
-  const assessorUser = createdUsers['assessor'];
+  const studentUser = createdUsers['student@test.com'];
+  const student2User = createdUsers['student2@test.com'];
+  const assessorUser = createdUsers['jyothi@learnerseducation.com'];
+  const realStudent1 = createdUsers['bhatnagar007vidit@gmail.com'];
+  const realStudent2 = createdUsers['intern@learnerseducation.com'];
 
   let enrolment = await Enrolment.findOne({
     userId: studentUser._id,
@@ -408,6 +419,47 @@ async function seed() {
     console.log(`    Assessor: ${(assessorUser as any).name}, Cohort: 2026-Q1, Status: in_progress`);
   } else {
     console.log(`  Enrolment already exists for student ${(student2User as any).name}`);
+  }
+
+  // Real user enrolments (Vidit & Intern -> Jyothi as assessor)
+  let enrolmentVidit = await Enrolment.findOne({
+    userId: realStudent1._id,
+    qualificationId: qualification._id,
+  });
+
+  if (!enrolmentVidit) {
+    enrolmentVidit = await Enrolment.create({
+      userId: realStudent1._id,
+      qualificationId: qualification._id,
+      assessorId: assessorUser._id,
+      status: 'in_progress',
+      cohortId: '2026-Q1',
+      enrolledAt: new Date(),
+    });
+    console.log(`  Created enrolment: ${(realStudent1 as any).name} -> ${qualification.title}`);
+    console.log(`    Assessor: ${(assessorUser as any).name}, Cohort: 2026-Q1`);
+  } else {
+    console.log(`  Enrolment already exists for ${(realStudent1 as any).name}`);
+  }
+
+  let enrolmentIntern = await Enrolment.findOne({
+    userId: realStudent2._id,
+    qualificationId: qualification._id,
+  });
+
+  if (!enrolmentIntern) {
+    enrolmentIntern = await Enrolment.create({
+      userId: realStudent2._id,
+      qualificationId: qualification._id,
+      assessorId: assessorUser._id,
+      status: 'in_progress',
+      cohortId: '2026-Q1',
+      enrolledAt: new Date(),
+    });
+    console.log(`  Created enrolment: ${(realStudent2 as any).name} -> ${qualification.title}`);
+    console.log(`    Assessor: ${(assessorUser as any).name}, Cohort: 2026-Q1`);
+  } else {
+    console.log(`  Enrolment already exists for ${(realStudent2 as any).name}`);
   }
 
   // ─── 6. BRITEthink Assessments ──────────────────────────────────────────────
@@ -888,18 +940,24 @@ async function seed() {
   console.log(`  Qualification: ${qualification.title} (slug: ${qualification.slug})`);
   console.log(`  Units: ${unitsData.length}`);
   console.log(`  Users: ${usersData.length}`);
-  console.log(`  Enrolments: 2 (Jane Smith + Emma Thompson)`);
+  console.log(`  Enrolments: 4 (Jane, Emma, Vidit, Intern)`);
   console.log(`  Assessments: 7 (3 for Jane, 4 for Emma)`);
   console.log(`  Work Hours: 8 entries (3 for Jane, 5 for Emma)`);
   console.log(`  Evidence: 6 files (3 for Jane, 3 for Emma)`);
   console.log(`  Course Documents: 5 files + 1 folder`);
   console.log(`  Personal Documents: 4 files (2 for Jane, 2 for Emma)`);
   console.log(`  Learning Materials: 6 items across 5 categories`);
-  console.log(`\n  Login credentials (all use password: Password123!):`);
-  console.log(`    Assessor: assessor@test.com`);
-  console.log(`    Student 1: student@test.com (Jane Smith)`);
-  console.log(`    Student 2: student2@test.com (Emma Thompson)`);
-  console.log(`    IQA: iqa@test.com`);
+  console.log(`\n  Login credentials:`);
+  console.log(`    --- Test users ---`);
+  console.log(`    Student 1: student@test.com / Password123! (Jane Smith)`);
+  console.log(`    Student 2: student2@test.com / Password123! (Emma Thompson)`);
+  console.log(`    IQA: iqa@test.com / Password123!`);
+  console.log(`    --- Real users ---`);
+  console.log(`    Assessor: jyothi@learnerseducation.com / password123`);
+  console.log(`    Student: bhatnagar007vidit@gmail.com / password`);
+  console.log(`    Student: intern@learnerseducation.com / password`);
+  console.log(`    --- Admin ---`);
+  console.log(`    Admin: admin@learnerseducation.com / passwordadmin`);
   console.log(`\n  Assessor dashboard URL: /c/${qualification.slug}`);
 
   await mongoose.disconnect();

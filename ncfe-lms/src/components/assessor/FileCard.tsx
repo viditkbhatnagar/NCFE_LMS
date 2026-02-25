@@ -30,9 +30,11 @@ interface FileCardProps {
   onClick: () => void;
   onRename?: (id: string, newName: string) => void;
   onDelete?: (id: string) => void;
+  onPreview?: (item: FileItem) => void;
+  onDownload?: (item: FileItem) => void;
 }
 
-export default function FileCard({ item, onClick, onRename, onDelete }: FileCardProps) {
+export default function FileCard({ item, onClick, onRename, onDelete, onPreview, onDownload }: FileCardProps) {
   const [showMenu, setShowMenu] = useState(false);
   const [renaming, setRenaming] = useState(false);
   const [newName, setNewName] = useState(item.fileName);
@@ -54,6 +56,8 @@ export default function FileCard({ item, onClick, onRename, onDelete }: FileCard
     setRenaming(false);
     setShowMenu(false);
   };
+
+  const showActions = !item.isFolder && (onPreview || onDownload);
 
   return (
     <div
@@ -96,14 +100,16 @@ export default function FileCard({ item, onClick, onRename, onDelete }: FileCard
               Rename
             </button>
           )}
-          {!item.isFolder && item.fileUrl && (
-            <a
-              href={item.fileUrl}
-              download={item.fileName}
-              className="block px-3 py-1.5 text-sm text-gray-700 hover:bg-gray-50"
+          {!item.isFolder && onDownload && (
+            <button
+              onClick={() => {
+                onDownload(item);
+                setShowMenu(false);
+              }}
+              className="w-full text-left px-3 py-1.5 text-sm text-gray-700 hover:bg-gray-50"
             >
               Download
-            </a>
+            </button>
           )}
           {onDelete && (
             <button
@@ -168,6 +174,40 @@ export default function FileCard({ item, onClick, onRename, onDelete }: FileCard
           <p>{formatSize(item.fileSize)}</p>
           <p>{dateStr}</p>
           {item.uploadedBy?.name && <p className="truncate">{item.uploadedBy.name}</p>}
+        </div>
+      )}
+
+      {/* Preview & Download action bar */}
+      {showActions && (
+        <div
+          className="absolute bottom-0 left-0 right-0 flex items-center justify-center gap-1 py-1.5 bg-white/90 border-t border-gray-200 rounded-b-lg opacity-0 group-hover:opacity-100 transition-opacity"
+          onClick={(e) => e.stopPropagation()}
+        >
+          {onPreview && (
+            <button
+              onClick={() => onPreview(item)}
+              className="inline-flex items-center gap-1 px-2.5 py-1 text-xs font-medium text-gray-600 hover:text-primary rounded hover:bg-gray-100 transition-colors"
+              title="Preview"
+            >
+              <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
+              </svg>
+              Preview
+            </button>
+          )}
+          {onDownload && (
+            <button
+              onClick={() => onDownload(item)}
+              className="inline-flex items-center gap-1 px-2.5 py-1 text-xs font-medium text-gray-600 hover:text-primary rounded hover:bg-gray-100 transition-colors"
+              title="Download"
+            >
+              <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
+              </svg>
+              Download
+            </button>
+          )}
         </div>
       )}
     </div>

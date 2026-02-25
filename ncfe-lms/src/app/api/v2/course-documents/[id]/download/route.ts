@@ -37,15 +37,23 @@ export async function GET(
       );
     }
 
+    const { searchParams } = new URL(request.url);
+    const isPreview = searchParams.get('preview') === 'true';
+
     const url = await getFileDownloadUrl(doc.fileUrl, {
       storageProvider: doc.storageProvider as 'local' | 's3' | undefined,
       storageBucket: doc.storageBucket,
       storageKey: doc.storageKey,
-      fileName: doc.fileName,
+      fileName: isPreview ? undefined : doc.fileName,
     });
 
-    const redirectTarget = url.startsWith('http') ? url : new URL(url, request.url).toString();
-    return NextResponse.redirect(redirectTarget);
+    const resolvedUrl = url.startsWith('http') ? url : new URL(url, request.url).toString();
+
+    if (searchParams.get('json') === 'true') {
+      return NextResponse.json({ success: true, url: resolvedUrl });
+    }
+
+    return NextResponse.redirect(resolvedUrl);
   } catch (err) {
     console.error('Error generating course document download URL:', err);
     return NextResponse.json(

@@ -8,6 +8,7 @@ export interface IAssessment extends Document {
   planIntent: string;
   planImplementation: string;
   status: AssessmentStatus;
+  publishCount: number;
   learnerId: mongoose.Types.ObjectId;
   assessorId: mongoose.Types.ObjectId;
   enrollmentId: mongoose.Types.ObjectId;
@@ -51,8 +52,12 @@ const AssessmentSchema = new Schema<IAssessment>(
     },
     status: {
       type: String,
-      enum: ['draft', 'published'],
+      enum: ['draft', 'published', 'published_modified'],
       default: 'draft',
+    },
+    publishCount: {
+      type: Number,
+      default: 0,
     },
     learnerId: {
       type: Schema.Types.ObjectId,

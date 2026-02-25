@@ -46,7 +46,7 @@ export async function GET(
     const [units, criteria, publishedAssessments] = await Promise.all([
       Unit.find({ qualificationId }).sort({ unitReference: 1 }).lean(),
       AssessmentCriteria.find({ qualificationId }).lean(),
-      Assessment.find({ enrollmentId, status: 'published' })
+      Assessment.find({ enrollmentId, status: { $in: ['published', 'published_modified'] } })
         .select('_id title date assessmentKind status')
         .lean(),
     ]);

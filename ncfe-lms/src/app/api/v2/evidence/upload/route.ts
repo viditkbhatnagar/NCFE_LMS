@@ -126,6 +126,21 @@ export async function POST(request: Request) {
       }
     }
 
+    // Notify the assessor when student uploads evidence
+    if (user.role === 'student') {
+      const assessorId = enrollment.assessorId?.toString();
+      if (assessorId) {
+        createNotification({
+          userId: assessorId,
+          type: 'evidence_uploaded',
+          title: 'New Evidence Uploaded',
+          message: `${session!.user.name} uploaded evidence: ${label.trim()}`,
+          entityType: 'Evidence',
+          entityId: evidenceId,
+        });
+      }
+    }
+
     return NextResponse.json(
       {
         success: true,

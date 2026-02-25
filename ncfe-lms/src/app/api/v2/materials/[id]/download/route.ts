@@ -38,15 +38,23 @@ export async function GET(
       );
     }
 
+    const { searchParams } = new URL(request.url);
+    const isPreview = searchParams.get('preview') === 'true';
+
     const url = await getFileDownloadUrl(material.fileUrl, {
       storageProvider: material.storageProvider as 'local' | 's3' | undefined,
       storageBucket: material.storageBucket,
       storageKey: material.storageKey,
-      fileName: material.fileName || material.title,
+      fileName: isPreview ? undefined : (material.fileName || material.title),
     });
 
-    const redirectTarget = url.startsWith('http') ? url : new URL(url, request.url).toString();
-    return NextResponse.redirect(redirectTarget);
+    const resolvedUrl = url.startsWith('http') ? url : new URL(url, request.url).toString();
+
+    if (searchParams.get('json') === 'true') {
+      return NextResponse.json({ success: true, url: resolvedUrl });
+    }
+
+    return NextResponse.redirect(resolvedUrl);
   } catch (err) {
     console.error('Error generating material download URL:', err);
     return NextResponse.json(

@@ -8,6 +8,7 @@ import FileGrid from '@/components/assessor/FileGrid';
 import FileListView from '@/components/assessor/FileListView';
 import FileUploadModal from '@/components/assessor/FileUploadModal';
 import NewFolderModal from '@/components/assessor/NewFolderModal';
+import FilePreviewModal from '@/components/assessor/FilePreviewModal';
 import type { FileItem, FolderBreadcrumb } from '@/types';
 
 type ViewMode = 'grid' | 'list';
@@ -25,6 +26,7 @@ export default function CourseDocumentsPage() {
   const [showUploadModal, setShowUploadModal] = useState(false);
   const [showFolderModal, setShowFolderModal] = useState(false);
   const [deleteConfirmId, setDeleteConfirmId] = useState<string | null>(null);
+  const [previewItem, setPreviewItem] = useState<FileItem | null>(null);
 
   const fetchItems = useCallback(async () => {
     setLoading(true);
@@ -119,6 +121,16 @@ export default function CourseDocumentsPage() {
     }
   };
 
+  const handlePreview = (item: FileItem) => {
+    if (!item.isFolder) setPreviewItem(item);
+  };
+
+  const handleDownload = (item: FileItem) => {
+    if (!item.isFolder) {
+      window.open(`/api/v2/course-documents/${item._id}/download`, '_blank');
+    }
+  };
+
   return (
     <div className="flex flex-col h-full p-6">
       {/* Header */}
@@ -163,6 +175,8 @@ export default function CourseDocumentsPage() {
             onItemClick={handleItemClick}
             onRename={readOnly ? undefined : handleRename}
             onDelete={readOnly ? undefined : handleDelete}
+            onPreview={handlePreview}
+            onDownload={handleDownload}
           />
         ) : (
           <FileListView
@@ -170,6 +184,8 @@ export default function CourseDocumentsPage() {
             onItemClick={handleItemClick}
             onRename={readOnly ? undefined : handleRename}
             onDelete={readOnly ? undefined : handleDelete}
+            onPreview={handlePreview}
+            onDownload={handleDownload}
           />
         )}
       </div>
@@ -204,6 +220,21 @@ export default function CourseDocumentsPage() {
         onClose={() => setShowFolderModal(false)}
         onConfirm={handleNewFolder}
       />
+
+      {previewItem && (
+        <FilePreviewModal
+          isOpen={!!previewItem}
+          onClose={() => setPreviewItem(null)}
+          downloadUrl={`/api/v2/course-documents/${previewItem._id}/download`}
+          fileName={previewItem.fileName}
+          fileType={previewItem.fileType}
+          metadata={{
+            size: previewItem.fileSize,
+            uploadedAt: previewItem.createdAt,
+            uploader: previewItem.uploadedBy ? { name: previewItem.uploadedBy.name, email: previewItem.uploadedBy.email } : undefined,
+          }}
+        />
+      )}
     </div>
   );
 }

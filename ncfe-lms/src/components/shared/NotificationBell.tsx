@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useEffect, useRef, useCallback } from 'react';
+import { usePathname } from 'next/navigation';
 
 interface NotificationItem {
   _id: string;
@@ -13,19 +14,54 @@ interface NotificationItem {
   createdAt: string;
 }
 
-function relativeTime(dateStr: string): string {
-  const now = Date.now();
-  const then = new Date(dateStr).getTime();
-  const diffSec = Math.floor((now - then) / 1000);
+function formatTimestamp(dateStr: string): string {
+  const date = new Date(dateStr);
+  const now = new Date();
+  const diffMs = now.getTime() - date.getTime();
+  const diffMin = Math.floor(diffMs / 60000);
 
-  if (diffSec < 60) return 'Just now';
-  const diffMin = Math.floor(diffSec / 60);
+  // Under 1 minute
+  if (diffMin < 1) return 'Just now';
+
+  // Under 1 hour: show relative
   if (diffMin < 60) return `${diffMin}m ago`;
-  const diffHr = Math.floor(diffMin / 60);
-  if (diffHr < 24) return `${diffHr}h ago`;
-  const diffDay = Math.floor(diffHr / 24);
-  if (diffDay < 7) return `${diffDay}d ago`;
-  return new Date(dateStr).toLocaleDateString();
+
+  // Same day: show time only
+  const isToday = date.toDateString() === now.toDateString();
+  if (isToday) {
+    return `Today at ${date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}`;
+  }
+
+  // Yesterday
+  const yesterday = new Date(now);
+  yesterday.setDate(yesterday.getDate() - 1);
+  if (date.toDateString() === yesterday.toDateString()) {
+    return `Yesterday at ${date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}`;
+  }
+
+  // Older: show date + time
+  return `${date.toLocaleDateString([], { day: 'numeric', month: 'short' })} at ${date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}`;
+}
+
+/** Build a URL to navigate to based on notification type and entity */
+function getNotificationUrl(n: NotificationItem, courseSlug: string | null): string | null {
+  const base = courseSlug ? `/c/${courseSlug}` : null;
+  if (!base) return null;
+
+  switch (n.type) {
+    case 'assessment_published':
+    case 'assessment_updated':
+    case 'assessment_created':
+    case 'sign_off_assessor':
+    case 'sign_off_learner':
+    case 'sign_off_iqa':
+    case 'remark_added':
+      return n.entityId ? `${base}/assessment?id=${n.entityId}` : `${base}/assessment`;
+    case 'evidence_uploaded':
+      return `${base}/portfolio`;
+    default:
+      return null;
+  }
 }
 
 const TYPE_ICONS: Record<string, string> = {
@@ -33,6 +69,8 @@ const TYPE_ICONS: Record<string, string> = {
     'M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2',
   assessment_published:
     'M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-6 9l2 2 4-4',
+  assessment_updated:
+    'M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15',
   sign_off_assessor:
     'M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z',
   sign_off_learner:
@@ -56,6 +94,10 @@ export default function NotificationBell() {
   const [notifications, setNotifications] = useState<NotificationItem[]>([]);
   const [loading, setLoading] = useState(false);
   const containerRef = useRef<HTMLDivElement>(null);
+  const pathname = usePathname();
+
+  // Extract course slug from current path (e.g. /c/some-slug/assessment -> some-slug)
+  const courseSlug = pathname.match(/^\/c\/([^/]+)/)?.[1] ?? null;
 
   // Poll unread count every 30 seconds
   const fetchUnreadCount = useCallback(async () => {
@@ -108,15 +150,25 @@ export default function NotificationBell() {
     return () => document.removeEventListener('mousedown', handleClickOutside);
   }, []);
 
-  async function markAsRead(id: string) {
-    try {
-      await fetch(`/api/notifications/${id}/read`, { method: 'PUT' });
-      setNotifications((prev) =>
-        prev.map((n) => (n._id === id ? { ...n, isRead: true } : n))
-      );
-      setUnreadCount((c) => Math.max(0, c - 1));
-    } catch {
-      // silently fail
+  async function handleNotificationClick(n: NotificationItem) {
+    // Mark as read if unread
+    if (!n.isRead) {
+      try {
+        await fetch(`/api/notifications/${n._id}/read`, { method: 'PUT' });
+        setNotifications((prev) =>
+          prev.map((item) => (item._id === n._id ? { ...item, isRead: true } : item))
+        );
+        setUnreadCount((c) => Math.max(0, c - 1));
+      } catch {
+        // silently fail
+      }
+    }
+
+    // Navigate to relevant page
+    const url = getNotificationUrl(n, courseSlug);
+    if (url) {
+      setOpen(false);
+      window.location.href = url;
     }
   }
 
@@ -127,6 +179,17 @@ export default function NotificationBell() {
       setUnreadCount(0);
     } catch {
       // silently fail
+    }
+  }
+
+  function handleViewAll() {
+    setOpen(false);
+    if (courseSlug) {
+      window.location.href = `/c/${courseSlug}/notifications`;
+    } else if (pathname.startsWith('/c')) {
+      window.location.href = '/c/notifications';
+    } else {
+      window.location.href = '/dashboard/notifications';
     }
   }
 
@@ -201,50 +264,71 @@ export default function NotificationBell() {
                 <p className="text-sm text-gray-400">No notifications yet</p>
               </div>
             ) : (
-              notifications.map((n) => (
-                <button
-                  key={n._id}
-                  onClick={() => !n.isRead && markAsRead(n._id)}
-                  className={`w-full text-left px-4 py-3 flex gap-3 hover:bg-gray-50 transition-colors border-b border-gray-50 last:border-b-0 ${
-                    !n.isRead ? 'bg-primary/5' : ''
-                  }`}
-                >
-                  {/* Icon */}
-                  <div className="shrink-0 mt-0.5">
-                    <svg
-                      className="w-5 h-5 text-gray-400"
-                      fill="none"
-                      viewBox="0 0 24 24"
-                      stroke="currentColor"
-                    >
-                      <path
-                        strokeLinecap="round"
-                        strokeLinejoin="round"
-                        strokeWidth={1.5}
-                        d={TYPE_ICONS[n.type] || FALLBACK_ICON}
-                      />
-                    </svg>
-                  </div>
-                  {/* Content */}
-                  <div className="flex-1 min-w-0">
-                    <div className="flex items-center gap-2">
-                      <p className="text-sm font-medium text-gray-900 truncate">
-                        {n.title}
-                      </p>
-                      {!n.isRead && (
-                        <span className="w-2 h-2 rounded-full bg-primary shrink-0" />
-                      )}
+              notifications.map((n) => {
+                const url = getNotificationUrl(n, courseSlug);
+                return (
+                  <button
+                    key={n._id}
+                    onClick={() => handleNotificationClick(n)}
+                    className={`w-full text-left px-4 py-3 flex gap-3 hover:bg-gray-50 transition-colors border-b border-gray-50 last:border-b-0 ${
+                      !n.isRead ? 'bg-primary/5' : ''
+                    } ${url ? 'cursor-pointer' : ''}`}
+                  >
+                    {/* Icon */}
+                    <div className="shrink-0 mt-0.5">
+                      <svg
+                        className="w-5 h-5 text-gray-400"
+                        fill="none"
+                        viewBox="0 0 24 24"
+                        stroke="currentColor"
+                      >
+                        <path
+                          strokeLinecap="round"
+                          strokeLinejoin="round"
+                          strokeWidth={1.5}
+                          d={TYPE_ICONS[n.type] || FALLBACK_ICON}
+                        />
+                      </svg>
                     </div>
-                    <p className="text-xs text-gray-500 line-clamp-2 mt-0.5">
-                      {n.message}
-                    </p>
-                    <p className="text-[11px] text-gray-400 mt-1">
-                      {relativeTime(n.createdAt)}
-                    </p>
-                  </div>
-                </button>
-              ))
+                    {/* Content */}
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center gap-2">
+                        <p className="text-sm font-medium text-gray-900 truncate">
+                          {n.title}
+                        </p>
+                        {!n.isRead && (
+                          <span className="w-2 h-2 rounded-full bg-primary shrink-0" />
+                        )}
+                      </div>
+                      <p className="text-xs text-gray-500 line-clamp-2 mt-0.5">
+                        {n.message}
+                      </p>
+                      <p className="text-[11px] text-gray-400 mt-1">
+                        {formatTimestamp(n.createdAt)}
+                      </p>
+                    </div>
+                    {/* Link arrow indicator */}
+                    {url && (
+                      <div className="shrink-0 self-center">
+                        <svg className="w-4 h-4 text-gray-300" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+                        </svg>
+                      </div>
+                    )}
+                  </button>
+                );
+              })
             )}
+          </div>
+
+          {/* View All Notifications footer */}
+          <div className="border-t border-gray-100">
+            <button
+              onClick={handleViewAll}
+              className="w-full px-4 py-3 text-sm font-medium text-primary hover:bg-gray-50 transition-colors text-center"
+            >
+              View all notifications
+            </button>
           </div>
         </div>
       )}

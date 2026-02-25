@@ -76,6 +76,10 @@ export default function AssessmentDetailPanel({
         });
         const json = await res.json();
         if (json.success) {
+          // Sync status from server (e.g. published → published_modified)
+          if (json.data?.status) {
+            setEditState((prev) => ({ ...prev, status: json.data.status }));
+          }
           onUpdated();
           return true;
         }

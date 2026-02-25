@@ -11,6 +11,8 @@ interface AssessmentCardProps {
 
 export default function AssessmentCard({ assessment, isSelected, onClick }: AssessmentCardProps) {
   const isDraft = assessment.status === 'draft';
+  const isModified = assessment.status === 'published_modified';
+  const wasUpdated = (assessment.publishCount ?? 0) > 1;
   const kind = assessment.assessmentKind;
   const config = kind ? TYPE_CONFIG[kind] : null;
   const learnerName = assessment.learnerId?.name || 'Unknown Learner';
@@ -19,22 +21,37 @@ export default function AssessmentCard({ assessment, isSelected, onClick }: Asse
     <button
       onClick={onClick}
       className={`w-full text-left bg-white rounded-[8px] shadow-sm transition-all hover:shadow-md ${
-        isDraft ? 'border-2 border-dashed border-gray-300' : 'border border-gray-200'
+        isDraft ? 'border-2 border-dashed border-gray-300' : isModified ? 'border border-amber-300' : 'border border-gray-200'
       } ${isSelected ? 'ring-2 ring-brand-500 border-brand-500' : ''}`}
     >
       {/* Colored top bar */}
       {config && (
         <div
           className="h-1 rounded-t-[8px]"
-          style={{ backgroundColor: config.color }}
+          style={{ backgroundColor: isModified ? '#f59e0b' : config.color }}
         />
       )}
 
       <div className="p-4">
-        {/* Date */}
-        <p className="text-xs text-gray-500 mb-1">
-          {formatAssessmentDate(assessment.date)}
-        </p>
+        {/* Date + Updated badge */}
+        <div className="flex items-center gap-2 mb-1">
+          <p className="text-xs text-gray-500">
+            {formatAssessmentDate(assessment.date)}
+          </p>
+          {wasUpdated && !isDraft && (
+            <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-full text-[10px] font-medium bg-blue-50 text-blue-600">
+              <svg className="w-2.5 h-2.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+              </svg>
+              Updated
+            </span>
+          )}
+          {isModified && (
+            <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-full text-[10px] font-medium bg-amber-50 text-amber-600">
+              Modified
+            </span>
+          )}
+        </div>
 
         {/* Title */}
         <h3 className="text-sm font-semibold text-gray-900 mb-2 line-clamp-2">

@@ -36,12 +36,12 @@ export async function GET(request: Request) {
       );
     }
 
-    // Students only see published assessments assigned to them
+    // Students see published and published_modified assessments assigned to them
     const assessments = await Assessment.find({
       learnerId: session!.user.id,
       qualificationId,
       enrollmentId: enrollment._id,
-      status: 'published',
+      status: { $in: ['published', 'published_modified'] },
     })
       .populate('learnerId', 'name email')
       .populate('enrollmentId', 'cohortId')
