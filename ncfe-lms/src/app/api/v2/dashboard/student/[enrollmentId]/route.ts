@@ -131,6 +131,7 @@ export async function GET(
       status: ev.status,
       uploadedAt: ev.uploadedAt ? new Date(ev.uploadedAt).toISOString() : '',
       learnerName: studentName,
+      thumbnailUrl: ev.thumbnailUrl,
     }));
 
     const materialsOut = recentMaterials.map((m) => ({

@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server';
 import dbConnect from '@/lib/db';
 import { withAuth } from '@/lib/route-guard';
 import { uploadFile } from '@/lib/upload';
+import { generateVideoThumbnail } from '@/lib/thumbnail';
 import Evidence from '@/models/Evidence';
 import Enrolment from '@/models/Enrolment';
 import { createNotification } from '@/lib/notifications';
@@ -120,6 +121,15 @@ export async function POST(request: Request) {
       storageKey = result.storageKey;
     }
 
+    // G15 — synchronous video thumbnail (soft-fail; null if not video or ffmpeg fails)
+    const thumb = await generateVideoThumbnail({
+      fileType,
+      storageProvider: storageProvider as 'local' | 's3',
+      filePath,
+      storageBucket,
+      storageKey,
+    });
+
     const evidence = await Evidence.create({
       enrolmentId,
       unitId: unitId || undefined,
@@ -140,6 +150,9 @@ export async function POST(request: Request) {
       witnessEmployer,
       witnessEmail,
       witnessStatement,
+      ...(thumb
+        ? { thumbnailUrl: thumb.thumbnailUrl, thumbnailStorageKey: thumb.thumbnailStorageKey }
+        : {}),
     });
 
     const evidenceId = evidence._id.toString();

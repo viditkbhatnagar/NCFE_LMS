@@ -40,11 +40,23 @@ export default function EvidenceListRow({
 
   return (
     <tr className="hover:bg-gray-50 border-b border-gray-100">
-      <td className="py-3 px-4 max-w-[200px]">
-        <p className="text-sm font-medium text-gray-900 truncate">
-          {evidence.label}
-        </p>
-        <p className="text-xs text-gray-400 truncate">{evidence.fileName}</p>
+      <td className="py-3 px-4 max-w-[260px]">
+        <div className="flex items-center gap-3">
+          {evidence.thumbnailUrl ? (
+            <img
+              src={evidence.thumbnailUrl}
+              alt=""
+              loading="lazy"
+              className="w-10 h-10 rounded object-cover bg-gray-100 flex-shrink-0"
+            />
+          ) : null}
+          <div className="min-w-0">
+            <p className="text-sm font-medium text-gray-900 truncate">
+              {evidence.label}
+            </p>
+            <p className="text-xs text-gray-400 truncate">{evidence.fileName}</p>
+          </div>
+        </div>
       </td>
       <td className="py-3 px-4 text-sm text-gray-600 max-w-[180px] truncate">
         {evidence.unitId ? (

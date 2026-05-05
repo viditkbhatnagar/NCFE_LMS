@@ -31,6 +31,7 @@ export interface IEvidence extends Document {
   witnessEmail?: string;
   witnessStatement?: string;
   thumbnailUrl?: string;
+  thumbnailStorageKey?: string;
   createdAt: Date;
   updatedAt: Date;
 }
@@ -116,6 +117,7 @@ const EvidenceSchema = new Schema<IEvidence>(
     witnessEmail: { type: String, trim: true, lowercase: true },
     witnessStatement: { type: String, trim: true, maxlength: 5000 },
     thumbnailUrl: { type: String, trim: true },
+    thumbnailStorageKey: { type: String, trim: true },
   },
   {
     timestamps: true,

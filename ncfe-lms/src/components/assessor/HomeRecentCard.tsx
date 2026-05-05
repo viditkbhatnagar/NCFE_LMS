@@ -9,6 +9,7 @@ export interface RecentCardItem {
   metaText: string;
   badge?: string;
   badgeClass?: string;
+  thumbnailUrl?: string;
 }
 
 interface Props {
@@ -60,6 +61,14 @@ export default function HomeRecentCard({
             key={item._id}
             className="px-5 py-3 flex items-center gap-3 hover:bg-gray-50 transition-colors"
           >
+            {item.thumbnailUrl && (
+              <img
+                src={item.thumbnailUrl}
+                alt=""
+                loading="lazy"
+                className="w-10 h-10 rounded object-cover bg-gray-100 shrink-0"
+              />
+            )}
             <div className="flex-1 min-w-0">
               <p className="text-sm font-medium text-gray-800 truncate">
                 {item.primaryText}

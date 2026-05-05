@@ -87,9 +87,18 @@ export default function EvidenceMappingSection({
               key={item._id}
               className="flex items-center gap-2 p-2 rounded-[6px] border border-gray-200 bg-gray-50"
             >
-              <svg className="w-4 h-4 text-gray-400 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 21h10a2 2 0 002-2V9.414a1 1 0 00-.293-.707l-5.414-5.414A1 1 0 0012.586 3H7a2 2 0 00-2 2v14a2 2 0 002 2z" />
-              </svg>
+              {item.evidenceId.thumbnailUrl ? (
+                <img
+                  src={item.evidenceId.thumbnailUrl}
+                  alt=""
+                  loading="lazy"
+                  className="w-8 h-8 rounded object-cover bg-gray-100 shrink-0"
+                />
+              ) : (
+                <svg className="w-4 h-4 text-gray-400 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 21h10a2 2 0 002-2V9.414a1 1 0 00-.293-.707l-5.414-5.414A1 1 0 0012.586 3H7a2 2 0 00-2 2v14a2 2 0 002 2z" />
+                </svg>
+              )}
               <div className="min-w-0 flex-1">
                 <p className="text-xs font-medium text-gray-900 truncate">
                   {item.evidenceId.label || item.evidenceId.fileName}

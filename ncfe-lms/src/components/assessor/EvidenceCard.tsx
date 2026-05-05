@@ -57,13 +57,30 @@ export default function EvidenceCard({
 
   return (
     <div className="bg-white border border-gray-200 rounded-lg p-4 hover:shadow-sm transition-shadow relative group">
-      {/* File type badge */}
-      <div
-        className="w-10 h-10 rounded-md flex items-center justify-center mb-3 text-xs font-bold text-white"
-        style={{ backgroundColor: fileIcon.color }}
-      >
-        {fileIcon.icon}
-      </div>
+      {/* G15 — Thumbnail (videos) or file-type badge */}
+      {evidence.thumbnailUrl ? (
+        <div className="w-full h-24 mb-3 rounded-md bg-gray-100 overflow-hidden flex items-center justify-center relative">
+          <img
+            src={evidence.thumbnailUrl}
+            alt=""
+            loading="lazy"
+            className="w-full h-full object-cover"
+          />
+          <span
+            className="absolute bottom-1 right-1 px-1.5 py-0.5 rounded text-[10px] font-bold text-white"
+            style={{ backgroundColor: fileIcon.color }}
+          >
+            {fileIcon.icon}
+          </span>
+        </div>
+      ) : (
+        <div
+          className="w-10 h-10 rounded-md flex items-center justify-center mb-3 text-xs font-bold text-white"
+          style={{ backgroundColor: fileIcon.color }}
+        >
+          {fileIcon.icon}
+        </div>
+      )}
 
       <p
         className="text-sm font-semibold text-gray-900 truncate mb-0.5"

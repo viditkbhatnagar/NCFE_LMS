@@ -148,6 +148,22 @@ export async function DELETE(
       // Continue with DB deletion even if file delete fails
     }
 
+    // G15 — cascade thumbnail cleanup (soft-fail)
+    if (evidence.thumbnailStorageKey) {
+      try {
+        const thumbPath = evidence.storageProvider === 's3' && evidence.storageBucket
+          ? `s3://${evidence.storageBucket}/${evidence.thumbnailStorageKey}`
+          : `/uploads/${evidence.thumbnailStorageKey}`;
+        await deleteFile(thumbPath, {
+          storageProvider: evidence.storageProvider as 'local' | 's3' | undefined,
+          storageBucket: evidence.storageBucket,
+          storageKey: evidence.thumbnailStorageKey,
+        });
+      } catch (thumbErr) {
+        console.warn('Failed to delete thumbnail from storage:', thumbErr);
+      }
+    }
+
     await Evidence.findByIdAndDelete(id);
 
     return NextResponse.json({ success: true });

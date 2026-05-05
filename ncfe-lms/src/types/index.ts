@@ -92,6 +92,7 @@ export interface EvidenceMapEntry {
     description: string;
     status: string;
     uploadedAt?: string;
+    thumbnailUrl?: string;
   };
 }
 
@@ -211,6 +212,7 @@ export interface PortfolioEvidence {
   uploadedAt: string;
   attemptNumber: number;
   unitId: { _id: string; unitReference: string; title: string } | null;
+  thumbnailUrl?: string;
 }
 
 // Phase 5: Home dashboard types
@@ -246,6 +248,7 @@ export interface RecentEvidenceItem {
   status: EvidenceStatus;
   uploadedAt: string;
   learnerName: string;
+  thumbnailUrl?: string;
 }
 
 export interface RecentMaterialItem {

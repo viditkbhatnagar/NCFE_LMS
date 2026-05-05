@@ -10,6 +10,7 @@ interface EvidenceItem {
   label: string;
   description: string;
   status: string;
+  thumbnailUrl?: string;
 }
 
 interface EvidenceSelectionModalProps {
@@ -53,6 +54,7 @@ export default function EvidenceSelectionModal({
             label: e.label as string,
             description: (e.description as string) || '',
             status: e.status as string,
+            thumbnailUrl: typeof e.thumbnailUrl === 'string' ? (e.thumbnailUrl as string) : undefined,
             unitName: e.unitId
               ? `${(e.unitId as Record<string, string>).unitReference} - ${(e.unitId as Record<string, string>).title}`
               : 'No unit',
@@ -139,10 +141,19 @@ export default function EvidenceSelectionModal({
                   )}
                 </div>
 
-                {/* File icon */}
-                <svg className="w-4 h-4 text-gray-400 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 21h10a2 2 0 002-2V9.414a1 1 0 00-.293-.707l-5.414-5.414A1 1 0 0012.586 3H7a2 2 0 00-2 2v14a2 2 0 002 2z" />
-                </svg>
+                {/* File icon or video thumbnail */}
+                {evidence.thumbnailUrl ? (
+                  <img
+                    src={evidence.thumbnailUrl}
+                    alt=""
+                    loading="lazy"
+                    className="w-8 h-8 rounded object-cover bg-gray-100 shrink-0"
+                  />
+                ) : (
+                  <svg className="w-4 h-4 text-gray-400 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 21h10a2 2 0 002-2V9.414a1 1 0 00-.293-.707l-5.414-5.414A1 1 0 0012.586 3H7a2 2 0 00-2 2v14a2 2 0 002 2z" />
+                  </svg>
+                )}
 
                 {/* Content */}
                 <div className="min-w-0 flex-1">
