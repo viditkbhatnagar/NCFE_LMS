@@ -22,6 +22,27 @@ export const evidenceUploadSchema = z.object({
   unitId: z.string().min(1, 'Unit ID is required'),
   label: z.string().min(1, 'Evidence label is required'),
   description: z.string().optional(),
+  evidenceKind: z
+    .enum([
+      'observation',
+      'professional_discussion',
+      'reflective_account',
+      'verbal_assessment',
+      'written_assessment',
+      'work_product',
+      'witness_testimony',
+    ])
+    .optional(),
+  witnessName: z.string().max(200).optional(),
+  witnessRole: z.string().max(200).optional(),
+  witnessEmployer: z.string().max(200).optional(),
+  witnessEmail: z.string().email().optional().or(z.literal('')),
+  witnessStatement: z.string().max(5000).optional(),
+});
+
+export const criterionCommentCreateSchema = z.object({
+  criteriaId: z.string().min(1, 'criteriaId is required'),
+  content: z.string().min(1, 'Content is required').max(2000),
 });
 
 export const evidenceMappingSchema = z.object({

@@ -7,6 +7,7 @@ import AssessmentCriteriaMap from '@/models/AssessmentCriteriaMap';
 import AssessmentEvidenceMap from '@/models/AssessmentEvidenceMap';
 import SignOff from '@/models/SignOff';
 import Remark from '@/models/Remark';
+import CriterionComment from '@/models/CriterionComment';
 import Notification from '@/models/Notification';
 import User from '@/models/User';
 import { createNotification } from '@/lib/notifications';
@@ -251,13 +252,14 @@ export async function DELETE(
       );
     }
 
-    // Cascade delete: delete assessment first, then related records
+    // Cascade delete: delete assessment first, then related records (G20)
     await Assessment.findByIdAndDelete(id);
     await Promise.all([
       AssessmentCriteriaMap.deleteMany({ assessmentId: id }),
       AssessmentEvidenceMap.deleteMany({ assessmentId: id }),
       SignOff.deleteMany({ assessmentId: id }),
       Remark.deleteMany({ assessmentId: id }),
+      CriterionComment.deleteMany({ assessmentId: id }),
       Notification.deleteMany({ entityType: 'Assessment', entityId: id }),
     ]);
 

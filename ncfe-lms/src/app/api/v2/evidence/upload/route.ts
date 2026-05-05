@@ -5,11 +5,20 @@ import { uploadFile } from '@/lib/upload';
 import Evidence from '@/models/Evidence';
 import Enrolment from '@/models/Enrolment';
 import { createNotification } from '@/lib/notifications';
+import { checkRateLimit, rateLimitIdentity } from '@/lib/rate-limit';
 
 export async function POST(request: Request) {
   try {
     const { session, error } = await withAuth(['assessor', 'student']);
     if (error) return error;
+
+    // G22 — rate limit uploads to 10/min per user
+    const rl = checkRateLimit(
+      rateLimitIdentity(request, session?.user.id),
+      { limit: 10, routeKey: 'evidence/upload:POST' },
+      request.url,
+    );
+    if (!rl.ok) return rl.response;
 
     const formData = await request.formData();
     const file = formData.get('file') as File | null;
@@ -17,6 +26,24 @@ export async function POST(request: Request) {
     const label = formData.get('label') as string | null;
     const description = (formData.get('description') as string) || '';
     const unitId = formData.get('unitId') as string | null;
+
+    // G12 — optional structured fields for evidence kind + witness testimony
+    const validEvidenceKinds = new Set([
+      'observation',
+      'professional_discussion',
+      'reflective_account',
+      'verbal_assessment',
+      'written_assessment',
+      'work_product',
+      'witness_testimony',
+    ]);
+    const rawKind = (formData.get('evidenceKind') as string) || '';
+    const evidenceKind = validEvidenceKinds.has(rawKind) ? rawKind : undefined;
+    const witnessName = (formData.get('witnessName') as string) || undefined;
+    const witnessRole = (formData.get('witnessRole') as string) || undefined;
+    const witnessEmployer = (formData.get('witnessEmployer') as string) || undefined;
+    const witnessEmail = (formData.get('witnessEmail') as string) || undefined;
+    const witnessStatement = (formData.get('witnessStatement') as string) || undefined;
 
     // Check if file was pre-uploaded via presigned URL
     const preUploadedKey = formData.get('storageKey') as string | null;
@@ -107,6 +134,12 @@ export async function POST(request: Request) {
       description,
       uploadedAt: new Date(),
       status: 'submitted',
+      evidenceKind,
+      witnessName,
+      witnessRole,
+      witnessEmployer,
+      witnessEmail,
+      witnessStatement,
     });
 
     const evidenceId = evidence._id.toString();

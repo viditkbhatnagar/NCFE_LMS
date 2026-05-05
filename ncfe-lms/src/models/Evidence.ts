@@ -1,5 +1,14 @@
 import mongoose, { Schema, Document, Model } from 'mongoose';
 
+export type EvidenceKind =
+  | 'observation'
+  | 'professional_discussion'
+  | 'reflective_account'
+  | 'verbal_assessment'
+  | 'written_assessment'
+  | 'work_product'
+  | 'witness_testimony';
+
 export interface IEvidence extends Document {
   enrolmentId: mongoose.Types.ObjectId;
   unitId: mongoose.Types.ObjectId;
@@ -15,6 +24,13 @@ export interface IEvidence extends Document {
   uploadedAt: Date;
   attemptNumber: number;
   status: 'draft' | 'submitted' | 'assessed';
+  evidenceKind?: EvidenceKind;
+  witnessName?: string;
+  witnessRole?: string;
+  witnessEmployer?: string;
+  witnessEmail?: string;
+  witnessStatement?: string;
+  thumbnailUrl?: string;
   createdAt: Date;
   updatedAt: Date;
 }
@@ -82,6 +98,24 @@ const EvidenceSchema = new Schema<IEvidence>(
       enum: ['draft', 'submitted', 'assessed'],
       default: 'draft',
     },
+    evidenceKind: {
+      type: String,
+      enum: [
+        'observation',
+        'professional_discussion',
+        'reflective_account',
+        'verbal_assessment',
+        'written_assessment',
+        'work_product',
+        'witness_testimony',
+      ],
+    },
+    witnessName: { type: String, trim: true },
+    witnessRole: { type: String, trim: true },
+    witnessEmployer: { type: String, trim: true },
+    witnessEmail: { type: String, trim: true, lowercase: true },
+    witnessStatement: { type: String, trim: true, maxlength: 5000 },
+    thumbnailUrl: { type: String, trim: true },
   },
   {
     timestamps: true,
@@ -90,6 +124,7 @@ const EvidenceSchema = new Schema<IEvidence>(
 
 EvidenceSchema.index({ enrolmentId: 1 });
 EvidenceSchema.index({ unitId: 1 });
+EvidenceSchema.index({ status: 1 });
 
 const Evidence: Model<IEvidence> =
   mongoose.models.Evidence ||

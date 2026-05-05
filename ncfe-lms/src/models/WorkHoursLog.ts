@@ -58,6 +58,7 @@ const WorkHoursLogSchema = new Schema<IWorkHoursLog>(
 WorkHoursLogSchema.index({ enrollmentId: 1 });
 WorkHoursLogSchema.index({ learnerId: 1 });
 WorkHoursLogSchema.index({ enrollmentId: 1, date: 1 });
+WorkHoursLogSchema.index({ learnerId: 1, date: -1 });
 
 const WorkHoursLog: Model<IWorkHoursLog> =
   mongoose.models.WorkHoursLog ||

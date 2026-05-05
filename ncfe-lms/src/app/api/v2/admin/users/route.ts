@@ -7,6 +7,7 @@ import Enrolment from '@/models/Enrolment';
 import '@/models/Centre';
 import { adminUserCreateSchema } from '@/lib/validators';
 import { sendWelcomeEmail } from '@/lib/email';
+import { checkRateLimit, rateLimitIdentity } from '@/lib/rate-limit';
 
 export async function GET(req: NextRequest) {
   const { error } = await withAuth(['admin']);
@@ -73,6 +74,14 @@ export async function GET(req: NextRequest) {
 export async function POST(req: NextRequest) {
   const { session, error } = await withAuth(['admin']);
   if (error) return error;
+
+  // G22 — rate limit (60 user-creation requests per admin per minute)
+  const rl = checkRateLimit(
+    rateLimitIdentity(req, session?.user.id),
+    { limit: 60, routeKey: 'admin/users:POST' },
+    req.url,
+  );
+  if (!rl.ok) return rl.response;
 
   await dbConnect();
 

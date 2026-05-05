@@ -90,6 +90,7 @@ AssessmentSchema.index({ learnerId: 1 });
 AssessmentSchema.index({ enrollmentId: 1 });
 AssessmentSchema.index({ status: 1 });
 AssessmentSchema.index({ date: -1 });
+AssessmentSchema.index({ qualificationId: 1, status: 1 });
 
 const Assessment: Model<IAssessment> =
   mongoose.models.Assessment ||

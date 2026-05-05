@@ -50,6 +50,8 @@ const EnrolmentSchema = new Schema<IEnrolment>(
 EnrolmentSchema.index({ userId: 1 });
 EnrolmentSchema.index({ qualificationId: 1 });
 EnrolmentSchema.index({ assessorId: 1 });
+EnrolmentSchema.index({ userId: 1, qualificationId: 1 });
+EnrolmentSchema.index({ status: 1 });
 
 const Enrolment: Model<IEnrolment> =
   mongoose.models.Enrolment ||

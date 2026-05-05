@@ -65,6 +65,7 @@ AuditLogSchema.pre('findOneAndDelete', function () {
 AuditLogSchema.index({ userId: 1 });
 AuditLogSchema.index({ entityType: 1, entityId: 1 });
 AuditLogSchema.index({ timestamp: -1 });
+AuditLogSchema.index({ action: 1 });
 
 const AuditLog: Model<IAuditLog> =
   mongoose.models.AuditLog ||

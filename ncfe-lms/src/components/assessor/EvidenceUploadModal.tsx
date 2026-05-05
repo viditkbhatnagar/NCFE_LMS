@@ -41,6 +41,12 @@ export default function EvidenceUploadModal({
   const [progress, setProgress] = useState(0);
   const [uploadPhase, setUploadPhase] = useState('');
   const [error, setError] = useState('');
+  const [evidenceKind, setEvidenceKind] = useState('');
+  const [witnessName, setWitnessName] = useState('');
+  const [witnessRole, setWitnessRole] = useState('');
+  const [witnessEmployer, setWitnessEmployer] = useState('');
+  const [witnessEmail, setWitnessEmail] = useState('');
+  const [witnessStatement, setWitnessStatement] = useState('');
   const fileRef = useRef<HTMLInputElement>(null);
   const xhrRef = useRef<XMLHttpRequest | null>(null);
 
@@ -52,6 +58,12 @@ export default function EvidenceUploadModal({
     setError('');
     setProgress(0);
     setUploadPhase('');
+    setEvidenceKind('');
+    setWitnessName('');
+    setWitnessRole('');
+    setWitnessEmployer('');
+    setWitnessEmail('');
+    setWitnessStatement('');
     if (xhrRef.current) {
       xhrRef.current.abort();
       xhrRef.current = null;
@@ -144,6 +156,14 @@ export default function EvidenceUploadModal({
       fd.append('fileName', file.name);
       fd.append('fileType', file.type);
       fd.append('fileSize', String(file.size));
+      if (evidenceKind) fd.append('evidenceKind', evidenceKind);
+      if (evidenceKind === 'witness_testimony') {
+        if (witnessName) fd.append('witnessName', witnessName);
+        if (witnessRole) fd.append('witnessRole', witnessRole);
+        if (witnessEmployer) fd.append('witnessEmployer', witnessEmployer);
+        if (witnessEmail) fd.append('witnessEmail', witnessEmail);
+        if (witnessStatement) fd.append('witnessStatement', witnessStatement);
+      }
 
       const res = await fetch('/api/v2/evidence/upload', {
         method: 'POST',
@@ -237,6 +257,71 @@ export default function EvidenceUploadModal({
             ))}
           </select>
         </div>
+
+        {/* Evidence kind (G12) */}
+        <div>
+          <label className="block text-sm font-medium text-gray-700 mb-1">
+            Evidence kind (optional)
+          </label>
+          <select
+            value={evidenceKind}
+            onChange={(e) => setEvidenceKind(e.target.value)}
+            className="w-full border border-gray-200 rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500/30"
+          >
+            <option value="">— Not specified —</option>
+            <option value="observation">Observation</option>
+            <option value="professional_discussion">Professional discussion</option>
+            <option value="reflective_account">Reflective account</option>
+            <option value="verbal_assessment">Verbal assessment</option>
+            <option value="written_assessment">Written assessment</option>
+            <option value="work_product">Work product</option>
+            <option value="witness_testimony">Witness testimony</option>
+          </select>
+        </div>
+
+        {/* Witness fields — shown only when kind = witness_testimony (G12) */}
+        {evidenceKind === 'witness_testimony' && (
+          <div className="space-y-3 p-3 rounded-md bg-amber-50 border border-amber-200">
+            <p className="text-xs font-medium text-amber-900">Witness details</p>
+            <div className="grid grid-cols-2 gap-3">
+              <input
+                type="text"
+                value={witnessName}
+                onChange={(e) => setWitnessName(e.target.value)}
+                placeholder="Witness name"
+                className="border border-gray-200 rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500/30"
+              />
+              <input
+                type="text"
+                value={witnessRole}
+                onChange={(e) => setWitnessRole(e.target.value)}
+                placeholder="Role / job title"
+                className="border border-gray-200 rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500/30"
+              />
+              <input
+                type="text"
+                value={witnessEmployer}
+                onChange={(e) => setWitnessEmployer(e.target.value)}
+                placeholder="Employer / organisation"
+                className="border border-gray-200 rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500/30"
+              />
+              <input
+                type="email"
+                value={witnessEmail}
+                onChange={(e) => setWitnessEmail(e.target.value)}
+                placeholder="Witness email"
+                className="border border-gray-200 rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500/30"
+              />
+            </div>
+            <textarea
+              value={witnessStatement}
+              onChange={(e) => setWitnessStatement(e.target.value)}
+              rows={3}
+              placeholder="Witness statement (what they observed)"
+              className="w-full border border-gray-200 rounded-md px-3 py-2 text-sm resize-none focus:outline-none focus:ring-2 focus:ring-brand-500/30"
+            />
+          </div>
+        )}
 
         {/* Progress bar */}
         {uploading && (
