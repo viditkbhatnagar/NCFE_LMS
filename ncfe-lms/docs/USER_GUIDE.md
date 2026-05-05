@@ -323,6 +323,49 @@ The 8 sidebar icons follow the BRITEthink architecture spec — identical for bo
 
 ---
 
+## Section 4.5 — Recently shipped features (Phase 2 / Batches A + B)
+
+### Required work hours + progress bar (G13)
+On `/admin/courses` create/edit, an admin can set an optional **Required Work Hours** number per qualification. When set, the assessor and student work-hours page (`/c/{slug}/work-hours`) displays a top-of-page progress bar showing `Xh Ym / Nh required` plus a percentage — green with "Requirement met" when fulfilled. Hidden when the requirement is unset.
+
+### Witness testimony fields (G12)
+The Evidence upload modal now includes an optional **Evidence kind** dropdown (mirroring `AssessmentKind`). When `witness_testimony` is selected, a witness block of 5 inputs appears: name, role, employer, email, and a free-text statement. These fields are stored on the Evidence record and additive — existing evidence is untouched.
+
+### Per-criterion comments (G11)
+Assessors and IQAs can leave per-criterion comments on an assessment via:
+- `GET  /api/v2/assessments/{id}/criteria-comments?criteriaId=…` — list
+- `POST /api/v2/assessments/{id}/criteria-comments` — `{ criteriaId, content }` (assessor / IQA only)
+- `DELETE /api/v2/assessments/{id}/criteria-comments/{commentId}` — author-only or admin
+
+Students see comments read-only (when accessing their own assessment). Per-criterion comments cascade-delete when the parent assessment is deleted. **UI for the expandable criterion thread is in next sprint** — endpoints are functional today.
+
+### Assessment PDF export (G14)
+On the assessment detail panel, a **PDF** button (next to Delete) downloads a complete assessment PDF including: header, plan intent + implementation, mapped criteria, mapped evidence, sign-offs, and remarks. Authorised: assessor (owner), the learner, IQA, admin. Endpoint: `GET /api/v2/assessments/{id}/pdf` (returns `application/pdf` with `Content-Disposition: attachment`).
+
+### Role change for existing users (G16)
+On the admin users edit form, the role dropdown is now editable. **When an admin demotes a student to a non-student role**, all of that student's `enrolled` / `in_progress` enrolments are automatically set to `withdrawn` and an audit log `USER_ROLE_CHANGED` is recorded with the count. The promotion student → assessor / IQA / admin works the same way.
+
+### Cookie consent banner + privacy page (G18)
+First-time visitors see a bottom-of-page banner: "We use essential cookies for sign-in… See our privacy policy." with **Accept all** / **Reject non-essential** buttons. Decision persists in `cookie_consent` cookie (1 year). New public route at `/privacy` describes data controller, what we collect, sub-processors (Brevo / AWS / MongoDB Atlas / Render), retention, and user rights.
+
+### HTTP security headers (G19)
+Every response now includes: `Content-Security-Policy` (defaults to `'self'` with safe inline allowances for the Next.js runtime), `Strict-Transport-Security` (1 year, includeSubDomains), `X-Frame-Options: DENY`, `X-Content-Type-Options: nosniff`, `Referrer-Policy: strict-origin-when-cross-origin`, `Permissions-Policy: camera=(), microphone=(), geolocation=()`.
+
+### API rate limiting (G22)
+Two endpoints are now rate-limited (60-second sliding window, in-memory, single-instance):
+- `POST /api/v2/admin/users` — 60/min/admin
+- `POST /api/v2/evidence/upload` — 10/min/user
+
+Exceeding the cap returns `429` with a `Retry-After` header.
+
+### Indexes (G21)
+Database indexes were strengthened (compound + supporting) on Enrolment, Notification, WorkHoursLog, AuditLog, Assessment, and Evidence. Mongoose builds them automatically on connect; no operational action required.
+
+### Cascade-delete (G20)
+Deleting a draft assessment now also removes its CriterionComment rows (added alongside the existing 5 child cascades). User and Enrolment "deletes" remain soft-deletes by design — they preserve audit trail.
+
+---
+
 ## Section 5 — FAQ
 
 **Q: How do I add a student to multiple courses?**
