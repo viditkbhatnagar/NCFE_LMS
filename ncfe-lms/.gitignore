@@ -40,3 +40,21 @@ yarn-error.log*
 # typescript
 *.tsbuildinfo
 next-env.d.ts
+
+# Playwright test artefacts and per-run state
+/test-results/
+/playwright-report/
+/screenshots/
+/tests/.auth/
+/tests/baseline.json
+/tests/baseline-s3.json
+/tests/baseline-user-ids.json
+/tests/.runId
+/tests/.run-id.json
+/tests/cleanup-failures.jsonl
+/tests/console-issues.jsonl
+/tests/postflight-report.json
+/tests/playwright-results.json
+
+# Generated fixture binaries (regenerated on demand via files-generate.ts / ffmpeg)
+/tests/fixtures/files/
