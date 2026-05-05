@@ -3,6 +3,10 @@
 import { useState, useEffect, useCallback } from 'react';
 import Link from 'next/link';
 import ConfirmDialog from '@/components/admin/ConfirmDialog';
+import ListStateBoundary, {
+  DefaultListSkeleton,
+  EmptyState,
+} from '@/components/common/ListStateBoundary';
 
 interface Qualification {
   _id: string;
@@ -20,6 +24,7 @@ interface Qualification {
 export default function AdminCoursesPage() {
   const [qualifications, setQualifications] = useState<Qualification[]>([]);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
   const [search, setSearch] = useState('');
   const [showForm, setShowForm] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
@@ -30,12 +35,23 @@ export default function AdminCoursesPage() {
   const [deleting, setDeleting] = useState(false);
 
   const fetchQualifications = useCallback(async () => {
+    setLoading(true);
+    setError(null);
     try {
       const res = await fetch(`/api/v2/admin/qualifications?search=${encodeURIComponent(search)}&limit=50`);
+      if (!res.ok) {
+        setError('The server returned an error. Please try again.');
+        return;
+      }
       const data = await res.json();
-      if (data.success) setQualifications(data.data);
+      if (data.success) {
+        setQualifications(data.data);
+      } else {
+        setError(data.error || 'Failed to load courses.');
+      }
     } catch (err) {
       console.error('Failed to fetch qualifications:', err);
+      setError('Network error. Check your connection and retry.');
     } finally {
       setLoading(false);
     }
@@ -248,12 +264,34 @@ export default function AdminCoursesPage() {
       )}
 
       {/* Table */}
-      <div className="bg-white rounded-[8px] border border-gray-200 overflow-hidden">
-        {loading ? (
-          <div className="p-8 text-center text-sm text-gray-400">Loading...</div>
-        ) : qualifications.length === 0 ? (
-          <div className="p-8 text-center text-sm text-gray-400">No courses found.</div>
-        ) : (
+      <ListStateBoundary
+        loading={loading}
+        error={error}
+        isEmpty={qualifications.length === 0}
+        onRetry={fetchQualifications}
+        skeleton={<DefaultListSkeleton rows={5} />}
+        emptyContent={
+          <EmptyState
+            title="No courses yet"
+            description={
+              search
+                ? `No courses match "${search}". Try a different search term.`
+                : 'Add a qualification to start managing units, learning outcomes, and assessment criteria.'
+            }
+            cta={
+              !search ? (
+                <button
+                  onClick={() => { resetForm(); setShowForm(true); }}
+                  className="px-4 py-2 text-sm font-medium text-white bg-primary rounded-[6px] hover:bg-primary/90"
+                >
+                  Add a course
+                </button>
+              ) : null
+            }
+          />
+        }
+      >
+        <div className="bg-white rounded-[8px] border border-gray-200 overflow-hidden">
           <div className="overflow-x-auto">
             <table className="w-full text-sm">
               <thead>
@@ -301,8 +339,8 @@ export default function AdminCoursesPage() {
               </tbody>
             </table>
           </div>
-        )}
-      </div>
+        </div>
+      </ListStateBoundary>
 
       <ConfirmDialog
         open={!!confirmDelete}

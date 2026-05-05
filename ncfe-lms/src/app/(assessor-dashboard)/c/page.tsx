@@ -1,74 +1,84 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { useSession } from 'next-auth/react';
 import Link from 'next/link';
 import type { AssessorCourse, UserRole } from '@/types';
+import ListStateBoundary, {
+  DefaultListSkeleton,
+  EmptyState,
+} from '@/components/common/ListStateBoundary';
 
 export default function CourseSelector() {
   const { data: session } = useSession();
   const userRole = (session?.user as { role?: UserRole } | undefined)?.role || 'student';
   const [courses, setCourses] = useState<AssessorCourse[]>([]);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
 
-  useEffect(() => {
-    async function fetchCourses() {
-      try {
-        const endpoint = userRole === 'student'
-          ? '/api/v2/student/courses'
-          : '/api/v2/assessor/courses';
-        const res = await fetch(endpoint);
-        const json = await res.json();
-        if (json.success) setCourses(json.data);
-      } catch (err) {
-        console.error('Error fetching courses:', err);
-      } finally {
-        setLoading(false);
+  const fetchCourses = useCallback(async () => {
+    if (!session) return;
+    setLoading(true);
+    setError(null);
+    try {
+      const endpoint = userRole === 'student'
+        ? '/api/v2/student/courses'
+        : '/api/v2/assessor/courses';
+      const res = await fetch(endpoint);
+      if (!res.ok) {
+        setError('The server returned an error. Please try again.');
+        return;
       }
+      const json = await res.json();
+      if (json.success) setCourses(json.data);
+      else setError(json.error || 'Failed to load courses.');
+    } catch (err) {
+      console.error('Error fetching courses:', err);
+      setError('Network error. Check your connection and retry.');
+    } finally {
+      setLoading(false);
     }
-    if (session) fetchCourses();
   }, [session, userRole]);
 
-  if (loading) {
-    return (
-      <div className="flex items-center justify-center h-64">
-        <div className="w-6 h-6 border-2 border-primary border-t-transparent rounded-full animate-spin" />
-      </div>
-    );
-  }
+  useEffect(() => {
+    if (session) fetchCourses();
+  }, [session, fetchCourses]);
 
   return (
     <div className="p-6">
       <h1 className="text-2xl font-bold text-gray-900 mb-2">My Courses</h1>
       <p className="text-sm text-gray-400 mb-6">Select a course to view its dashboard</p>
 
-      {courses.length === 0 && (
-        <div className="flex flex-col items-center py-16 text-gray-400">
-          <svg
-            className="w-16 h-16 mb-4"
-            fill="none"
-            viewBox="0 0 24 24"
-            stroke="currentColor"
-          >
-            <path
-              strokeLinecap="round"
-              strokeLinejoin="round"
-              strokeWidth={1}
-              d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332.477-4.5 1.253"
-            />
-          </svg>
-          <p className="text-lg font-medium text-gray-500">
-            {userRole === 'student' ? 'No courses enrolled' : 'No courses assigned'}
-          </p>
-          <p className="text-sm text-gray-400 mt-1">
-            Contact your administrator to get enrolled
-          </p>
-        </div>
-      )}
-
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-        {courses.map((course) => (
-          <Link
+      <ListStateBoundary
+        loading={loading}
+        error={error}
+        isEmpty={courses.length === 0}
+        onRetry={fetchCourses}
+        skeleton={
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+            {[...Array(3)].map((_, i) => (
+              <div key={i} className="bg-white border border-gray-200 rounded-[8px] p-5 animate-pulse">
+                <div className="h-4 bg-gray-200 rounded w-16 mb-3" />
+                <div className="h-5 bg-gray-200 rounded w-3/4 mb-2" />
+                <div className="h-3 bg-gray-200 rounded w-1/3" />
+              </div>
+            ))}
+          </div>
+        }
+        emptyContent={
+          <EmptyState
+            title={userRole === 'student' ? 'No courses enrolled' : 'No courses assigned'}
+            description={
+              userRole === 'student'
+                ? "Contact your administrator to get enrolled in a qualification."
+                : 'You have no courses assigned yet. An admin can assign you to a qualification.'
+            }
+          />
+        }
+      >
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+          {courses.map((course) => (
+            <Link
             key={course._id}
             href={`/c/${course.slug}`}
             className="block bg-white border border-gray-200 rounded-[8px] p-5 hover:border-primary hover:shadow-sm transition-all group"
@@ -101,8 +111,9 @@ export default function CourseSelector() {
               </p>
             )}
           </Link>
-        ))}
-      </div>
+          ))}
+        </div>
+      </ListStateBoundary>
     </div>
   );
 }

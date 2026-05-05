@@ -4,6 +4,10 @@ import { useState, useEffect, useCallback, useRef } from 'react';
 import { useParams } from 'next/navigation';
 import Link from 'next/link';
 import ConfirmDialog from '@/components/admin/ConfirmDialog';
+import ListStateBoundary, {
+  DefaultListSkeleton,
+  EmptyState,
+} from '@/components/common/ListStateBoundary';
 
 interface AssessmentCriteria {
   _id: string;
@@ -42,6 +46,7 @@ export default function CourseDetailPage() {
   const [acs, setAcs] = useState<Record<string, AssessmentCriteria[]>>({});
   const [expandedLo, setExpandedLo] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState<string | null>(null);
 
   // Form states
   const [unitForm, setUnitForm] = useState({ unitReference: '', title: '', description: '' });
@@ -71,17 +76,41 @@ export default function CourseDetailPage() {
   const [showCsvDialog, setShowCsvDialog] = useState(false);
 
   const fetchQualification = useCallback(async () => {
-    const res = await fetch(`/api/v2/admin/qualifications/${id}`);
-    const data = await res.json();
-    if (data.success) setQualification(data.data);
+    try {
+      const res = await fetch(`/api/v2/admin/qualifications/${id}`);
+      if (!res.ok) {
+        setLoadError('The server returned an error. Please try again.');
+        return;
+      }
+      const data = await res.json();
+      if (data.success) setQualification(data.data);
+    } catch {
+      setLoadError('Network error. Check your connection and retry.');
+    }
   }, [id]);
 
   const fetchUnits = useCallback(async () => {
-    const res = await fetch(`/api/v2/admin/units?qualificationId=${id}`);
-    const data = await res.json();
-    if (data.success) setUnits(data.data);
-    setLoading(false);
+    setLoading(true);
+    try {
+      const res = await fetch(`/api/v2/admin/units?qualificationId=${id}`);
+      if (!res.ok) {
+        setLoadError('The server returned an error. Please try again.');
+        return;
+      }
+      const data = await res.json();
+      if (data.success) setUnits(data.data);
+    } catch {
+      setLoadError('Network error. Check your connection and retry.');
+    } finally {
+      setLoading(false);
+    }
   }, [id]);
+
+  const refetchAll = useCallback(() => {
+    setLoadError(null);
+    fetchQualification();
+    fetchUnits();
+  }, [fetchQualification, fetchUnits]);
 
   const fetchLOs = useCallback(async (unitId: string) => {
     const res = await fetch(`/api/v2/admin/learning-outcomes?unitId=${unitId}`);
@@ -277,10 +306,6 @@ export default function CourseDetailPage() {
     if (csvFileRef.current) csvFileRef.current.value = '';
   };
 
-  if (loading) {
-    return <div className="text-sm text-gray-400">Loading...</div>;
-  }
-
   return (
     <div className="space-y-6">
       <div>
@@ -343,6 +368,27 @@ export default function CourseDetailPage() {
           </form>
         )}
 
+        <ListStateBoundary
+          loading={loading}
+          error={loadError}
+          isEmpty={units.length === 0}
+          onRetry={refetchAll}
+          skeleton={<DefaultListSkeleton rows={4} />}
+          emptyContent={
+            <EmptyState
+              title="No units yet"
+              description="Add units, learning outcomes, and assessment criteria to build out the curriculum for this qualification."
+              cta={
+                <button
+                  onClick={() => setShowUnitForm(true)}
+                  className="px-4 py-2 text-sm font-medium text-white bg-primary rounded-[6px] hover:bg-primary/90"
+                >
+                  Add a unit
+                </button>
+              }
+            />
+          }
+        >
         {units.map((unit) => (
           <div key={unit._id} className="bg-white rounded-[8px] border border-gray-200">
             <button
@@ -479,12 +525,7 @@ export default function CourseDetailPage() {
             )}
           </div>
         ))}
-
-        {units.length === 0 && (
-          <div className="bg-white rounded-[8px] border border-gray-200 p-8 text-center text-sm text-gray-400">
-            No units added yet. Click &ldquo;Add Unit&rdquo; to get started.
-          </div>
-        )}
+        </ListStateBoundary>
       </div>
 
       <ConfirmDialog

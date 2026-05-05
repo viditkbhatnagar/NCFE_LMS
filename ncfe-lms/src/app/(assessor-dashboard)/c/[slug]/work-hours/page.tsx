@@ -7,6 +7,10 @@ import WorkHourEntry from '@/components/assessor/WorkHourEntry';
 import WorkHourEntryForm from '@/components/assessor/WorkHourEntryForm';
 import ConfirmDialog from '@/components/admin/ConfirmDialog';
 import type { WorkHourEntryItem } from '@/types';
+import ListStateBoundary, {
+  DefaultListSkeleton,
+  EmptyState,
+} from '@/components/common/ListStateBoundary';
 
 function formatDateParam(date: Date): string {
   const y = date.getFullYear();
@@ -21,6 +25,7 @@ export default function WorkHoursPage() {
 
   const [entries, setEntries] = useState<WorkHourEntryItem[]>([]);
   const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
   const [selectedDate, setSelectedDate] = useState(new Date());
   const [showForm, setShowForm] = useState(false);
   const [editingEntry, setEditingEntry] = useState<WorkHourEntryItem | null>(null);
@@ -34,17 +39,23 @@ export default function WorkHoursPage() {
   const fetchEntries = useCallback(async () => {
     if (!currentEnrollmentId) return;
     setLoading(true);
+    setError(null);
     try {
       const params = new URLSearchParams({
         enrollmentId: currentEnrollmentId,
         date: formatDateParam(selectedDate),
       });
       const res = await fetch(`/api/v2/work-hours?${params}`);
-      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      if (!res.ok) {
+        setError('The server returned an error. Please try again.');
+        return;
+      }
       const json = await res.json();
       if (json.success) setEntries(json.data);
+      else setError(json.error || 'Failed to load entries.');
     } catch (err) {
       console.error('Error fetching work hours:', err);
+      setError('Network error. Check your connection and retry.');
     } finally {
       setLoading(false);
     }
@@ -200,19 +211,35 @@ export default function WorkHoursPage() {
           />
         )}
 
-        {loading ? (
-          <div className="flex justify-center py-12">
-            <div className="w-6 h-6 border-2 border-brand-500 border-t-transparent rounded-full animate-spin" />
-          </div>
-        ) : entries.length === 0 && !showForm ? (
-          <div className="flex flex-col items-center py-16 text-gray-400">
-            <svg className="w-16 h-16 mb-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
-            </svg>
-            <p className="text-lg font-medium text-gray-500 mb-1">No time logs for this date</p>
-            <p className="text-sm text-gray-400">Click &quot;+ New&quot; to add a work hours entry</p>
-          </div>
-        ) : (
+        {!showForm && (
+          <ListStateBoundary
+            loading={loading}
+            error={error}
+            isEmpty={entries.length === 0}
+            onRetry={fetchEntries}
+            skeleton={<DefaultListSkeleton rows={3} />}
+            emptyContent={
+              <EmptyState
+                title="No time logs for this date"
+                description={
+                  isStudent
+                    ? 'Click "+ New" above to log hours for this day.'
+                    : 'No hours recorded by this learner for the selected date.'
+                }
+              />
+            }
+          >
+            {entries.map((entry) => (
+              <WorkHourEntry
+                key={entry._id}
+                entry={entry}
+                onEdit={handleEdit}
+                onDelete={handleDelete}
+              />
+            ))}
+          </ListStateBoundary>
+        )}
+        {showForm && entries.length > 0 &&
           entries.map((entry) => (
             <WorkHourEntry
               key={entry._id}
@@ -220,8 +247,7 @@ export default function WorkHoursPage() {
               onEdit={handleEdit}
               onDelete={handleDelete}
             />
-          ))
-        )}
+          ))}
       </div>
 
       {/* Daily summary */}

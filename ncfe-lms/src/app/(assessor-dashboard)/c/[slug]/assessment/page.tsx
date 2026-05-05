@@ -7,6 +7,10 @@ import LearnerSelectionModal from '@/components/assessor/LearnerSelectionModal';
 import AssessmentDetailPanel from '@/components/assessor/assessment-detail/AssessmentDetailPanel';
 import { groupByTimePeriod } from '@/lib/assessment-utils';
 import type { AssessmentListItem } from '@/types';
+import ListStateBoundary, {
+  DefaultListSkeleton,
+  EmptyState,
+} from '@/components/common/ListStateBoundary';
 
 export default function AssessmentsPage() {
   const { qualification, enrollments, currentEnrollmentId, selectedLearner, userRole } =
@@ -20,6 +24,7 @@ export default function AssessmentsPage() {
 
   const [assessments, setAssessments] = useState<AssessmentListItem[]>([]);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
   const [selectedAssessmentId, setSelectedAssessmentId] = useState<string | null>(null);
   const [showLearnerModal, setShowLearnerModal] = useState(false);
   const [creating, setCreating] = useState(false);
@@ -66,6 +71,7 @@ export default function AssessmentsPage() {
 
   const fetchAssessments = useCallback(async () => {
     setLoading(true);
+    setError(null);
     try {
       let url: string;
       if (readOnly) {
@@ -77,12 +83,19 @@ export default function AssessmentsPage() {
       }
 
       const res = await fetch(url);
+      if (!res.ok) {
+        setError('The server returned an error. Please try again.');
+        return;
+      }
       const json = await res.json();
       if (json.success) {
         setAssessments(json.data);
+      } else {
+        setError(json.error || 'Failed to load assessments.');
       }
     } catch (err) {
       console.error('Error fetching assessments:', err);
+      setError('Network error. Check your connection and retry.');
     } finally {
       setLoading(false);
     }
@@ -157,47 +170,36 @@ export default function AssessmentsPage() {
           )}
         </div>
 
-        {/* Loading state */}
-        {loading && (
-          <div className="flex justify-center py-12">
-            <div className="w-6 h-6 border-2 border-primary border-t-transparent rounded-full animate-spin" />
-          </div>
-        )}
-
-        {/* Empty state */}
-        {!loading && assessments.length === 0 && (
-          <div className="flex flex-col items-center py-16 text-gray-400">
-            <svg className="w-16 h-16 mb-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-              <path
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                strokeWidth={1}
-                d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2"
-              />
-            </svg>
-            <p className="text-lg font-medium text-gray-500 mb-2">
-              {readOnly ? 'No assessments available' : 'No assessments yet'}
-            </p>
-            <p className="text-sm text-gray-400 mb-4">
-              {readOnly
-                ? 'Your assessor has not yet created any assessments for you'
-                : 'Create your first assessment to get started'}
-            </p>
-            {!readOnly && (
-              <button
-                onClick={handleCreate}
-                disabled={creating}
-                className="px-4 py-2 bg-primary text-white rounded-[6px] text-sm font-medium hover:bg-primary/90 transition-colors disabled:opacity-50"
-              >
-                + Create an Assessment
-              </button>
-            )}
-          </div>
-        )}
-
-        {/* Card grid grouped by time */}
-        {!loading &&
-          groups.map((group) => (
+        <ListStateBoundary
+          loading={loading}
+          error={error}
+          isEmpty={assessments.length === 0}
+          onRetry={fetchAssessments}
+          skeleton={<DefaultListSkeleton rows={4} />}
+          emptyContent={
+            <EmptyState
+              title={readOnly ? 'No assessments available' : 'No assessments yet'}
+              description={
+                readOnly
+                  ? 'Your assessor has not yet created any assessments for you.'
+                  : 'Create your first assessment to plan units, capture evidence, and sign off.'
+              }
+              cta={
+                !readOnly ? (
+                  <button
+                    onClick={handleCreate}
+                    disabled={creating}
+                    className="px-4 py-2 bg-primary text-white rounded-[6px] text-sm font-medium hover:bg-primary/90 transition-colors disabled:opacity-50"
+                  >
+                    + Create an assessment
+                  </button>
+                ) : null
+              }
+            />
+          }
+        >
+          {/* Card grid grouped by time */}
+          {groups.map((group) => (
             <div key={group.label} className="mb-6">
               <h2 className="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-3">
                 {group.label}
@@ -214,6 +216,7 @@ export default function AssessmentsPage() {
               </div>
             </div>
           ))}
+        </ListStateBoundary>
       </div>
 
       {/* Right: Detail panel — full-screen on mobile, overlay on desktop */}

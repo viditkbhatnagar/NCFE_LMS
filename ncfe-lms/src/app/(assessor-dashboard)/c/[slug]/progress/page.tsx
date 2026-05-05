@@ -9,6 +9,10 @@ import OutcomeCard from '@/components/assessor/OutcomeCard';
 import CriterionCard from '@/components/assessor/CriterionCard';
 import ProgressAssessmentItem from '@/components/assessor/ProgressAssessmentItem';
 import type { ProgressUnit } from '@/types';
+import ListStateBoundary, {
+  DefaultListSkeleton,
+  EmptyState,
+} from '@/components/common/ListStateBoundary';
 
 interface ProgressData {
   units: ProgressUnit[];
@@ -20,6 +24,7 @@ export default function ProgressPage() {
 
   const [data, setData] = useState<ProgressData | null>(null);
   const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
   const [selectedUnitId, setSelectedUnitId] = useState<string | null>(null);
   const [selectedLOId, setSelectedLOId] = useState<string | null>(null);
   const [selectedACId, setSelectedACId] = useState<string | null>(null);
@@ -35,12 +40,19 @@ export default function ProgressPage() {
   const fetchProgress = useCallback(async () => {
     if (!currentEnrollmentId) return;
     setLoading(true);
+    setError(null);
     try {
       const res = await fetch(`/api/v2/progress/${currentEnrollmentId}`);
+      if (!res.ok) {
+        setError('The server returned an error. Please try again.');
+        return;
+      }
       const json = await res.json();
       if (json.success) setData(json.data);
+      else setError(json.error || 'Failed to load progress.');
     } catch (err) {
       console.error('Error fetching progress:', err);
+      setError('Network error. Check your connection and retry.');
     } finally {
       setLoading(false);
     }
@@ -103,13 +115,25 @@ export default function ProgressPage() {
 
       {/* 4-column layout — horizontal scroll on narrow viewports */}
       <div className="flex-1 overflow-x-auto overflow-y-hidden">
-        <div className="flex h-full min-w-[900px] bg-white border border-gray-200 rounded-lg overflow-hidden">
-          {loading ? (
-            <div className="flex-1 flex items-center justify-center">
-              <div className="w-6 h-6 border-2 border-brand-500 border-t-transparent rounded-full animate-spin" />
+        <ListStateBoundary
+          loading={loading}
+          error={error}
+          isEmpty={!loading && !error && (data?.units?.length ?? 0) === 0}
+          onRetry={fetchProgress}
+          skeleton={
+            <div className="flex h-full min-w-[900px] bg-white border border-gray-200 rounded-lg overflow-hidden">
+              <DefaultListSkeleton rows={4} />
             </div>
-          ) : (
-            <>
+          }
+          emptyContent={
+            <EmptyState
+              title="No units in this course"
+              description="An admin needs to add learning outcomes and assessment criteria to this qualification."
+            />
+          }
+        >
+        <div className="flex h-full min-w-[900px] bg-white border border-gray-200 rounded-lg overflow-hidden">
+          <>
               {/* Column 1: Units */}
               <ProgressColumn
                 title="Units"
@@ -189,9 +213,9 @@ export default function ProgressPage() {
                   ))
                 )}
               </ProgressColumn>
-            </>
-          )}
+          </>
         </div>
+        </ListStateBoundary>
       </div>
     </div>
   );

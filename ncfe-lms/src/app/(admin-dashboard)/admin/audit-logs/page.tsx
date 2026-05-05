@@ -1,6 +1,10 @@
 'use client';
 
 import { useState, useEffect, useCallback } from 'react';
+import ListStateBoundary, {
+  DefaultListSkeleton,
+  EmptyState,
+} from '@/components/common/ListStateBoundary';
 
 interface AuditLog {
   _id: string;
@@ -25,6 +29,7 @@ interface UserOption {
 export default function AdminAuditLogsPage() {
   const [logs, setLogs] = useState<AuditLog[]>([]);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
   const [pagination, setPagination] = useState({ page: 1, total: 0, totalPages: 0 });
   const [entityTypeFilter, setEntityTypeFilter] = useState('All');
   const [actionFilter, setActionFilter] = useState('');
@@ -73,15 +78,23 @@ export default function AdminAuditLogsPage() {
 
   const fetchLogs = useCallback(async () => {
     setLoading(true);
+    setError(null);
     try {
       const res = await fetch(`/api/v2/admin/audit-logs?${buildParams()}`);
+      if (!res.ok) {
+        setError('The server returned an error. Please try again.');
+        return;
+      }
       const data = await res.json();
       if (data.success) {
         setLogs(data.data);
         setPagination((prev) => ({ ...prev, total: data.pagination.total, totalPages: data.pagination.totalPages }));
+      } else {
+        setError(data.error || 'Failed to load audit logs.');
       }
     } catch (err) {
       console.error('Failed to fetch audit logs:', err);
+      setError('Network error. Check your connection and retry.');
     } finally {
       setLoading(false);
     }
@@ -223,12 +236,24 @@ export default function AdminAuditLogsPage() {
       </div>
 
       {/* Table */}
-      <div className="bg-white rounded-[8px] border border-gray-200 overflow-hidden">
-        {loading ? (
-          <div className="p-8 text-center text-sm text-gray-400">Loading...</div>
-        ) : logs.length === 0 ? (
-          <div className="p-8 text-center text-sm text-gray-400">No audit logs found.</div>
-        ) : (
+      <ListStateBoundary
+        loading={loading}
+        error={error}
+        isEmpty={logs.length === 0}
+        onRetry={fetchLogs}
+        skeleton={<DefaultListSkeleton rows={6} />}
+        emptyContent={
+          <EmptyState
+            title="No audit logs found"
+            description={
+              entityTypeFilter !== 'All' || actionFilter || userIdFilter || fromDate || toDate
+                ? 'Try clearing some filters to see more results.'
+                : 'Audit entries appear here as users, courses, and assessments are created and changed.'
+            }
+          />
+        }
+      >
+        <div className="bg-white rounded-[8px] border border-gray-200 overflow-hidden">
           <div className="overflow-x-auto">
             <table className="w-full text-sm">
               <thead>
@@ -266,7 +291,6 @@ export default function AdminAuditLogsPage() {
               </tbody>
             </table>
           </div>
-        )}
 
         {/* Expanded detail - rendered below table */}
         {expandedId && (() => {
@@ -319,7 +343,8 @@ export default function AdminAuditLogsPage() {
             </div>
           </div>
         )}
-      </div>
+        </div>
+      </ListStateBoundary>
     </div>
   );
 }

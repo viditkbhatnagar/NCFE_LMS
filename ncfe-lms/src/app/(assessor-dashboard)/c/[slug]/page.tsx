@@ -12,6 +12,7 @@ import type {
   RecentMaterialItem,
   AssessmentKind,
 } from '@/types';
+import { ErrorState } from '@/components/common/ListStateBoundary';
 
 const STATUS_BADGE: Record<string, string> = {
   draft: 'bg-gray-100 text-gray-600',
@@ -40,6 +41,7 @@ function evidenceToCardItem(ev: RecentEvidenceItem): RecentCardItem {
     metaText: ev.uploadedAt ? formatAssessmentDate(ev.uploadedAt) : '',
     badge: ev.status,
     badgeClass: STATUS_BADGE[ev.status] ?? 'bg-gray-100 text-gray-600',
+    thumbnailUrl: ev.thumbnailUrl,
   };
 }
 
@@ -75,8 +77,10 @@ export default function CourseHomePage() {
   const { qualification, userRole, currentEnrollmentId } = useAssessorCourse();
   const [data, setData] = useState<AssessorHomeDashboard | null>(null);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
 
   const fetchData = useCallback(async () => {
+    setError(null);
     let url: string;
     if (userRole === 'student' && currentEnrollmentId) {
       url = `/api/v2/dashboard/student/${currentEnrollmentId}`;
@@ -88,11 +92,16 @@ export default function CourseHomePage() {
     }
     try {
       const res = await fetch(url);
-      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      if (!res.ok) {
+        setError('The server returned an error. Please try again.');
+        return;
+      }
       const json = await res.json();
       if (json.success) setData(json.data);
+      else setError(json.error || 'Failed to load dashboard.');
     } catch (err) {
       console.error('Error fetching home data:', err);
+      setError('Network error. Check your connection and retry.');
     } finally {
       setLoading(false);
     }
@@ -104,6 +113,14 @@ export default function CourseHomePage() {
 
   const slug = qualification.slug;
   const basePath = `/c/${slug}`;
+
+  if (error && !loading) {
+    return (
+      <div className="p-6">
+        <ErrorState message={error} onRetry={() => { setLoading(true); fetchData(); }} />
+      </div>
+    );
+  }
 
   if (loading) {
     return (

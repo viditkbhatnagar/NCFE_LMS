@@ -11,6 +11,10 @@ import NewFolderModal from '@/components/assessor/NewFolderModal';
 import FilePreviewModal from '@/components/assessor/FilePreviewModal';
 import ConfirmDialog from '@/components/admin/ConfirmDialog';
 import type { FileItem, FolderBreadcrumb } from '@/types';
+import ListStateBoundary, {
+  DefaultListSkeleton,
+  EmptyState,
+} from '@/components/common/ListStateBoundary';
 
 type ViewMode = 'grid' | 'list';
 
@@ -20,6 +24,7 @@ export default function CourseDocumentsPage() {
 
   const [items, setItems] = useState<FileItem[]>([]);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
   const [currentFolderId, setCurrentFolderId] = useState<string | null>(null);
   const [breadcrumbs, setBreadcrumbs] = useState<FolderBreadcrumb[]>([]);
   const [viewMode, setViewMode] = useState<ViewMode>('grid');
@@ -32,16 +37,23 @@ export default function CourseDocumentsPage() {
 
   const fetchItems = useCallback(async () => {
     setLoading(true);
+    setError(null);
     try {
       const params = new URLSearchParams({ qualificationId: qualification._id });
       if (currentFolderId) params.set('folderId', currentFolderId);
       if (fileTypeFilter) params.set('fileType', fileTypeFilter);
 
       const res = await fetch(`/api/v2/course-documents?${params}`);
+      if (!res.ok) {
+        setError('The server returned an error. Please try again.');
+        return;
+      }
       const json = await res.json();
       if (json.success) setItems(json.data);
+      else setError(json.error || 'Failed to load course documents.');
     } catch (err) {
       console.error('Error fetching course documents:', err);
+      setError('Network error. Check your connection and retry.');
     } finally {
       setLoading(false);
     }
@@ -163,19 +175,36 @@ export default function CourseDocumentsPage() {
 
       {/* Content */}
       <div className="flex-1 overflow-y-auto">
-        {loading ? (
-          <div className="flex justify-center py-12">
-            <div className="w-6 h-6 border-2 border-brand-500 border-t-transparent rounded-full animate-spin" />
-          </div>
-        ) : items.length === 0 ? (
-          <div className="flex flex-col items-center py-16 text-gray-400">
-            <svg className="w-16 h-16 mb-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1} d="M7 21h10a2 2 0 002-2V9.414a1 1 0 00-.293-.707l-5.414-5.414A1 1 0 0012.586 3H7a2 2 0 00-2 2v14a2 2 0 002 2z" />
-            </svg>
-            <p className="text-lg font-medium text-gray-500 mb-1">No course documents found</p>
-            <p className="text-sm text-gray-400">No course documents are available for this course yet.</p>
-          </div>
-        ) : viewMode === 'grid' ? (
+        <ListStateBoundary
+          loading={loading}
+          error={error}
+          isEmpty={items.length === 0}
+          onRetry={fetchItems}
+          skeleton={<DefaultListSkeleton rows={4} />}
+          emptyContent={
+            <EmptyState
+              title="No course documents yet"
+              description={
+                fileTypeFilter || currentFolderId
+                  ? 'No documents match the current filter or folder.'
+                  : readOnly
+                    ? 'No course documents have been uploaded yet.'
+                    : 'Upload course documents to share with learners and assessors.'
+              }
+              cta={
+                !readOnly && !fileTypeFilter && !currentFolderId ? (
+                  <button
+                    onClick={() => setShowUploadModal(true)}
+                    className="px-4 py-2 bg-primary text-white rounded-[6px] text-sm font-medium hover:bg-primary/90"
+                  >
+                    Upload document
+                  </button>
+                ) : null
+              }
+            />
+          }
+        >
+        {viewMode === 'grid' ? (
           <FileGrid
             items={items}
             onItemClick={handleItemClick}
@@ -194,6 +223,7 @@ export default function CourseDocumentsPage() {
             onDownload={handleDownload}
           />
         )}
+        </ListStateBoundary>
       </div>
 
       <ConfirmDialog

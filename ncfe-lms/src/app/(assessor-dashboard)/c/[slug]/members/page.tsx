@@ -5,19 +5,32 @@ import { useAssessorCourse } from '@/contexts/AssessorCourseContext';
 import MemberCard from '@/components/assessor/MemberCard';
 import LearnerGroup from '@/components/assessor/LearnerGroup';
 import type { MembersData } from '@/types';
+import ListStateBoundary, {
+  DefaultListSkeleton,
+  EmptyState,
+} from '@/components/common/ListStateBoundary';
 
 export default function MembersPage() {
   const { qualification } = useAssessorCourse();
   const [data, setData] = useState<MembersData | null>(null);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
 
   const fetchData = useCallback(async () => {
+    setLoading(true);
+    setError(null);
     try {
       const res = await fetch(`/api/v2/members/${qualification._id}`);
+      if (!res.ok) {
+        setError('The server returned an error. Please try again.');
+        return;
+      }
       const json = await res.json();
       if (json.success) setData(json.data);
+      else setError(json.error || 'Failed to load members.');
     } catch (err) {
       console.error('Error fetching members:', err);
+      setError('Network error. Check your connection and retry.');
     } finally {
       setLoading(false);
     }
@@ -27,18 +40,11 @@ export default function MembersPage() {
     fetchData();
   }, [fetchData]);
 
-  if (loading) {
-    return (
-      <div className="flex items-center justify-center h-64">
-        <div className="w-6 h-6 border-2 border-primary border-t-transparent rounded-full animate-spin" />
-      </div>
-    );
-  }
-
   const totalLearners = data?.learnerGroups.reduce(
     (sum, g) => sum + g.learners.length,
     0
   ) ?? 0;
+  const isEmpty = !data || ((data.teamMembers?.length ?? 0) === 0 && totalLearners === 0);
 
   return (
     <div className="p-6 space-y-6">
@@ -46,6 +52,20 @@ export default function MembersPage() {
         <h1 className="text-2xl font-bold text-gray-900">Members</h1>
         <p className="text-sm text-gray-400 mt-0.5">Your allocated members as ASSESSOR</p>
       </div>
+
+      <ListStateBoundary
+        loading={loading}
+        error={error}
+        isEmpty={isEmpty}
+        onRetry={fetchData}
+        skeleton={<DefaultListSkeleton rows={4} />}
+        emptyContent={
+          <EmptyState
+            title="No members yet"
+            description="Once an admin enrols students or assigns assessors to this qualification, they'll appear here."
+          />
+        }
+      >
 
       {/* Team Members card */}
       <div className="bg-white rounded-[8px] border border-gray-200">
@@ -99,6 +119,7 @@ export default function MembersPage() {
           ))}
         </div>
       </div>
+      </ListStateBoundary>
     </div>
   );
 }

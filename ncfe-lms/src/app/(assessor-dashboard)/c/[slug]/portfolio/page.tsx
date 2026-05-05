@@ -8,6 +8,10 @@ import EvidenceListRow from '@/components/assessor/EvidenceListRow';
 import EvidenceUploadModal from '@/components/assessor/EvidenceUploadModal';
 import FilePreviewModal from '@/components/assessor/FilePreviewModal';
 import type { PortfolioEvidence, EvidenceStatus } from '@/types';
+import ListStateBoundary, {
+  DefaultListSkeleton,
+  EmptyState,
+} from '@/components/common/ListStateBoundary';
 
 type ViewMode = 'grid' | 'list';
 type SortOrder = 'newest' | 'oldest';
@@ -24,6 +28,7 @@ export default function PortfolioPage() {
   const [evidence, setEvidence] = useState<PortfolioEvidence[]>([]);
   const [units, setUnits] = useState<SimpleUnit[]>([]);
   const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
   const [showUploadModal, setShowUploadModal] = useState(false);
   const [previewItem, setPreviewItem] = useState<PortfolioEvidence | null>(null);
   const [uploadedBy, setUploadedBy] = useState<{ name: string; email: string } | null>(null);
@@ -68,6 +73,7 @@ export default function PortfolioPage() {
   const fetchEvidence = useCallback(async () => {
     if (!currentEnrollmentId) return;
     setLoading(true);
+    setError(null);
     try {
       const params = new URLSearchParams({ sort });
       if (status) params.set('status', status);
@@ -76,13 +82,20 @@ export default function PortfolioPage() {
       const res = await fetch(
         `/api/v2/portfolio/${currentEnrollmentId}?${params}`
       );
+      if (!res.ok) {
+        setError('The server returned an error. Please try again.');
+        return;
+      }
       const json = await res.json();
       if (json.success) {
         setEvidence(json.data);
         if (json.uploadedBy) setUploadedBy(json.uploadedBy);
+      } else {
+        setError(json.error || 'Failed to load portfolio.');
       }
     } catch (err) {
       console.error('Error fetching portfolio:', err);
+      setError('Network error. Check your connection and retry.');
     } finally {
       setLoading(false);
     }
@@ -201,33 +214,36 @@ export default function PortfolioPage() {
 
       {/* Content area */}
       <div className="flex-1 overflow-y-auto">
-        {loading ? (
-          <div className="flex justify-center py-12">
-            <div className="w-6 h-6 border-2 border-brand-500 border-t-transparent rounded-full animate-spin" />
-          </div>
-        ) : evidence.length === 0 ? (
-          <div className="flex flex-col items-center py-16 text-gray-400">
-            <svg
-              className="w-16 h-16 mb-4"
-              fill="none"
-              viewBox="0 0 24 24"
-              stroke="currentColor"
-            >
-              <path
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                strokeWidth={1}
-                d="M7 21h10a2 2 0 002-2V9.414a1 1 0 00-.293-.707l-5.414-5.414A1 1 0 0012.586 3H7a2 2 0 00-2 2v14a2 2 0 002 2z"
-              />
-            </svg>
-            <p className="text-lg font-medium text-gray-500 mb-1">
-              No evidence found
-            </p>
-            <p className="text-sm text-gray-400">
-              No evidence has been uploaded yet.
-            </p>
-          </div>
-        ) : viewMode === 'grid' ? (
+        <ListStateBoundary
+          loading={loading}
+          error={error}
+          isEmpty={evidence.length === 0}
+          onRetry={fetchEvidence}
+          skeleton={<DefaultListSkeleton rows={4} />}
+          emptyContent={
+            <EmptyState
+              title={status || fileType ? 'No matching evidence' : 'No evidence yet'}
+              description={
+                status || fileType
+                  ? 'Try clearing filters to see more.'
+                  : userRole === 'student'
+                    ? "You haven't uploaded any evidence yet. Click Upload above to add your first file."
+                    : "This learner hasn't uploaded any evidence yet."
+              }
+              cta={
+                !status && !fileType && userRole === 'student' ? (
+                  <button
+                    onClick={() => setShowUploadModal(true)}
+                    className="px-4 py-2 bg-primary text-white rounded-[6px] text-sm font-medium hover:bg-primary/90"
+                  >
+                    Upload evidence
+                  </button>
+                ) : null
+              }
+            />
+          }
+        >
+          {viewMode === 'grid' ? (
           <div className="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5 gap-3">
             {evidence.map((e) => (
               <EvidenceCard
@@ -279,7 +295,8 @@ export default function PortfolioPage() {
               </tbody>
             </table>
           </div>
-        )}
+          )}
+        </ListStateBoundary>
       </div>
 
       {/* Upload modal */}

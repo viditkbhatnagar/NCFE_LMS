@@ -2,6 +2,7 @@
 
 import { useEffect, useState, useCallback } from 'react';
 import { usePathname } from 'next/navigation';
+import ListStateBoundary, { EmptyState } from '@/components/common/ListStateBoundary';
 
 interface Notification {
   _id: string;
@@ -66,6 +67,7 @@ function formatFullTimestamp(dateStr: string): string {
 export default function NotificationsPage() {
   const [notifications, setNotifications] = useState<Notification[]>([]);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
   const [page, setPage] = useState(1);
   const [hasMore, setHasMore] = useState(true);
   const pathname = usePathname();
@@ -73,8 +75,16 @@ export default function NotificationsPage() {
   const limit = 20;
 
   const fetchNotifications = useCallback(async (pageNum: number) => {
+    if (pageNum === 1) {
+      setLoading(true);
+      setError(null);
+    }
     try {
       const res = await fetch(`/api/notifications?page=${pageNum}&limit=${limit}`);
+      if (!res.ok) {
+        if (pageNum === 1) setError('The server returned an error. Please try again.');
+        return;
+      }
       const json = await res.json();
       if (json.success) {
         if (pageNum === 1) {
@@ -83,13 +93,18 @@ export default function NotificationsPage() {
           setNotifications((prev) => [...prev, ...json.data]);
         }
         setHasMore(json.data.length === limit);
+      } else if (pageNum === 1) {
+        setError(json.error || 'Failed to load notifications.');
       }
-    } catch (error) {
-      console.error('Failed to fetch notifications:', error);
+    } catch (err) {
+      console.error('Failed to fetch notifications:', err);
+      if (pageNum === 1) setError('Network error. Check your connection and retry.');
     } finally {
       setLoading(false);
     }
   }, []);
+
+  const handleRetry = useCallback(() => fetchNotifications(1), [fetchNotifications]);
 
   useEffect(() => {
     fetchNotifications(1);
@@ -150,40 +165,34 @@ export default function NotificationsPage() {
       </div>
 
       {/* Notifications list */}
-      {loading ? (
-        <div className="space-y-3">
-          {[1, 2, 3, 4, 5].map((i) => (
-            <div key={i} className="bg-white rounded-[8px] border border-gray-200 p-4 animate-pulse">
-              <div className="flex gap-3">
-                <div className="w-8 h-8 rounded-full bg-gray-200 shrink-0" />
-                <div className="flex-1 space-y-2">
-                  <div className="h-4 bg-gray-200 rounded w-1/3" />
-                  <div className="h-3 bg-gray-200 rounded w-2/3" />
-                  <div className="h-3 bg-gray-200 rounded w-1/4" />
+      <ListStateBoundary
+        loading={loading}
+        error={error}
+        isEmpty={notifications.length === 0}
+        onRetry={handleRetry}
+        skeleton={
+          <div className="space-y-3">
+            {[1, 2, 3, 4, 5].map((i) => (
+              <div key={i} className="bg-white rounded-[8px] border border-gray-200 p-4 animate-pulse">
+                <div className="flex gap-3">
+                  <div className="w-8 h-8 rounded-full bg-gray-200 shrink-0" />
+                  <div className="flex-1 space-y-2">
+                    <div className="h-4 bg-gray-200 rounded w-1/3" />
+                    <div className="h-3 bg-gray-200 rounded w-2/3" />
+                    <div className="h-3 bg-gray-200 rounded w-1/4" />
+                  </div>
                 </div>
               </div>
-            </div>
-          ))}
-        </div>
-      ) : notifications.length === 0 ? (
-        <div className="bg-white rounded-[8px] border border-gray-200 py-16 text-center">
-          <svg
-            className="w-12 h-12 text-gray-300 mx-auto mb-3"
-            fill="none"
-            viewBox="0 0 24 24"
-            stroke="currentColor"
-          >
-            <path
-              strokeLinecap="round"
-              strokeLinejoin="round"
-              strokeWidth={1.5}
-              d={FALLBACK_ICON}
-            />
-          </svg>
-          <p className="text-gray-500">No notifications yet</p>
-        </div>
-      ) : (
-        <>
+            ))}
+          </div>
+        }
+        emptyContent={
+          <EmptyState
+            title="No notifications yet"
+            description="When something happens — a new assessment, a sign-off, evidence uploaded — you'll see it here."
+          />
+        }
+      >
           <div className="space-y-2">
             {notifications.map((n) => {
               const url = getNotificationUrl(n, courseSlug);
@@ -254,8 +263,7 @@ export default function NotificationsPage() {
               </button>
             </div>
           )}
-        </>
-      )}
+      </ListStateBoundary>
     </div>
   );
 }
