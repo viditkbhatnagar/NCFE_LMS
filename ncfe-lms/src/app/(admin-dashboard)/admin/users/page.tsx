@@ -13,6 +13,8 @@ interface CreatedCredentials {
   password: string;
   emailSent: boolean;
   emailError?: string;
+  enrolmentSummary?: string;
+  enrolmentError?: string;
 }
 
 interface ResetCredentials {
@@ -31,6 +33,26 @@ interface User {
   phone?: string;
   centreId?: { _id: string; name: string; code: string } | null;
   createdAt: string;
+  enrolmentCount?: number;
+}
+
+interface QualificationOption {
+  _id: string;
+  title: string;
+  code?: string;
+}
+
+interface AssessorOption {
+  _id: string;
+  name: string;
+  email: string;
+  role: string;
+}
+
+function defaultCohort(): string {
+  const d = new Date();
+  const q = Math.floor(d.getMonth() / 3) + 1;
+  return `${d.getFullYear()}-Q${q}`;
 }
 
 const roles = ['all', 'student', 'assessor', 'iqa', 'admin'] as const;
@@ -68,6 +90,39 @@ export default function AdminUsersPage() {
   const [lastCreated, setLastCreated] = useState<CreatedCredentials | null>(null);
   const [lastReset, setLastReset] = useState<ResetCredentials | null>(null);
 
+  // G1 — combined create+enrol state
+  const [enrolForm, setEnrolForm] = useState({
+    qualificationId: '',
+    assessorId: '',
+    cohortId: defaultCohort(),
+  });
+  const [qualOptions, setQualOptions] = useState<QualificationOption[]>([]);
+  const [assessorOptions, setAssessorOptions] = useState<AssessorOption[]>([]);
+
+  // G2 — inline enrol modal state
+  const [enrolForUser, setEnrolForUser] = useState<User | null>(null);
+  const [enrolModalForm, setEnrolModalForm] = useState({ qualificationId: '', assessorId: '', cohortId: defaultCohort() });
+  const [enrolModalSaving, setEnrolModalSaving] = useState(false);
+  const [enrolModalError, setEnrolModalError] = useState<string | null>(null);
+
+  // Load dropdown options (qualifications + assessors) once
+  useEffect(() => {
+    (async () => {
+      try {
+        const [qRes, aRes] = await Promise.all([
+          fetch('/api/v2/admin/qualifications?limit=100&status=active'),
+          fetch('/api/v2/admin/users?limit=200&role=assessor'),
+        ]);
+        const qData = await qRes.json();
+        const aData = await aRes.json();
+        if (qData.success) setQualOptions(qData.data);
+        if (aData.success) setAssessorOptions(aData.data);
+      } catch (err) {
+        console.warn('Failed to load enrol dropdown options', err);
+      }
+    })();
+  }, []);
+
   const fetchUsers = useCallback(async () => {
     setLoading(true);
     const params = new URLSearchParams({ page: String(pagination.page), limit: '20' });
@@ -102,6 +157,9 @@ export default function AdminUsersPage() {
 
   const openCreateForm = () => {
     setForm({ name: '', email: '', password: generatePassword(), role: 'student', phone: '', status: 'active' });
+    // Leave all 3 enrolment fields blank — admin opts in by selecting a qualification.
+    // Once the admin picks a qualification, the cohort will auto-default below.
+    setEnrolForm({ qualificationId: '', assessorId: '', cohortId: '' });
     setEditingId(null);
     setErrors({});
     setPasswordVisible(true);
@@ -159,6 +217,40 @@ export default function AdminUsersPage() {
     }
   };
 
+  const submitEnrolModal = async () => {
+    if (!enrolForUser) return;
+    if (!enrolModalForm.qualificationId || !enrolModalForm.assessorId || !enrolModalForm.cohortId) {
+      setEnrolModalError('Pick a qualification + assessor + cohort.');
+      return;
+    }
+    setEnrolModalSaving(true);
+    setEnrolModalError(null);
+    try {
+      const res = await fetch('/api/v2/admin/enrolments', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          userId: enrolForUser._id,
+          qualificationId: enrolModalForm.qualificationId,
+          assessorId: enrolModalForm.assessorId,
+          cohortId: enrolModalForm.cohortId,
+          status: 'in_progress',
+        }),
+      });
+      const data = await res.json();
+      if (!res.ok || !data.success) {
+        setEnrolModalError(data.error || 'Enrolment failed.');
+        return;
+      }
+      setEnrolForUser(null);
+      await fetchUsers();
+    } catch (err) {
+      setEnrolModalError(err instanceof Error ? err.message : 'Network error.');
+    } finally {
+      setEnrolModalSaving(false);
+    }
+  };
+
   const handleResendWelcome = async (u: User) => {
     if (!confirm(`Resend welcome email to ${u.email}? This will generate a new password.`)) return;
     try {
@@ -199,6 +291,19 @@ export default function AdminUsersPage() {
     setSaving(true);
     setErrors({});
 
+    // G1 — validate combined create+enrol fields up front. All-or-nothing.
+    const isStudent = !editingId && form.role === 'student';
+    const enrolFilled = [enrolForm.qualificationId, enrolForm.assessorId, enrolForm.cohortId].filter(Boolean).length;
+    if (isStudent && enrolFilled > 0 && enrolFilled < 3) {
+      setErrors({
+        _form: [
+          'To enrol the new student, fill all three of Qualification, Assessor, and Cohort — or leave all blank to create the user only.',
+        ],
+      });
+      setSaving(false);
+      return;
+    }
+
     const url = editingId ? `/api/v2/admin/users/${editingId}` : '/api/v2/admin/users';
     const method = editingId ? 'PUT' : 'POST';
     const body = editingId
@@ -214,6 +319,36 @@ export default function AdminUsersPage() {
       const data = await res.json();
       if (data.success) {
         if (!editingId) {
+          let enrolmentSummary: string | undefined;
+          let enrolmentError: string | undefined;
+          if (isStudent && enrolFilled === 3) {
+            try {
+              const enrolRes = await fetch('/api/v2/admin/enrolments', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                  userId: data.data._id,
+                  qualificationId: enrolForm.qualificationId,
+                  assessorId: enrolForm.assessorId,
+                  cohortId: enrolForm.cohortId,
+                  status: 'in_progress',
+                }),
+              });
+              const enrolData = await enrolRes.json();
+              if (enrolRes.ok && enrolData.success) {
+                const qual = qualOptions.find((q) => q._id === enrolForm.qualificationId);
+                const assessor = assessorOptions.find((a) => a._id === enrolForm.assessorId);
+                enrolmentSummary = `Enrolled in ${qual?.title ?? 'course'} under ${assessor?.name ?? 'assessor'}, cohort ${enrolForm.cohortId}.`;
+              } else {
+                enrolmentError =
+                  enrolData.error ||
+                  (enrolData.errors && JSON.stringify(enrolData.errors)) ||
+                  `Enrolment failed (HTTP ${enrolRes.status}).`;
+              }
+            } catch (err) {
+              enrolmentError = err instanceof Error ? err.message : 'Enrolment request failed';
+            }
+          }
           setLastCreated({
             name: form.name,
             email: form.email,
@@ -221,6 +356,8 @@ export default function AdminUsersPage() {
             password: form.password,
             emailSent: !!data.emailSent,
             emailError: data.emailError,
+            enrolmentSummary,
+            enrolmentError,
           });
         }
         resetForm();
@@ -458,6 +595,66 @@ export default function AdminUsersPage() {
                 </div>
               )}
             </div>
+
+            {!editingId && form.role === 'student' && (
+              <div className="border-t border-gray-100 pt-4 mt-2">
+                <p className="text-xs font-medium text-gray-700 uppercase tracking-wide mb-1">Enrolment (optional)</p>
+                <p className="text-xs text-gray-500 mb-3">
+                  Fill all three to enrol the new student into a course right away. Leave blank to create the user only.
+                </p>
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+                  <div>
+                    <label className="block text-xs text-gray-600 mb-1">Qualification</label>
+                    <select
+                      value={enrolForm.qualificationId}
+                      onChange={(e) => setEnrolForm((s) => ({
+                        ...s,
+                        qualificationId: e.target.value,
+                        // Auto-pre-fill cohort once admin opts in by picking a qualification
+                        cohortId: e.target.value && !s.cohortId ? defaultCohort() : s.cohortId,
+                      }))}
+                      className="w-full px-3 py-2 text-sm border border-gray-300 rounded-[6px] focus:outline-none focus:ring-2 focus:ring-primary/50"
+                      aria-label="Qualification"
+                    >
+                      <option value="">— Select qualification —</option>
+                      {qualOptions.map((q) => (
+                        <option key={q._id} value={q._id}>
+                          {q.title}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                  <div>
+                    <label className="block text-xs text-gray-600 mb-1">Assessor</label>
+                    <select
+                      value={enrolForm.assessorId}
+                      onChange={(e) => setEnrolForm((s) => ({ ...s, assessorId: e.target.value }))}
+                      className="w-full px-3 py-2 text-sm border border-gray-300 rounded-[6px] focus:outline-none focus:ring-2 focus:ring-primary/50"
+                      aria-label="Assessor"
+                    >
+                      <option value="">— Select assessor —</option>
+                      {assessorOptions.map((a) => (
+                        <option key={a._id} value={a._id}>
+                          {a.name} ({a.email})
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                  <div>
+                    <label className="block text-xs text-gray-600 mb-1">Cohort</label>
+                    <input
+                      type="text"
+                      value={enrolForm.cohortId}
+                      onChange={(e) => setEnrolForm((s) => ({ ...s, cohortId: e.target.value }))}
+                      placeholder="e.g. 2026-Q2"
+                      className="w-full px-3 py-2 text-sm border border-gray-300 rounded-[6px] focus:outline-none focus:ring-2 focus:ring-primary/50"
+                      aria-label="Cohort"
+                    />
+                  </div>
+                </div>
+              </div>
+            )}
+
             <div className="flex gap-3">
               <button type="submit" disabled={saving} className="px-4 py-2 text-sm font-medium text-white bg-primary rounded-[6px] disabled:opacity-50">
                 {saving ? 'Saving...' : editingId ? 'Update' : 'Create'}
@@ -492,7 +689,17 @@ export default function AdminUsersPage() {
               <tbody>
                 {users.map((u) => (
                   <tr key={u._id} className="border-b border-gray-50 hover:bg-gray-50">
-                    <td className="px-5 py-3 font-medium text-gray-900">{u.name}</td>
+                    <td className="px-5 py-3 font-medium text-gray-900">
+                      <a href={`/admin/users/${u._id}`} className="hover:underline">{u.name}</a>
+                      {u.role === 'student' && typeof u.enrolmentCount === 'number' && (
+                        <span
+                          className="ml-2 inline-flex items-center px-1.5 py-0.5 text-[10px] font-medium rounded bg-gray-100 text-gray-600"
+                          title="Active enrolments"
+                        >
+                          {u.enrolmentCount} {u.enrolmentCount === 1 ? 'course' : 'courses'}
+                        </span>
+                      )}
+                    </td>
                     <td className="px-5 py-3 text-gray-600">{u.email}</td>
                     <td className="px-5 py-3">
                       <span className="inline-flex px-2 py-0.5 text-xs font-medium rounded-full bg-blue-100 text-blue-700">
@@ -508,7 +715,21 @@ export default function AdminUsersPage() {
                     </td>
                     <td className="px-5 py-3 text-gray-600">{u.centreId?.name || '-'}</td>
                     <td className="px-5 py-3 text-right space-x-2">
+                      <a href={`/admin/users/${u._id}`} className="text-gray-700 hover:underline text-xs">View</a>
                       <button onClick={() => handleEdit(u)} className="text-primary hover:underline text-xs">Edit</button>
+                      {u.role === 'student' && (
+                        <button
+                          onClick={() => {
+                            setEnrolForUser(u);
+                            setEnrolModalForm({ qualificationId: '', assessorId: '', cohortId: defaultCohort() });
+                            setEnrolModalError(null);
+                          }}
+                          className="text-emerald-700 hover:underline text-xs"
+                          title="Enrol in another course"
+                        >
+                          Enrol
+                        </button>
+                      )}
                       <button
                         onClick={() => {
                           setNewPassword(generatePassword());
@@ -666,6 +887,77 @@ export default function AdminUsersPage() {
         </div>
       )}
 
+      {/* G2 — Enrol-existing-user dialog */}
+      {enrolForUser && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center" role="dialog" aria-modal="true">
+          <div className="absolute inset-0 bg-black/50" onClick={() => setEnrolForUser(null)} />
+          <div className="relative bg-white rounded-[8px] shadow-xl max-w-md w-full mx-4 p-6">
+            <h3 className="text-lg font-semibold text-gray-900">Enrol in another course</h3>
+            <p className="text-sm text-gray-600 mt-1">
+              Enrol <strong>{enrolForUser.name}</strong> ({enrolForUser.email}) in a new course. They&rsquo;ll receive an email if their preferences allow.
+            </p>
+            <div className="space-y-3 mt-4">
+              <div>
+                <label className="block text-xs text-gray-600 mb-1">Qualification</label>
+                <select
+                  value={enrolModalForm.qualificationId}
+                  onChange={(e) => setEnrolModalForm((s) => ({ ...s, qualificationId: e.target.value }))}
+                  className="w-full px-3 py-2 text-sm border border-gray-300 rounded-[6px] focus:outline-none focus:ring-2 focus:ring-primary/50"
+                  aria-label="Qualification"
+                >
+                  <option value="">— Select qualification —</option>
+                  {qualOptions.map((q) => (
+                    <option key={q._id} value={q._id}>{q.title}</option>
+                  ))}
+                </select>
+              </div>
+              <div>
+                <label className="block text-xs text-gray-600 mb-1">Assessor</label>
+                <select
+                  value={enrolModalForm.assessorId}
+                  onChange={(e) => setEnrolModalForm((s) => ({ ...s, assessorId: e.target.value }))}
+                  className="w-full px-3 py-2 text-sm border border-gray-300 rounded-[6px] focus:outline-none focus:ring-2 focus:ring-primary/50"
+                  aria-label="Assessor"
+                >
+                  <option value="">— Select assessor —</option>
+                  {assessorOptions.map((a) => (
+                    <option key={a._id} value={a._id}>{a.name} ({a.email})</option>
+                  ))}
+                </select>
+              </div>
+              <div>
+                <label className="block text-xs text-gray-600 mb-1">Cohort</label>
+                <input
+                  type="text"
+                  value={enrolModalForm.cohortId}
+                  onChange={(e) => setEnrolModalForm((s) => ({ ...s, cohortId: e.target.value }))}
+                  className="w-full px-3 py-2 text-sm border border-gray-300 rounded-[6px] focus:outline-none focus:ring-2 focus:ring-primary/50"
+                  aria-label="Cohort"
+                />
+              </div>
+            </div>
+            {enrolModalError && (
+              <p className="text-sm text-red-600 mt-3">{enrolModalError}</p>
+            )}
+            <div className="flex justify-end gap-3 mt-4">
+              <button
+                onClick={() => setEnrolForUser(null)}
+                className="px-4 py-2 text-sm font-medium text-gray-700 border border-gray-300 rounded-[6px]"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={submitEnrolModal}
+                disabled={enrolModalSaving}
+                className="px-4 py-2 text-sm font-medium text-white bg-primary rounded-[6px] disabled:opacity-50"
+              >
+                {enrolModalSaving ? 'Enrolling…' : 'Enrol'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Post-create success modal */}
       {lastCreated && (
         <div className="fixed inset-0 z-50 flex items-center justify-center" role="dialog" aria-modal="true" aria-labelledby="created-title">
@@ -696,6 +988,25 @@ export default function AdminUsersPage() {
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
                 </svg>
                 <span>Email failed — please share these credentials manually. {lastCreated.emailError ? <em>Reason: {lastCreated.emailError}</em> : null}</span>
+              </div>
+            )}
+            {lastCreated.enrolmentSummary && (
+              <div className="mt-3 p-3 rounded-[6px] bg-blue-50 border border-blue-200 text-xs text-blue-800 flex items-start gap-2">
+                <svg className="w-4 h-4 flex-shrink-0 mt-0.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 14l9-5-9-5-9 5 9 5z" />
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 14l6.16-3.422a12.083 12.083 0 01.665 6.479A11.952 11.952 0 0012 20.055a11.952 11.952 0 00-6.824-2.998 12.078 12.078 0 01.665-6.479L12 14z" />
+                </svg>
+                <span>{lastCreated.enrolmentSummary}</span>
+              </div>
+            )}
+            {lastCreated.enrolmentError && (
+              <div className="mt-3 p-3 rounded-[6px] bg-amber-50 border border-amber-200 text-xs text-amber-800 flex items-start gap-2">
+                <svg className="w-4 h-4 flex-shrink-0 mt-0.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+                </svg>
+                <span>
+                  User created, but enrolment failed: <em>{lastCreated.enrolmentError}</em>. Enrol manually via /admin/enrolments.
+                </span>
               </div>
             )}
             <div className="mt-3 p-3 rounded-[6px] bg-amber-50 border border-amber-200 text-xs text-amber-800 flex items-start gap-2">
