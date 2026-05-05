@@ -8,6 +8,7 @@ import FileGrid from '@/components/assessor/FileGrid';
 import FileListView from '@/components/assessor/FileListView';
 import FileUploadModal from '@/components/assessor/FileUploadModal';
 import FilePreviewModal from '@/components/assessor/FilePreviewModal';
+import ConfirmDialog from '@/components/admin/ConfirmDialog';
 import type { FileItem, FolderBreadcrumb } from '@/types';
 
 type ViewMode = 'grid' | 'list';
@@ -24,6 +25,8 @@ export default function PersonalDocumentsPage() {
   const [fileTypeFilter, setFileTypeFilter] = useState('');
   const [showUploadModal, setShowUploadModal] = useState(false);
   const [previewItem, setPreviewItem] = useState<FileItem | null>(null);
+  const [deleteId, setDeleteId] = useState<string | null>(null);
+  const [deleting, setDeleting] = useState(false);
 
   const fetchItems = useCallback(async () => {
     // Students don't need selectedLearner — API auto-scopes to own docs
@@ -91,6 +94,30 @@ export default function PersonalDocumentsPage() {
     }
   };
 
+  const handleDeleteRequest = (id: string) => {
+    setDeleteId(id);
+  };
+
+  const handleDeleteConfirm = async () => {
+    if (!deleteId) return;
+    setDeleting(true);
+    try {
+      const res = await fetch(`/api/v2/personal-documents/${deleteId}`, {
+        method: 'DELETE',
+      });
+      if (!res.ok) {
+        const json = await res.json().catch(() => ({}));
+        console.error('Delete failed:', json.error || res.statusText);
+      }
+      setDeleteId(null);
+      await fetchItems();
+    } catch (err) {
+      console.error('Error deleting personal document:', err);
+    } finally {
+      setDeleting(false);
+    }
+  };
+
   // Assessor with no learner selected
   if (!isStudent && !selectedLearner) {
     return (
@@ -147,6 +174,7 @@ export default function PersonalDocumentsPage() {
             onItemClick={handleItemClick}
             onPreview={handlePreview}
             onDownload={handleDownload}
+            onDelete={handleDeleteRequest}
           />
         ) : (
           <FileListView
@@ -154,6 +182,7 @@ export default function PersonalDocumentsPage() {
             onItemClick={handleItemClick}
             onPreview={handlePreview}
             onDownload={handleDownload}
+            onDelete={handleDeleteRequest}
           />
         )}
       </div>
@@ -185,6 +214,17 @@ export default function PersonalDocumentsPage() {
           }}
         />
       )}
+
+      <ConfirmDialog
+        open={!!deleteId}
+        title="Delete document?"
+        message="This permanently removes the file from storage. This action cannot be undone."
+        confirmLabel="Delete"
+        destructive
+        loading={deleting}
+        onConfirm={handleDeleteConfirm}
+        onCancel={() => setDeleteId(null)}
+      />
     </div>
   );
 }

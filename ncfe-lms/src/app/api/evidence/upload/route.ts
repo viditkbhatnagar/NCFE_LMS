@@ -96,10 +96,14 @@ export async function POST(request: Request) {
     return NextResponse.json({ success: true, data: responsePayload }, { status: 201 });
   } catch (err) {
     console.error('Error uploading evidence:', err);
-    const message = err instanceof Error ? err.message : 'Internal server error';
+    const isValidation =
+      err instanceof Error &&
+      (err.message.includes('size exceeds') || err.message.includes('not allowed'));
+    const message = isValidation ? (err as Error).message : 'Internal server error';
+    const status = isValidation ? 400 : 500;
     return NextResponse.json(
       { success: false, error: message },
-      { status: 500 }
+      { status }
     );
   }
 }

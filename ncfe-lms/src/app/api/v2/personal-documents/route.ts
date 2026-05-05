@@ -198,7 +198,7 @@ export async function POST(request: Request) {
     console.error('Error creating personal document:', err);
     const isValidation =
       err instanceof Error &&
-      (err.message.includes('50MB') || err.message.includes('not allowed'));
+      (err.message.includes('size exceeds') || err.message.includes('not allowed'));
     const message = isValidation ? err.message : 'Internal server error';
     const status = isValidation ? 400 : 500;
     return NextResponse.json(

@@ -138,7 +138,7 @@ function parseS3Location(filePath: string): { bucket?: string; key?: string } {
 export async function uploadFile(file: File, ownerId: string): Promise<UploadResult> {
   // Validate file size
   if (file.size > MAX_FILE_SIZE) {
-    throw new Error('File size exceeds 50MB limit');
+    throw new Error('File size exceeds 2GB limit');
   }
 
   // Validate file type

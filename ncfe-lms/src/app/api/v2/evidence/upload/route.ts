@@ -158,14 +158,14 @@ export async function POST(request: Request) {
     );
   } catch (err: unknown) {
     console.error('Error uploading evidence (v2):', err);
-    const message =
+    const isValidation =
       err instanceof Error &&
-      (err.message.includes('50MB') || err.message.includes('not allowed'))
-        ? err.message
-        : 'Internal server error';
+      (err.message.includes('size exceeds') || err.message.includes('not allowed'));
+    const message = isValidation ? (err as Error).message : 'Internal server error';
+    const status = isValidation ? 400 : 500;
     return NextResponse.json(
       { success: false, error: message },
-      { status: 500 }
+      { status }
     );
   }
 }

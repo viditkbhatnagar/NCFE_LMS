@@ -76,3 +76,35 @@ export async function GET(
     );
   }
 }
+
+export async function DELETE(
+  request: Request,
+  { params }: { params: Promise<{ id: string }> }
+) {
+  try {
+    const { id } = await params;
+    const { error } = await withAuth(['iqa']);
+    if (error) return error;
+
+    await dbConnect();
+
+    const sample = await IQASample.findById(id);
+    if (!sample) {
+      return NextResponse.json(
+        { success: false, error: 'IQA sample not found' },
+        { status: 404 }
+      );
+    }
+
+    await IQADecision.deleteMany({ iqaSampleId: id });
+    await IQASample.findByIdAndDelete(id);
+
+    return NextResponse.json({ success: true, data: { deleted: id } });
+  } catch (err) {
+    console.error('Error deleting IQA sample:', err);
+    return NextResponse.json(
+      { success: false, error: 'Internal server error' },
+      { status: 500 }
+    );
+  }
+}

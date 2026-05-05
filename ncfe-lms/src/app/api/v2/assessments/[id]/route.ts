@@ -7,6 +7,7 @@ import AssessmentCriteriaMap from '@/models/AssessmentCriteriaMap';
 import AssessmentEvidenceMap from '@/models/AssessmentEvidenceMap';
 import SignOff from '@/models/SignOff';
 import Remark from '@/models/Remark';
+import Notification from '@/models/Notification';
 import { createNotification } from '@/lib/notifications';
 import '@/models/AssessmentCriteria'; // register schema for populate
 import '@/models/Unit'; // register schema for nested populate
@@ -252,6 +253,7 @@ export async function DELETE(
       AssessmentEvidenceMap.deleteMany({ assessmentId: id }),
       SignOff.deleteMany({ assessmentId: id }),
       Remark.deleteMany({ assessmentId: id }),
+      Notification.deleteMany({ entityType: 'Assessment', entityId: id }),
     ]);
 
     return NextResponse.json({ success: true, data: { deleted: true } });
