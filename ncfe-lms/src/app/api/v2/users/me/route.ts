@@ -23,7 +23,7 @@ export async function GET() {
   if (error) return error;
   await dbConnect();
   const user = await User.findById(session!.user.id)
-    .select('name email role phone avatar status notificationPreferences mustChangePassword')
+    .select('name email role phone avatar status notificationPreferences')
     .lean();
   if (!user) {
     return NextResponse.json({ success: false, error: 'Not found' }, { status: 404 });

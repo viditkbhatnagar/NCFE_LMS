@@ -40,7 +40,7 @@ No regressions on previously-green prod specs. The 9 in-scope gaps are all live,
 | **G2** Inline 'Enrol in another course' + count badge | ✅ shipped | P0 | `f6546b2` | `enrolmentCount` enriched server-side (single $group). Each student row shows `· N courses` chip + 'Enrol' action that opens a 3-field modal. |
 | **G3** User detail / view enrolments | ✅ shipped | P0 | `f6546b2` | New `/admin/users/[id]/page.tsx` shows profile + enrolments list with per-row Withdraw action (uses ConfirmDialog). `/api/v2/admin/enrolments` GET now respects `?userId=` filter. |
 | **G4** Self-service password reset | ⏭ skipped (by design) | — | — | **Intentionally NOT in scope.** Per explicit user instruction: students cannot self-reset; admin holds the credentials. `/forgot-password` keeps the contact-admin static view. |
-| **G5** Force change password on first login | ✅ shipped | P0 | `ecbbc65` | New `mustChangePassword` field (additive, default false). Admin user-create / reset-password / resend-welcome all flip it true. JWT + session callbacks propagate. Middleware redirects flagged users to `/profile/change-password`. New page + new `POST /api/v2/users/me/change-password` endpoint clears the flag and signs out so the JWT refreshes. |
+| **G5** Force change password on first login | ⏪ ROLLED BACK | P0 | `ecbbc65` shipped, then reverted | Per user directive: admin-controlled passwords only. Admin generates → emails to student → student keeps that password until admin resets again. No self-service change, no first-login flow. The `mustChangePassword` field, middleware redirect, `/profile/change-password` page, and `POST /api/v2/users/me/change-password` endpoint were all removed. |
 | **G6** Profile editing (name/phone/avatar/password) | ✅ shipped | P0 | `30bcf4b` | New `GET/PUT /api/v2/users/me`. Profile page rewritten with edit mode + avatar upload (PNG/JPEG/WEBP/GIF, ≤2 MB) + Change-password CTA. |
 | **G7** Email notifications + opt-out preferences | ✅ shipped | P0 | `5ec7cd6` | Three new templates wired: sign-off → student, IQA decision → assessor + student, new enrolment → student. `notificationPreferences: { signOff, iqaDecision, newEnrolment }` on User; toggles live in /profile (G6). All sends audit-logged + soft-fail. |
 | **G8** Audit log filters + CSV export | ✅ shipped | P1 | `a931c12` | Date range, user search-as-you-type, sort toggle, **Export CSV** (audit-logged as `AUDIT_EXPORTED`, capped at 10 000 rows). |
@@ -72,13 +72,12 @@ After deploy of `b985ef5`, re-ran the existing prod suite:
 **No regressions on previously-green tests.**
 
 ### 3.2 New prod ui-gaps spec — ✅ 11 / 11
-[`tests/prod/ui-gaps.spec.ts`](prod/ui-gaps.spec.ts) covers G1, G2, G3, G5, G6, G7, G8, G10 against production. Cleanup runs in `afterAll`:
+[`tests/prod/ui-gaps.spec.ts`](prod/ui-gaps.spec.ts) covers G1, G2, G3, G6, G7, G8, G10 against production. Cleanup runs in `afterAll`:
 
 - G1 — admin creates student WITHOUT enrolment fields → user only ✅
 - G1 — combined create+enrol creates BOTH user and enrolment ✅
 - G2 — admin user list response includes `enrolmentCount` on student rows ✅
 - G3 — admin user detail API returns the full record + page renders ✅
-- G5 — `POST /api/v2/users/me/change-password` rejects wrong current pw (400) and accepts correct one (200) ✅
 - G6 — `GET + PUT /api/v2/users/me` lets a user update their own profile + notification preferences ✅
 - G7 — new enrolment triggers `EMAIL_SENT` audit-log entry with `template=new_enrolment` ✅
 - G8 — date-range + entityType filter narrows results ✅
@@ -131,7 +130,7 @@ All listed in [tests/UI_AUDIT.md](UI_AUDIT.md) with severity tags.
 
 ## Hard constraints honoured
 
-- ✅ No schema-breaking changes — `mustChangePassword`, `notificationPreferences`, and the existing `avatar` field are all additive with defaults.
+- ✅ No schema-breaking changes — `notificationPreferences` and the existing `avatar` field are all additive with defaults. (The `mustChangePassword` field shipped in `ecbbc65` was rolled back per user directive — see G5 row above.)
 - ✅ James Bond demo (`7777jamesbond7777@gmail.com`) NOT touched.
 - ✅ All test entities tagged with `RUN_ID` and cleaned up in `afterAll`.
 - ✅ No `deleteMany({})` on shared collections.

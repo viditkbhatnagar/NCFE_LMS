@@ -1,9 +1,10 @@
 import { test, expect, type APIRequestContext } from '@playwright/test';
 import { PROD_RUN_ID, PROD_USERS, makeApiContext } from './_helpers';
 
-// G1, G2, G3, G5, G6, G7, G8, G9, G10 verification against production.
-// G4 (self-service password reset) is intentionally NOT covered — admin
-// holds the credentials per explicit user instruction.
+// G1, G2, G3, G6, G7, G8, G9, G10 verification against production.
+// G4 (self-service password reset) and G5 (force-change-password) are
+// intentionally NOT covered — admin holds the credentials per explicit
+// user directive (admin generates → emails → student keeps that password).
 //
 // All entities are RUN_ID-tagged and torn down in afterAll. James Bond
 // (7777jamesbond7777@gmail.com) is NEVER touched.
@@ -17,7 +18,7 @@ const created = {
 
 test.describe.configure({ mode: 'serial' });
 
-test.describe('Production — UI gap fixes (G1, G2, G3, G5, G6, G7, G8, G10)', () => {
+test.describe('Production — UI gap fixes (G1, G2, G3, G6, G7, G8, G10)', () => {
   test.beforeAll(async () => {
     admin = await makeApiContext(PROD_USERS.admin);
   });
@@ -153,29 +154,10 @@ test.describe('Production — UI gap fixes (G1, G2, G3, G5, G6, G7, G8, G10)', (
   });
 
   // -------------------------------------------------------------------
-  // G5 — change-password endpoint exists and validates current pw
+  // G5 — REMOVED. Force-change-password-on-first-login was rolled back
+  // per user directive: admin generates → emails → student keeps that
+  // password until admin resets it again. No self-service change.
   // -------------------------------------------------------------------
-  test('G5 — POST /api/v2/users/me/change-password requires correct current password', async () => {
-    // Sign in as the student we just created (real session, not admin)
-    const userResp = await admin.get(`/api/v2/admin/users/${created.studentId}`);
-    const user = (await userResp.json()).data as { email: string };
-    const studentApi = await makeApiContext({ email: user.email, password: 'TempPass123!Aa' });
-    try {
-      // Wrong current password → 400
-      const wrong = await studentApi.post('/api/v2/users/me/change-password', {
-        data: { currentPassword: 'definitely-not-it', newPassword: 'NewPass789!Cc' },
-      });
-      expect(wrong.status()).toBe(400);
-
-      // Correct current password → 200, mustChangePassword cleared
-      const ok = await studentApi.post('/api/v2/users/me/change-password', {
-        data: { currentPassword: 'TempPass123!Aa', newPassword: 'NewPass789!Cc' },
-      });
-      expect(ok.status()).toBe(200);
-    } finally {
-      await studentApi.dispose();
-    }
-  });
 
   // -------------------------------------------------------------------
   // G6 — self-service profile editing
@@ -183,7 +165,7 @@ test.describe('Production — UI gap fixes (G1, G2, G3, G5, G6, G7, G8, G10)', (
   test('G6 — GET + PUT /api/v2/users/me lets a user update their own profile', async () => {
     const studentApi = await makeApiContext({
       email: ((await (await admin.get(`/api/v2/admin/users/${created.studentId}`)).json()).data as { email: string }).email,
-      password: 'NewPass789!Cc', // changed in G5
+      password: 'TempPass123!Aa',
     });
     try {
       const before = await studentApi.get('/api/v2/users/me');

@@ -310,36 +310,28 @@ export default function ProfilePage() {
           </div>
         </div>
 
-        <div className="border-t border-border pt-6 mt-6 flex flex-wrap items-center gap-3">
-          {editing ? (
-            <>
-              <button
-                onClick={saveProfile}
-                disabled={saving}
-                className="px-4 py-2 text-sm font-medium text-white bg-primary rounded-[6px] hover:bg-primary/90 disabled:opacity-50"
-              >
-                {saving ? 'Saving…' : 'Save changes'}
-              </button>
-              <button
-                onClick={() => {
-                  setEditing(false);
-                  setName(me.name);
-                  setPhone(me.phone ?? '');
-                  setError(null);
-                }}
-                className="px-4 py-2 text-sm font-medium text-gray-700 border border-gray-300 rounded-[6px] hover:bg-gray-50"
-              >
-                Cancel
-              </button>
-            </>
-          ) : null}
-          <button
-            onClick={() => router.push('/profile/change-password')}
-            className="px-4 py-2 text-sm font-medium text-gray-700 border border-gray-300 rounded-[6px] hover:bg-gray-50"
-          >
-            Change password
-          </button>
-        </div>
+        {editing && (
+          <div className="border-t border-border pt-6 mt-6 flex flex-wrap items-center gap-3">
+            <button
+              onClick={saveProfile}
+              disabled={saving}
+              className="px-4 py-2 text-sm font-medium text-white bg-primary rounded-[6px] hover:bg-primary/90 disabled:opacity-50"
+            >
+              {saving ? 'Saving…' : 'Save changes'}
+            </button>
+            <button
+              onClick={() => {
+                setEditing(false);
+                setName(me.name);
+                setPhone(me.phone ?? '');
+                setError(null);
+              }}
+              className="px-4 py-2 text-sm font-medium text-gray-700 border border-gray-300 rounded-[6px] hover:bg-gray-50"
+            >
+              Cancel
+            </button>
+          </div>
+        )}
       </Card>
     </div>
   );

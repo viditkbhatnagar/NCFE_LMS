@@ -58,8 +58,6 @@ Open [https://ncfe-lms.onrender.com/sign-in](https://ncfe-lms.onrender.com/sign-
 | Student | `/c` (course list) |
 | IQA | `/dashboard` (IQA home) |
 
-If you're a **newly-created or password-reset user**, you'll be redirected to **`/profile/change-password`** until you set a new password — this is a security feature so the admin doesn't retain knowledge of your working password.
-
 If you've forgotten your password, the **Forgot password? Contact admin** link on the sign-in page takes you to a contact-administrator notice:
 
 ![Forgot password](screenshots/02-forgot-password.png)
@@ -234,7 +232,7 @@ The full assessment lifecycle, narrated as a single story:
 Admin opens `/admin/users` → **Add User**, types the student's name + email, clicks **Generate** for a password, picks the qualification + assessor + cohort, submits. The student gets a welcome email with their credentials and a link to sign in.
 
 ### 2. Student first login
-Student receives the email, clicks **Sign in**, enters credentials. Because the password was admin-issued, they're redirected to **`/profile/change-password`**, set a new password, and land on `/c` (their course list).
+Student receives the email, clicks **Sign in**, enters the admin-issued credentials, and lands directly on `/c` (their course list). The student keeps that password until the admin resets it again — there is no self-service password change.
 
 ### 3. Assessor plans the assessment
 Assessor signs in, picks the student from the Learners dropdown, goes to **Assessment**, clicks **+ Create**. Fills title + kind + plan, opens **Criteria Mapping**, ticks 3 criteria across 2 units, saves.
@@ -334,10 +332,13 @@ A: Two ways. (1) On the user-create form, the Qualification/Assessor/Cohort fiel
 A: Check the success modal. If it shows a green check and `Email sent to ✓`, the email was accepted by Brevo — most likely it's in spam (single-sender Brevo verification doesn't guarantee inbox placement until domain authentication is set up). Check the audit log for `EMAIL_SENT` or `EMAIL_FAILED`. If failed, the user was still created — share the credentials manually using **Copy all credentials** in the success modal, or click **Resend** on the user row.
 
 **Q: A student says they forgot their password. What do I do?**
-A: Self-service password reset is disabled by design. Open `/admin/users`, click **Reset PW** on their row, click **Generate** for a new password, submit. The success modal shows the new password — copy it and share it with the student. They'll be required to change it again on their next sign-in.
+A: Self-service password reset is disabled by design. Open `/admin/users`, click **Reset PW** on their row, click **Generate** for a new password, submit. The success modal shows the new password — copy it and share it with the student. They sign in with the new password and keep using it until you reset it again.
 
-**Q: A student opened the link in the welcome email but is stuck on a "Change your password" screen. Is something wrong?**
-A: No, that's correct. Admin-issued passwords always require a change on first login so the admin doesn't retain knowledge of the user's working password. The student fills the form (current = the admin-issued password, new = whatever they choose), submits, and is signed back into the normal flow.
+**Q: Can a student change their own password?**
+A: No, by design. The admin holds password ownership: admin generates → emails the password to the student → student keeps that password until admin resets it. If a student wants a new password, they contact you (the admin) and you run **Reset PW** on their row.
+
+**Q: What happens when a newly-created user logs in for the first time?**
+A: They land directly on their course list (`/c`) — there is no first-login password change flow. They use the admin-issued password until admin resets it again.
 
 **Q: What happens when I delete a user?**
 A: Admin **delete** is a **soft delete** by design — it sets `status: inactive` and keeps the row for audit recovery. The user can no longer sign in, but their assessments / evidence / enrolments remain so the audit trail stays intact. To re-activate, edit the user and switch status back to `active`.

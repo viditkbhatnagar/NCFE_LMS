@@ -47,7 +47,6 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
           name: user.name,
           role: user.role,
           centreId: user.centreId?.toString(),
-          mustChangePassword: user.mustChangePassword === true,
         };
       },
     }),
@@ -77,19 +76,11 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
       }
       return true;
     },
-    jwt({ token, user, trigger }) {
+    jwt({ token, user }) {
       if (user) {
         token.id = user.id;
         token.role = (user as Record<string, unknown>).role;
         token.centreId = (user as Record<string, unknown>).centreId;
-        token.mustChangePassword = (user as Record<string, unknown>).mustChangePassword === true;
-      }
-      // Allow `update()` from the client to refresh mustChangePassword after
-      // the user clears it on /profile/change-password.
-      if (trigger === 'update' && token.id) {
-        // re-fetch is heavy; instead let the change-password endpoint trigger
-        // a sign-out/sign-in or call session.update({ mustChangePassword: false })
-        // explicitly. The check below trusts that signal.
       }
       return token;
     },
@@ -98,8 +89,6 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
         session.user.id = token.id as string;
         (session.user as unknown as Record<string, unknown>).role = token.role;
         (session.user as unknown as Record<string, unknown>).centreId = token.centreId;
-        (session.user as unknown as Record<string, unknown>).mustChangePassword =
-          token.mustChangePassword === true;
       }
       return session;
     },

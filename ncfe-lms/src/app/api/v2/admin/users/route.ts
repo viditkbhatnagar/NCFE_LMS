@@ -101,9 +101,6 @@ export async function POST(req: NextRequest) {
     role: validation.data.role,
     phone: validation.data.phone,
     status: validation.data.status,
-    // Admin-issued credentials must be changed on first login so the admin
-    // doesn't retain knowledge of the user's working password.
-    mustChangePassword: true,
   });
 
   await createAuditLog({
