@@ -35,6 +35,9 @@ const IGNORED_RESPONSE_URLS = [
   /\/api\/auth\/_log/,
 ];
 
+/* eslint-disable react-hooks/rules-of-hooks -- the `use` callback below is
+   Playwright's fixture API, not the React hook; ESLint's hook detector
+   misidentifies it because of the parameter name. */
 export const test = base.extend<BaseFixtures>({
   runId: async ({}, use) => {
     await use(RUN_ID);
@@ -104,6 +107,7 @@ export const test = base.extend<BaseFixtures>({
     await use(page);
   },
 });
+/* eslint-enable react-hooks/rules-of-hooks */
 
 export { expect };
 export type { ConsoleCapture };

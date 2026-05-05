@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useState } from 'react';
 import Link from 'next/link';
 
 const COOKIE_NAME = 'cookie_consent';
@@ -20,11 +20,14 @@ function writeCookie(name: string, value: string) {
 }
 
 export default function CookieConsentBanner() {
-  const [visible, setVisible] = useState(false);
-
-  useEffect(() => {
-    if (!readCookie(COOKIE_NAME)) setVisible(true);
-  }, []);
+  // Initial state checks the cookie synchronously (only on the client; document
+  // is undefined during SSR so readCookie returns null and the banner stays
+  // hidden until hydration). Keeps the synchronous setVisible(true) out of an
+  // effect (which ESLint flags as a cascading-render anti-pattern).
+  const [visible, setVisible] = useState<boolean>(() => {
+    if (typeof document === 'undefined') return false;
+    return readCookie(COOKIE_NAME) === null;
+  });
 
   if (!visible) return null;
 

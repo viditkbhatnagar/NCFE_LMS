@@ -5,7 +5,6 @@ import {
   PROD_RUN_ID,
   PROD_USERS,
   makeApiContext,
-  makeBrowserContext,
 } from './_helpers';
 
 // Production end-to-end UAT walkthrough.

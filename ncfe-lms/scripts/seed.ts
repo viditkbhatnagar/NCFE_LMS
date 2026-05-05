@@ -395,10 +395,10 @@ async function seed() {
       cohortId: '2026-Q1',
       enrolledAt: new Date(),
     });
-    console.log(`  Created enrolment: Student ${(studentUser as any).name} -> ${qualification.title}`);
-    console.log(`    Assessor: ${(assessorUser as any).name}, Cohort: 2026-Q1, Status: in_progress`);
+    console.log(`  Created enrolment: Student ${(studentUser as unknown as { name: string }).name} -> ${qualification.title}`);
+    console.log(`    Assessor: ${(assessorUser as unknown as { name: string }).name}, Cohort: 2026-Q1, Status: in_progress`);
   } else {
-    console.log(`  Enrolment already exists for student ${(studentUser as any).name}`);
+    console.log(`  Enrolment already exists for student ${(studentUser as unknown as { name: string }).name}`);
   }
 
   let enrolment2 = await Enrolment.findOne({
@@ -415,10 +415,10 @@ async function seed() {
       cohortId: '2026-Q1',
       enrolledAt: new Date(),
     });
-    console.log(`  Created enrolment: Student ${(student2User as any).name} -> ${qualification.title}`);
-    console.log(`    Assessor: ${(assessorUser as any).name}, Cohort: 2026-Q1, Status: in_progress`);
+    console.log(`  Created enrolment: Student ${(student2User as unknown as { name: string }).name} -> ${qualification.title}`);
+    console.log(`    Assessor: ${(assessorUser as unknown as { name: string }).name}, Cohort: 2026-Q1, Status: in_progress`);
   } else {
-    console.log(`  Enrolment already exists for student ${(student2User as any).name}`);
+    console.log(`  Enrolment already exists for student ${(student2User as unknown as { name: string }).name}`);
   }
 
   // Real user enrolments (Vidit & Intern -> Jyothi as assessor)
@@ -436,10 +436,10 @@ async function seed() {
       cohortId: '2026-Q1',
       enrolledAt: new Date(),
     });
-    console.log(`  Created enrolment: ${(realStudent1 as any).name} -> ${qualification.title}`);
-    console.log(`    Assessor: ${(assessorUser as any).name}, Cohort: 2026-Q1`);
+    console.log(`  Created enrolment: ${(realStudent1 as unknown as { name: string }).name} -> ${qualification.title}`);
+    console.log(`    Assessor: ${(assessorUser as unknown as { name: string }).name}, Cohort: 2026-Q1`);
   } else {
-    console.log(`  Enrolment already exists for ${(realStudent1 as any).name}`);
+    console.log(`  Enrolment already exists for ${(realStudent1 as unknown as { name: string }).name}`);
   }
 
   let enrolmentIntern = await Enrolment.findOne({
@@ -456,10 +456,10 @@ async function seed() {
       cohortId: '2026-Q1',
       enrolledAt: new Date(),
     });
-    console.log(`  Created enrolment: ${(realStudent2 as any).name} -> ${qualification.title}`);
-    console.log(`    Assessor: ${(assessorUser as any).name}, Cohort: 2026-Q1`);
+    console.log(`  Created enrolment: ${(realStudent2 as unknown as { name: string }).name} -> ${qualification.title}`);
+    console.log(`    Assessor: ${(assessorUser as unknown as { name: string }).name}, Cohort: 2026-Q1`);
   } else {
-    console.log(`  Enrolment already exists for ${(realStudent2 as any).name}`);
+    console.log(`  Enrolment already exists for ${(realStudent2 as unknown as { name: string }).name}`);
   }
 
   // ─── 6. BRITEthink Assessments ──────────────────────────────────────────────

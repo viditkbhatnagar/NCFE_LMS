@@ -1,6 +1,5 @@
 import { test, expect } from '../fixtures/base';
 import {
-  ENROLMENTS,
   KNOWN_IDS,
   QUALIFICATION_ID,
   UNITS,

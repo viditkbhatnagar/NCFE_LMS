@@ -47,7 +47,7 @@ test.describe('Student isolation — security checks', () => {
   });
 
   test('student cannot access /admin/users (role check)', async ({ page }) => {
-    const resp = await page.goto('/admin/users', { waitUntil: 'networkidle' });
+    await page.goto('/admin/users', { waitUntil: 'networkidle' });
     // Should redirect or 4xx; either way the user is not on /admin/users authenticated.
     const url = page.url();
     expect(url).not.toMatch(/\/admin\/users/);

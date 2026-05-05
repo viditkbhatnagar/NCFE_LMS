@@ -19,7 +19,11 @@ export async function GET() {
       .lean();
 
     const qualificationIds = [
-      ...new Set(enrollments.map((e: any) => String(e.qualificationId))),
+      ...new Set(
+        (enrollments as Array<{ qualificationId: unknown }>).map((e) =>
+          String(e.qualificationId),
+        ),
+      ),
     ];
 
     if (qualificationIds.length === 0) {

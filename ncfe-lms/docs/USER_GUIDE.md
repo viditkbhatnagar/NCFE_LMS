@@ -366,6 +366,43 @@ Deleting a draft assessment now also removes its CriterionComment rows (added al
 
 ---
 
+## Section 4.6 — Recently shipped features (Final wrap-up — G9 / G15 / G17)
+
+### Empty / loading / error states across list pages (G9)
+Every list page in the app now renders three explicit states:
+- **Loading** — a quiet shimmer (`animate-pulse`) matching the eventual list shape.
+- **Empty** — a centered icon + headline + one-line guidance and (where the user can do something about it) a CTA button. Wrapper carries `data-testid="empty-state"`.
+- **Error** — alert icon + "Couldn't load this page" + plain-language reason + a Retry button that re-runs the fetch. Wrapper carries `data-testid="error-state"`.
+
+The shared component lives at `src/components/common/ListStateBoundary.tsx` so all 16 list pages — admin (users, enrolments, courses, course detail, audit-logs) plus the course dashboard (selector, home, assessment, progress, portfolio, course-documents, personal-documents, materials, work-hours, members, notifications) — render the three states consistently. CTA visibility respects role gating: students see "Upload evidence" on an empty portfolio; assessors see "Create assessment" on an empty assessment list; admin sees "Add user" / "Add a course".
+
+### Server-side video thumbnails on evidence (G15)
+When a video file (any `video/*` mime) is uploaded as evidence, the server extracts a single frame at 1 second using a bundled `ffmpeg-static` binary, uploads the JPG to S3 alongside the original, and stores the URL on the Evidence record. The thumbnail then renders in place of the generic file icon in:
+- `EvidenceCard` (portfolio grid view)
+- `EvidenceListRow` (portfolio table view)
+- `EvidenceMappingSection` (assessment detail panel)
+- `EvidenceSelectionModal` (when picking evidence to map to an assessment)
+- `HomeRecentCard` (recent-evidence card on `/c/{slug}` home)
+
+Generation is **soft-fail** at every step. If the download, ffmpeg, or upload errors out — for example because the file is corrupt, the codec is unusual, or the runtime ffmpeg binary path is unresolvable — the upload itself still succeeds, the evidence is saved without `thumbnailUrl`, and the UI falls back to the existing file icon. Total request latency is capped (30 s ffmpeg timeout, 30 s download timeout). When the evidence is deleted the thumbnail S3 object is cascaded as part of the existing delete handler.
+
+### Bulk operations on /admin/users (G17)
+The user list grew a leftmost checkbox column plus a sticky bulk-action toolbar that slides in when ≥ 1 row is selected. The toolbar shows the selection count and a dropdown with three actions:
+- **Deactivate selected** — flips `status: 'inactive'` for every selected user (audit-logged as `USER_DEACTIVATED_BULK`).
+- **Resend welcome email** — for each selected user, generates a fresh password, updates the record, and sends the welcome email. The result modal reports `{ sent, failed: [{id, error}] }` so per-id failures surface without aborting the rest. Rate-limited to 10 ops/minute per admin.
+- **Export selected as CSV** — server-side CSV download with columns `name, email, role, status, phone, createdAt, enrolmentCount`.
+
+Above the table are quick-filter chips: All / Active only / Inactive only and the existing role chips (All / Student / Assessor / IQA / Admin). Bulk requests are capped at 100 ids; selecting > 100 disables the bulk dropdown with an inline note.
+
+### Bulk operations on /admin/enrolments (G17)
+Same checkbox + toolbar pattern. Filter chips: All / In progress / Completed / Withdrawn (the "In progress" chip covers both `enrolled` and `in_progress` Enrolment statuses). Bulk actions:
+- **Withdraw selected** — sets `status: 'withdrawn'` (audit-logged as `ENROLMENT_WITHDRAWN_BULK`).
+- **Export selected as CSV** — columns `studentName, studentEmail, qualificationTitle, assessorName, cohort, status, enrolledAt`.
+
+All bulk endpoints are admin-only via `withAuth(['admin'])` and reject more than 100 ids with a 400.
+
+---
+
 ## Section 5 — FAQ
 
 **Q: How do I add a student to multiple courses?**
@@ -403,6 +440,15 @@ A: `/admin/audit-logs` → set **From** = yesterday and **To** = yesterday (the 
 
 **Q: Brevo says "Email failed" because the recipient bounced. Can I retry?**
 A: Click **Resend** on the user row. That generates a fresh password, updates the user, and re-sends the welcome email. If Brevo is back up the new send goes through.
+
+**Q: How do I deactivate multiple students at once?**
+A: On `/admin/users`, tick the checkboxes next to the rows you want to act on (or click the header checkbox to select the whole page). A sticky toolbar appears at the top of the list with a **Bulk action** dropdown — pick **Deactivate selected**, confirm in the dialog, and every selected student is flipped to `status: inactive` in a single round-trip. The same toolbar lets you **Resend welcome email** to a batch (rate-limited to 10 per minute) or **Export selected as CSV**. Bulk operations are capped at 100 rows per request.
+
+**Q: Why don't I see a thumbnail for my video evidence?**
+A: The server tries to generate a thumbnail at upload time using a one-second snapshot. It can quietly skip if the codec is unusual, the file is malformed, or the conversion takes longer than 30 seconds. The upload itself still succeeds in those cases — only the preview falls back to the generic file icon. If you want a thumbnail and the file looks healthy, re-encode it as standard `H.264 / mp4` and re-upload.
+
+**Q: Why is the "In progress" enrolment filter showing both newly-enrolled and in-progress students?**
+A: That's deliberate. The Enrolment status enum has both `enrolled` (just created, no work yet) and `in_progress` (work has started); from a stakeholder perspective both are "active learning". The chip groups them so admins can see all currently-active enrolments at once.
 
 **Q: How do I change the email sender display name (e.g. from "NCFE LMS" to "Centre Name LMS")?**
 A: Edit the `BREVO_SENDER_NAME` env var on Render → service → Environment tab and save. Render auto-redeploys. The verified sender mailbox doesn't change — only the display name does.

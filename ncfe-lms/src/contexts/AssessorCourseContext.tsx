@@ -1,6 +1,6 @@
 'use client';
 
-import { createContext, useContext, useState, useEffect, type ReactNode } from 'react';
+import { createContext, useContext, useState, type ReactNode } from 'react';
 import { useSearchParams, useRouter, usePathname } from 'next/navigation';
 import type { UserRole } from '@/types';
 
@@ -84,12 +84,16 @@ export function AssessorCourseProvider({ qualification, enrollments, userRole, c
     router.replace(qs ? `${pathname}?${qs}` : pathname);
   };
 
-  useEffect(() => {
-    // Only auto-select first enrollment for students (assessors default to "All Learners")
-    if (userRole === 'student' && !currentEnrollmentId && enrollments.length > 0) {
-      setCurrentEnrollmentIdState(enrollments[0]._id);
-    }
-  }, [enrollments, currentEnrollmentId, userRole]);
+  // Auto-select the first enrollment for students. Computed during render
+  // (the React-recommended "adjust state when a prop changes" pattern); the
+  // condition becomes false on the next render so this terminates immediately.
+  if (
+    userRole === 'student' &&
+    !currentEnrollmentId &&
+    enrollments.length > 0
+  ) {
+    setCurrentEnrollmentIdState(enrollments[0]._id);
+  }
 
   return (
     <AssessorCourseContext.Provider

@@ -1,4 +1,4 @@
-import { test, expect, request as playwrightRequest } from '@playwright/test';
+import { test, expect } from '@playwright/test';
 import { PROD_USERS, makeApiContext } from './_helpers';
 
 // Production notifications smoke — verifies the notifications API responds

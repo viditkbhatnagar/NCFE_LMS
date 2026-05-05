@@ -31,7 +31,12 @@ export function useAutoSave<T extends Record<string, unknown>>({
   const saveTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const pendingUpdatesRef = useRef<Partial<T>>({});
   const saveFnRef = useRef(saveFn);
-  saveFnRef.current = saveFn;
+
+  // Keep the ref in sync with the latest saveFn without re-running the
+  // debounce setup. Updating refs during render is a React anti-pattern.
+  useEffect(() => {
+    saveFnRef.current = saveFn;
+  }, [saveFn]);
 
   const scheduleUpdate = useCallback(
     (updates: Partial<T>) => {

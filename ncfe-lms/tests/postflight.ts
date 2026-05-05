@@ -227,7 +227,7 @@ async function main(): Promise<PostflightReport> {
 
   // Then run the leak detector — anything left after the sweep is a real
   // leak we want surfaced (entity that didn't contain RUN_ID anywhere).
-  let leakedDocs = await findRunIdLeaks(db);
+  const leakedDocs = await findRunIdLeaks(db);
   const preExistingTestData = await findPreExistingTestData(db);
 
   let leakedS3Keys = await findS3Leaks(Object.values(userIdMap));

@@ -63,7 +63,13 @@ export default async function CourseLayout({ children, params }: Props) {
     level: qualification.level,
   };
 
-  const serializedEnrollments = enrollments.map((e: any) => ({
+  type PopulatedEnrollment = {
+    _id: { toString(): string };
+    userId: { _id: { toString(): string }; name: string; email: string };
+    status: string;
+    cohortId?: string | null;
+  };
+  const serializedEnrollments = (enrollments as unknown as PopulatedEnrollment[]).map((e) => ({
     _id: e._id.toString(),
     userId: {
       _id: e.userId._id.toString(),
