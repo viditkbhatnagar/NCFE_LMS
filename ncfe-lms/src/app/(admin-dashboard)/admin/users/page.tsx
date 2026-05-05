@@ -1,8 +1,12 @@
 'use client';
 
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useMemo } from 'react';
 import ConfirmDialog from '@/components/admin/ConfirmDialog';
 import { generatePassword } from '@/lib/password-generator';
+import ListStateBoundary, {
+  DefaultListSkeleton,
+  EmptyState,
+} from '@/components/common/ListStateBoundary';
 
 const SIGN_IN_URL = 'https://ncfe-lms.onrender.com/sign-in';
 
@@ -60,9 +64,18 @@ const roles = ['all', 'student', 'assessor', 'iqa', 'admin'] as const;
 export default function AdminUsersPage() {
   const [users, setUsers] = useState<User[]>([]);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
   const [activeRole, setActiveRole] = useState<string>('all');
+  const [statusFilter, setStatusFilter] = useState<'all' | 'active' | 'inactive'>('all');
   const [search, setSearch] = useState('');
   const [pagination, setPagination] = useState({ page: 1, total: 0, totalPages: 0 });
+
+  // G17 — bulk selection state
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
+  const [bulkMenuOpen, setBulkMenuOpen] = useState(false);
+  const [bulkAction, setBulkAction] = useState<null | 'deactivate' | 'resend' | 'export'>(null);
+  const [bulkRunning, setBulkRunning] = useState(false);
+  const [bulkResult, setBulkResult] = useState<null | { kind: 'deactivate' | 'resend' | 'export'; sent?: number; failed?: { id: string; error: string }[]; updated?: number }>(null);
 
   // Form states
   const [showForm, setShowForm] = useState(false);
@@ -125,23 +138,130 @@ export default function AdminUsersPage() {
 
   const fetchUsers = useCallback(async () => {
     setLoading(true);
+    setError(null);
     const params = new URLSearchParams({ page: String(pagination.page), limit: '20' });
     if (activeRole !== 'all') params.set('role', activeRole);
+    if (statusFilter !== 'all') params.set('status', statusFilter);
     if (search) params.set('search', search);
 
     try {
       const res = await fetch(`/api/v2/admin/users?${params}`);
+      if (!res.ok) {
+        setError('The server returned an error. Please try again.');
+        return;
+      }
       const data = await res.json();
       if (data.success) {
         setUsers(data.data);
         setPagination((prev) => ({ ...prev, total: data.pagination.total, totalPages: data.pagination.totalPages }));
+      } else {
+        setError(data.error || 'Failed to load users.');
       }
     } catch (err) {
       console.error('Failed to fetch users:', err);
+      setError('Network error. Check your connection and retry.');
     } finally {
       setLoading(false);
     }
-  }, [activeRole, search, pagination.page]);
+  }, [activeRole, statusFilter, search, pagination.page]);
+
+  // Reset selection on filter / pagination change.
+  useEffect(() => {
+    setSelectedIds(new Set());
+  }, [activeRole, statusFilter, search, pagination.page]);
+
+  const allOnPageSelected = useMemo(
+    () => users.length > 0 && users.every((u) => selectedIds.has(u._id)),
+    [users, selectedIds],
+  );
+
+  const toggleSelect = (id: string) => {
+    setSelectedIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  };
+  const toggleSelectAllOnPage = () => {
+    setSelectedIds((prev) => {
+      const next = new Set(prev);
+      if (allOnPageSelected) {
+        users.forEach((u) => next.delete(u._id));
+      } else {
+        users.forEach((u) => next.add(u._id));
+      }
+      return next;
+    });
+  };
+  const clearSelection = () => setSelectedIds(new Set());
+
+  const runBulkDeactivate = async () => {
+    setBulkRunning(true);
+    try {
+      const res = await fetch('/api/v2/admin/users/bulk-deactivate', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ ids: Array.from(selectedIds) }),
+      });
+      const data = await res.json();
+      if (data.success) {
+        setBulkResult({ kind: 'deactivate', updated: data.data?.updated ?? 0 });
+        clearSelection();
+        fetchUsers();
+      } else {
+        setBulkResult({ kind: 'deactivate', updated: 0 });
+      }
+    } finally {
+      setBulkRunning(false);
+      setBulkAction(null);
+    }
+  };
+  const runBulkResend = async () => {
+    setBulkRunning(true);
+    try {
+      const res = await fetch('/api/v2/admin/users/bulk-resend-welcome', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ ids: Array.from(selectedIds) }),
+      });
+      const data = await res.json();
+      setBulkResult({
+        kind: 'resend',
+        sent: data?.data?.sent ?? 0,
+        failed: data?.data?.failed ?? [],
+      });
+      clearSelection();
+    } finally {
+      setBulkRunning(false);
+      setBulkAction(null);
+    }
+  };
+  const runBulkExport = async () => {
+    setBulkRunning(true);
+    try {
+      const res = await fetch('/api/v2/admin/users/bulk-export', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ ids: Array.from(selectedIds) }),
+      });
+      if (res.ok) {
+        const blob = await res.blob();
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = `users-export-${new Date().toISOString().slice(0, 19).replace(/[:T]/g, '-')}.csv`;
+        document.body.appendChild(a);
+        a.click();
+        a.remove();
+        URL.revokeObjectURL(url);
+        setBulkResult({ kind: 'export' });
+      }
+    } finally {
+      setBulkRunning(false);
+      setBulkAction(null);
+    }
+  };
 
   useEffect(() => {
     fetchUsers();
@@ -444,7 +564,7 @@ export default function AdminUsersPage() {
 
       {/* Role tabs + search */}
       <div className="flex flex-col sm:flex-row gap-3 items-start sm:items-center justify-between">
-        <div className="flex gap-1">
+        <div className="flex flex-wrap gap-1">
           {roles.map((r) => (
             <button
               key={r}
@@ -456,6 +576,22 @@ export default function AdminUsersPage() {
               {r === 'all' ? 'All' : r.charAt(0).toUpperCase() + r.slice(1)}
             </button>
           ))}
+          <span className="mx-2 self-center text-gray-300">|</span>
+          {([
+            { key: 'all', label: 'Any status' },
+            { key: 'active', label: 'Active only' },
+            { key: 'inactive', label: 'Inactive only' },
+          ] as const).map((s) => (
+            <button
+              key={s.key}
+              onClick={() => { setStatusFilter(s.key); setPagination((p) => ({ ...p, page: 1 })); }}
+              className={`px-3 py-1.5 text-xs font-medium rounded-[6px] transition-colors ${
+                statusFilter === s.key ? 'bg-gray-800 text-white' : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+              }`}
+            >
+              {s.label}
+            </button>
+          ))}
         </div>
         <input
           type="text"
@@ -465,6 +601,66 @@ export default function AdminUsersPage() {
           className="w-full max-w-xs px-4 py-2 text-sm border border-gray-300 rounded-[6px] focus:outline-none focus:ring-2 focus:ring-primary/50"
         />
       </div>
+
+      {/* G17 — bulk action toolbar */}
+      {selectedIds.size > 0 && (
+        <div
+          data-testid="bulk-toolbar"
+          className="flex flex-wrap items-center gap-3 px-4 py-3 bg-amber-50 border border-amber-200 rounded-[6px] sticky top-0 z-10"
+        >
+          <span className="text-sm font-medium text-amber-900">
+            {selectedIds.size} selected
+            {selectedIds.size > 100 && (
+              <span className="ml-2 text-xs text-red-600">
+                (limit 100; deselect some to enable bulk actions)
+              </span>
+            )}
+          </span>
+          <div className="flex-1" />
+          <div className="relative">
+            <button
+              type="button"
+              onClick={() => setBulkMenuOpen((o) => !o)}
+              disabled={selectedIds.size > 100 || bulkRunning}
+              className="px-3 py-1.5 text-xs font-medium text-white bg-amber-600 rounded-[6px] hover:bg-amber-700 disabled:opacity-50"
+            >
+              Bulk action ▾
+            </button>
+            {bulkMenuOpen && selectedIds.size <= 100 && (
+              <div className="absolute right-0 mt-1 w-56 bg-white border border-gray-200 rounded-[6px] shadow z-20">
+                <button
+                  type="button"
+                  onClick={() => { setBulkMenuOpen(false); setBulkAction('deactivate'); }}
+                  className="w-full text-left px-3 py-2 text-xs hover:bg-gray-50"
+                >
+                  Deactivate selected
+                </button>
+                <button
+                  type="button"
+                  onClick={() => { setBulkMenuOpen(false); setBulkAction('resend'); }}
+                  className="w-full text-left px-3 py-2 text-xs hover:bg-gray-50"
+                >
+                  Resend welcome email
+                </button>
+                <button
+                  type="button"
+                  onClick={() => { setBulkMenuOpen(false); runBulkExport(); }}
+                  className="w-full text-left px-3 py-2 text-xs hover:bg-gray-50"
+                >
+                  Export selected as CSV
+                </button>
+              </div>
+            )}
+          </div>
+          <button
+            type="button"
+            onClick={clearSelection}
+            className="px-3 py-1.5 text-xs font-medium text-gray-700 bg-white border border-gray-300 rounded-[6px] hover:bg-gray-50"
+          >
+            Clear
+          </button>
+        </div>
+      )}
 
       {/* Create/Edit Form */}
       {showForm && (
@@ -668,16 +864,47 @@ export default function AdminUsersPage() {
       )}
 
       {/* Table */}
-      <div className="bg-white rounded-[8px] border border-gray-200 overflow-hidden">
-        {loading ? (
-          <div className="p-8 text-center text-sm text-gray-400">Loading...</div>
-        ) : users.length === 0 ? (
-          <div className="p-8 text-center text-sm text-gray-400">No users found.</div>
-        ) : (
+      <ListStateBoundary
+        loading={loading}
+        error={error}
+        isEmpty={users.length === 0}
+        onRetry={fetchUsers}
+        skeleton={<DefaultListSkeleton rows={6} />}
+        emptyContent={
+          <EmptyState
+            title="No users found"
+            description={
+              search || activeRole !== 'all' || statusFilter !== 'all'
+                ? 'Try clearing filters or changing your search.'
+                : 'Add your first user to get started — students, assessors, IQA, or admin.'
+            }
+            cta={
+              !search && activeRole === 'all' && statusFilter === 'all' ? (
+                <button
+                  onClick={openCreateForm}
+                  className="px-4 py-2 text-sm font-medium text-white bg-primary rounded-[6px] hover:bg-primary/90"
+                >
+                  Add a user
+                </button>
+              ) : null
+            }
+          />
+        }
+      >
+        <div className="bg-white rounded-[8px] border border-gray-200 overflow-hidden">
           <div className="overflow-x-auto">
             <table className="w-full text-sm">
               <thead>
                 <tr className="border-b border-gray-100 bg-gray-50">
+                  <th className="px-3 py-3 w-8">
+                    <input
+                      type="checkbox"
+                      checked={allOnPageSelected}
+                      onChange={toggleSelectAllOnPage}
+                      aria-label="Select all on page"
+                      className="h-4 w-4 rounded border-gray-300 text-primary focus:ring-primary/50"
+                    />
+                  </th>
                   <th className="text-left px-5 py-3 text-xs font-medium text-gray-500 uppercase">Name</th>
                   <th className="text-left px-5 py-3 text-xs font-medium text-gray-500 uppercase">Email</th>
                   <th className="text-left px-5 py-3 text-xs font-medium text-gray-500 uppercase">Role</th>
@@ -689,6 +916,15 @@ export default function AdminUsersPage() {
               <tbody>
                 {users.map((u) => (
                   <tr key={u._id} className="border-b border-gray-50 hover:bg-gray-50">
+                    <td className="px-3 py-3">
+                      <input
+                        type="checkbox"
+                        checked={selectedIds.has(u._id)}
+                        onChange={() => toggleSelect(u._id)}
+                        aria-label={`Select ${u.name}`}
+                        className="h-4 w-4 rounded border-gray-300 text-primary focus:ring-primary/50"
+                      />
+                    </td>
                     <td className="px-5 py-3 font-medium text-gray-900">
                       <a href={`/admin/users/${u._id}`} className="hover:underline">{u.name}</a>
                       {u.role === 'student' && typeof u.enrolmentCount === 'number' && (
@@ -763,7 +999,6 @@ export default function AdminUsersPage() {
               </tbody>
             </table>
           </div>
-        )}
 
         {pagination.totalPages > 1 && (
           <div className="flex items-center justify-between px-5 py-3 border-t border-gray-100">
@@ -788,7 +1023,80 @@ export default function AdminUsersPage() {
             </div>
           </div>
         )}
-      </div>
+        </div>
+      </ListStateBoundary>
+
+      {/* G17 — bulk deactivate confirm */}
+      <ConfirmDialog
+        open={bulkAction === 'deactivate'}
+        title="Deactivate selected users"
+        message={`Deactivate ${selectedIds.size} user${selectedIds.size === 1 ? '' : 's'}? They'll lose access immediately. You can re-activate later.`}
+        confirmLabel="Deactivate"
+        destructive
+        loading={bulkRunning}
+        onConfirm={runBulkDeactivate}
+        onCancel={() => setBulkAction(null)}
+      />
+
+      {/* G17 — bulk resend confirm */}
+      <ConfirmDialog
+        open={bulkAction === 'resend'}
+        title="Resend welcome email"
+        message={`Generate a fresh password and send a welcome email to ${selectedIds.size} user${selectedIds.size === 1 ? '' : 's'}? Their existing password will be replaced.`}
+        confirmLabel="Send"
+        loading={bulkRunning}
+        onConfirm={runBulkResend}
+        onCancel={() => setBulkAction(null)}
+      />
+
+      {/* G17 — bulk result modal */}
+      {bulkResult && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center">
+          <div className="absolute inset-0 bg-black/50" onClick={() => setBulkResult(null)} />
+          <div className="relative bg-white rounded-[8px] shadow-xl max-w-md w-full mx-4 p-6">
+            <h3 className="text-lg font-semibold text-gray-900">
+              {bulkResult.kind === 'deactivate'
+                ? 'Bulk deactivation complete'
+                : bulkResult.kind === 'resend'
+                  ? 'Bulk resend complete'
+                  : 'Export downloaded'}
+            </h3>
+            <div className="mt-3 text-sm text-gray-600 space-y-2">
+              {bulkResult.kind === 'deactivate' && (
+                <p><strong>{bulkResult.updated ?? 0}</strong> user(s) deactivated.</p>
+              )}
+              {bulkResult.kind === 'resend' && (
+                <>
+                  <p><strong>{bulkResult.sent ?? 0}</strong> emails sent.</p>
+                  {bulkResult.failed && bulkResult.failed.length > 0 && (
+                    <div>
+                      <p className="text-red-600 font-medium">{bulkResult.failed.length} failure(s):</p>
+                      <ul className="mt-1 text-xs list-disc pl-5">
+                        {bulkResult.failed.map((f) => (
+                          <li key={f.id}>
+                            <span className="font-mono">{f.id.slice(-8)}</span>: {f.error}
+                          </li>
+                        ))}
+                      </ul>
+                    </div>
+                  )}
+                </>
+              )}
+              {bulkResult.kind === 'export' && (
+                <p>The CSV download should have started in your browser.</p>
+              )}
+            </div>
+            <div className="flex justify-end gap-3 mt-5">
+              <button
+                onClick={() => setBulkResult(null)}
+                className="px-4 py-2 text-sm font-medium text-white bg-primary rounded-[6px] hover:bg-primary/90"
+              >
+                Close
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Deactivate/Activate confirm */}
       <ConfirmDialog

@@ -1,7 +1,13 @@
 'use client';
 
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useMemo } from 'react';
 import ConfirmDialog from '@/components/admin/ConfirmDialog';
+import ListStateBoundary, {
+  DefaultListSkeleton,
+  EmptyState,
+} from '@/components/common/ListStateBoundary';
+
+type StatusChip = 'all' | 'active' | 'completed' | 'withdrawn';
 
 interface Enrolment {
   _id: string;
@@ -24,7 +30,15 @@ interface SelectOption {
 export default function AdminEnrolmentsPage() {
   const [enrolments, setEnrolments] = useState<Enrolment[]>([]);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
   const [pagination, setPagination] = useState({ page: 1, total: 0, totalPages: 0 });
+  const [statusChip, setStatusChip] = useState<StatusChip>('all');
+
+  // G17 — bulk selection
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
+  const [bulkAction, setBulkAction] = useState<null | 'withdraw'>(null);
+  const [bulkRunning, setBulkRunning] = useState(false);
+  const [bulkResult, setBulkResult] = useState<null | { kind: 'withdraw' | 'export'; updated?: number }>(null);
 
   // Form states
   const [showForm, setShowForm] = useState(false);
@@ -44,19 +58,110 @@ export default function AdminEnrolmentsPage() {
 
   const fetchEnrolments = useCallback(async () => {
     setLoading(true);
+    setError(null);
     try {
-      const res = await fetch(`/api/v2/admin/enrolments?page=${pagination.page}&limit=20`);
+      const params = new URLSearchParams({ page: String(pagination.page), limit: '20' });
+      if (statusChip !== 'all') params.set('statusChip', statusChip);
+      const res = await fetch(`/api/v2/admin/enrolments?${params}`);
+      if (!res.ok) {
+        setError('The server returned an error. Please try again.');
+        return;
+      }
       const data = await res.json();
       if (data.success) {
         setEnrolments(data.data);
         setPagination((prev) => ({ ...prev, total: data.pagination.total, totalPages: data.pagination.totalPages }));
+      } else {
+        setError(data.error || 'Failed to load enrolments.');
       }
     } catch (err) {
       console.error('Failed to fetch enrolments:', err);
+      setError('Network error. Check your connection and retry.');
     } finally {
       setLoading(false);
     }
-  }, [pagination.page]);
+  }, [pagination.page, statusChip]);
+
+  // Reset selection when filters change.
+  useEffect(() => {
+    setSelectedIds(new Set());
+  }, [statusChip, pagination.page]);
+
+  // Client-side filter (in case the server doesn't yet recognise statusChip)
+  const filteredEnrolments = useMemo(() => {
+    if (statusChip === 'all') return enrolments;
+    if (statusChip === 'active') return enrolments.filter((e) => e.status === 'enrolled' || e.status === 'in_progress');
+    return enrolments.filter((e) => e.status === statusChip);
+  }, [enrolments, statusChip]);
+
+  const allOnPageSelected = useMemo(
+    () => filteredEnrolments.length > 0 && filteredEnrolments.every((e) => selectedIds.has(e._id)),
+    [filteredEnrolments, selectedIds],
+  );
+  const toggleSelect = (id: string) => {
+    setSelectedIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  };
+  const toggleSelectAllOnPage = () => {
+    setSelectedIds((prev) => {
+      const next = new Set(prev);
+      if (allOnPageSelected) {
+        filteredEnrolments.forEach((e) => next.delete(e._id));
+      } else {
+        filteredEnrolments.forEach((e) => next.add(e._id));
+      }
+      return next;
+    });
+  };
+  const clearSelection = () => setSelectedIds(new Set());
+
+  const runBulkWithdraw = async () => {
+    setBulkRunning(true);
+    try {
+      const res = await fetch('/api/v2/admin/enrolments/bulk-withdraw', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ ids: Array.from(selectedIds) }),
+      });
+      const data = await res.json();
+      if (data.success) {
+        setBulkResult({ kind: 'withdraw', updated: data.data?.updated ?? 0 });
+        clearSelection();
+        fetchEnrolments();
+      }
+    } finally {
+      setBulkRunning(false);
+      setBulkAction(null);
+    }
+  };
+  const runBulkExport = async () => {
+    setBulkRunning(true);
+    try {
+      const res = await fetch('/api/v2/admin/enrolments/bulk-export', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ ids: Array.from(selectedIds) }),
+      });
+      if (res.ok) {
+        const blob = await res.blob();
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = `enrolments-export-${new Date().toISOString().slice(0, 19).replace(/[:T]/g, '-')}.csv`;
+        document.body.appendChild(a);
+        a.click();
+        a.remove();
+        URL.revokeObjectURL(url);
+        setBulkResult({ kind: 'export' });
+      }
+    } finally {
+      setBulkRunning(false);
+    }
+  };
 
   const fetchOptions = useCallback(async () => {
     const [studRes, assRes, qualRes] = await Promise.all([
@@ -166,6 +271,67 @@ export default function AdminEnrolmentsPage() {
         </button>
       </div>
 
+      {/* Filter chips */}
+      <div className="flex flex-wrap gap-1">
+        {([
+          { key: 'all', label: 'All' },
+          { key: 'active', label: 'In progress' },
+          { key: 'completed', label: 'Completed' },
+          { key: 'withdrawn', label: 'Withdrawn' },
+        ] as const).map((c) => (
+          <button
+            key={c.key}
+            onClick={() => { setStatusChip(c.key); setPagination((p) => ({ ...p, page: 1 })); }}
+            className={`px-3 py-1.5 text-xs font-medium rounded-[6px] transition-colors ${
+              statusChip === c.key ? 'bg-primary text-white' : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+            }`}
+          >
+            {c.label}
+          </button>
+        ))}
+      </div>
+
+      {/* Bulk action toolbar */}
+      {selectedIds.size > 0 && (
+        <div
+          data-testid="bulk-toolbar"
+          className="flex flex-wrap items-center gap-3 px-4 py-3 bg-amber-50 border border-amber-200 rounded-[6px] sticky top-0 z-10"
+        >
+          <span className="text-sm font-medium text-amber-900">
+            {selectedIds.size} selected
+            {selectedIds.size > 100 && (
+              <span className="ml-2 text-xs text-red-600">
+                (limit 100; deselect some)
+              </span>
+            )}
+          </span>
+          <div className="flex-1" />
+          <button
+            type="button"
+            onClick={() => setBulkAction('withdraw')}
+            disabled={selectedIds.size > 100 || bulkRunning}
+            className="px-3 py-1.5 text-xs font-medium text-white bg-red-600 rounded-[6px] hover:bg-red-700 disabled:opacity-50"
+          >
+            Withdraw selected
+          </button>
+          <button
+            type="button"
+            onClick={runBulkExport}
+            disabled={selectedIds.size > 100 || bulkRunning}
+            className="px-3 py-1.5 text-xs font-medium text-gray-700 bg-white border border-gray-300 rounded-[6px] hover:bg-gray-50 disabled:opacity-50"
+          >
+            Export CSV
+          </button>
+          <button
+            type="button"
+            onClick={clearSelection}
+            className="px-3 py-1.5 text-xs font-medium text-gray-700 bg-white border border-gray-300 rounded-[6px] hover:bg-gray-50"
+          >
+            Clear
+          </button>
+        </div>
+      )}
+
       {/* Create/Edit Form */}
       {showForm && (
         <div className="bg-white rounded-[8px] border border-gray-200 p-5">
@@ -259,16 +425,47 @@ export default function AdminEnrolmentsPage() {
       )}
 
       {/* Table */}
-      <div className="bg-white rounded-[8px] border border-gray-200 overflow-hidden">
-        {loading ? (
-          <div className="p-8 text-center text-sm text-gray-400">Loading...</div>
-        ) : enrolments.length === 0 ? (
-          <div className="p-8 text-center text-sm text-gray-400">No enrolments found.</div>
-        ) : (
+      <ListStateBoundary
+        loading={loading}
+        error={error}
+        isEmpty={filteredEnrolments.length === 0}
+        onRetry={fetchEnrolments}
+        skeleton={<DefaultListSkeleton rows={5} />}
+        emptyContent={
+          <EmptyState
+            title="No enrolments yet"
+            description={
+              statusChip !== 'all'
+                ? `No ${statusChip === 'active' ? 'in-progress' : statusChip} enrolments. Try a different filter.`
+                : 'Enrol students in courses to start tracking their progress and assigning assessors.'
+            }
+            cta={
+              statusChip === 'all' ? (
+                <button
+                  onClick={() => { resetForm(); setShowForm(true); }}
+                  className="px-4 py-2 text-sm font-medium text-white bg-primary rounded-[6px] hover:bg-primary/90"
+                >
+                  New enrolment
+                </button>
+              ) : null
+            }
+          />
+        }
+      >
+        <div className="bg-white rounded-[8px] border border-gray-200 overflow-hidden">
           <div className="overflow-x-auto">
             <table className="w-full text-sm">
               <thead>
                 <tr className="border-b border-gray-100 bg-gray-50">
+                  <th className="px-3 py-3 w-8">
+                    <input
+                      type="checkbox"
+                      checked={allOnPageSelected}
+                      onChange={toggleSelectAllOnPage}
+                      aria-label="Select all on page"
+                      className="h-4 w-4 rounded border-gray-300 text-primary focus:ring-primary/50"
+                    />
+                  </th>
                   <th className="text-left px-5 py-3 text-xs font-medium text-gray-500 uppercase">Student</th>
                   <th className="text-left px-5 py-3 text-xs font-medium text-gray-500 uppercase">Course</th>
                   <th className="text-left px-5 py-3 text-xs font-medium text-gray-500 uppercase">Assessor</th>
@@ -279,8 +476,17 @@ export default function AdminEnrolmentsPage() {
                 </tr>
               </thead>
               <tbody>
-                {enrolments.map((e) => (
+                {filteredEnrolments.map((e) => (
                   <tr key={e._id} className="border-b border-gray-50 hover:bg-gray-50">
+                    <td className="px-3 py-3">
+                      <input
+                        type="checkbox"
+                        checked={selectedIds.has(e._id)}
+                        onChange={() => toggleSelect(e._id)}
+                        aria-label={`Select enrolment for ${e.userId?.name || 'unknown'}`}
+                        className="h-4 w-4 rounded border-gray-300 text-primary focus:ring-primary/50"
+                      />
+                    </td>
                     <td className="px-5 py-3 font-medium text-gray-900">{e.userId?.name || 'Unknown'}</td>
                     <td className="px-5 py-3 text-gray-600">{e.qualificationId?.title || 'Unknown'}</td>
                     <td className="px-5 py-3 text-gray-600">{e.assessorId?.name || 'Unassigned'}</td>
@@ -304,7 +510,6 @@ export default function AdminEnrolmentsPage() {
               </tbody>
             </table>
           </div>
-        )}
 
         {pagination.totalPages > 1 && (
           <div className="flex items-center justify-between px-5 py-3 border-t border-gray-100">
@@ -329,7 +534,8 @@ export default function AdminEnrolmentsPage() {
             </div>
           </div>
         )}
-      </div>
+        </div>
+      </ListStateBoundary>
 
       <ConfirmDialog
         open={!!confirmWithdraw}
@@ -341,6 +547,43 @@ export default function AdminEnrolmentsPage() {
         onConfirm={handleWithdraw}
         onCancel={() => setConfirmWithdraw(null)}
       />
+
+      {/* G17 — bulk withdraw confirm */}
+      <ConfirmDialog
+        open={bulkAction === 'withdraw'}
+        title="Withdraw selected enrolments"
+        message={`Withdraw ${selectedIds.size} enrolment${selectedIds.size === 1 ? '' : 's'}? Students will lose access to those courses.`}
+        confirmLabel="Withdraw"
+        destructive
+        loading={bulkRunning}
+        onConfirm={runBulkWithdraw}
+        onCancel={() => setBulkAction(null)}
+      />
+
+      {/* G17 — bulk result modal */}
+      {bulkResult && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center">
+          <div className="absolute inset-0 bg-black/50" onClick={() => setBulkResult(null)} />
+          <div className="relative bg-white rounded-[8px] shadow-xl max-w-md w-full mx-4 p-6">
+            <h3 className="text-lg font-semibold text-gray-900">
+              {bulkResult.kind === 'withdraw' ? 'Bulk withdraw complete' : 'Export downloaded'}
+            </h3>
+            <p className="mt-3 text-sm text-gray-600">
+              {bulkResult.kind === 'withdraw'
+                ? `${bulkResult.updated ?? 0} enrolment(s) withdrawn.`
+                : 'The CSV download should have started in your browser.'}
+            </p>
+            <div className="flex justify-end gap-3 mt-5">
+              <button
+                onClick={() => setBulkResult(null)}
+                className="px-4 py-2 text-sm font-medium text-white bg-primary rounded-[6px] hover:bg-primary/90"
+              >
+                Close
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
