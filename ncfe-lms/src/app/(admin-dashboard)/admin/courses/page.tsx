@@ -13,6 +13,7 @@ interface Qualification {
   awardingBody: string;
   status: string;
   unitCount: number;
+  requiredWorkHours?: number | null;
   createdAt: string;
 }
 
@@ -22,7 +23,7 @@ export default function AdminCoursesPage() {
   const [search, setSearch] = useState('');
   const [showForm, setShowForm] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
-  const [form, setForm] = useState({ title: '', level: 3, code: '', awardingBody: 'NCFE/CACHE', description: '' });
+  const [form, setForm] = useState({ title: '', level: 3, code: '', awardingBody: 'NCFE/CACHE', description: '', requiredWorkHours: '' });
   const [saving, setSaving] = useState(false);
   const [errors, setErrors] = useState<Record<string, string[]>>({});
   const [confirmDelete, setConfirmDelete] = useState<string | null>(null);
@@ -45,14 +46,21 @@ export default function AdminCoursesPage() {
   }, [fetchQualifications]);
 
   const resetForm = () => {
-    setForm({ title: '', level: 3, code: '', awardingBody: 'NCFE/CACHE', description: '' });
+    setForm({ title: '', level: 3, code: '', awardingBody: 'NCFE/CACHE', description: '', requiredWorkHours: '' });
     setEditingId(null);
     setShowForm(false);
     setErrors({});
   };
 
   const handleEdit = (q: Qualification) => {
-    setForm({ title: q.title, level: q.level, code: q.code, awardingBody: q.awardingBody, description: '' });
+    setForm({
+      title: q.title,
+      level: q.level,
+      code: q.code,
+      awardingBody: q.awardingBody,
+      description: '',
+      requiredWorkHours: q.requiredWorkHours != null ? String(q.requiredWorkHours) : '',
+    });
     setEditingId(q._id);
     setShowForm(true);
   };
@@ -68,10 +76,21 @@ export default function AdminCoursesPage() {
     const method = editingId ? 'PUT' : 'POST';
 
     try {
+      const payload: Record<string, unknown> = {
+        title: form.title,
+        level: form.level,
+        code: form.code,
+        awardingBody: form.awardingBody,
+        description: form.description,
+      };
+      if (form.requiredWorkHours.trim() !== '') {
+        const n = parseInt(form.requiredWorkHours, 10);
+        if (!isNaN(n)) payload.requiredWorkHours = n;
+      }
       const res = await fetch(url, {
         method,
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(form),
+        body: JSON.stringify(payload),
       });
       const data = await res.json();
       if (data.success) {
@@ -183,6 +202,20 @@ export default function AdminCoursesPage() {
                   onChange={(e) => setForm({ ...form, awardingBody: e.target.value })}
                   className="w-full px-3 py-2 text-sm border border-gray-300 rounded-[6px] focus:outline-none focus:ring-2 focus:ring-primary/50"
                 />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Required Work Hours <span className="text-xs text-gray-400">(optional)</span>
+                </label>
+                <input
+                  type="number"
+                  min="0"
+                  value={form.requiredWorkHours}
+                  onChange={(e) => setForm({ ...form, requiredWorkHours: e.target.value })}
+                  placeholder="e.g. 30"
+                  className="w-full px-3 py-2 text-sm border border-gray-300 rounded-[6px] focus:outline-none focus:ring-2 focus:ring-primary/50"
+                />
+                <p className="text-xs text-gray-500 mt-1">Shown as a progress bar on the learner Work Hours page. Leave blank to disable.</p>
               </div>
             </div>
             <div>

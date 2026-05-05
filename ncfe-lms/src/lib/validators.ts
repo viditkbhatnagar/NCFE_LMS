@@ -187,6 +187,7 @@ export const qualificationCreateSchema = z.object({
   awardingBody: z.string().optional().default('NCFE/CACHE'),
   description: z.string().optional().default(''),
   status: z.enum(['active', 'inactive']).optional().default('active'),
+  requiredWorkHours: z.number().int().min(0).max(10000).optional(),
 });
 
 export const qualificationUpdateSchema = qualificationCreateSchema.partial();

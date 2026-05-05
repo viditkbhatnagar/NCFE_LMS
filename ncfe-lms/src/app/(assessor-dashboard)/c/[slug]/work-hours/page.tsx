@@ -26,6 +26,10 @@ export default function WorkHoursPage() {
   const [editingEntry, setEditingEntry] = useState<WorkHourEntryItem | null>(null);
   const [deleteConfirmId, setDeleteConfirmId] = useState<string | null>(null);
   const [deleting, setDeleting] = useState(false);
+  const [totals, setTotals] = useState<{
+    totalMinutes: number;
+    requiredWorkHours: number | null;
+  } | null>(null);
 
   const fetchEntries = useCallback(async () => {
     if (!currentEnrollmentId) return;
@@ -46,10 +50,25 @@ export default function WorkHoursPage() {
     }
   }, [currentEnrollmentId, selectedDate]);
 
+  const fetchTotals = useCallback(async () => {
+    if (!currentEnrollmentId) return;
+    try {
+      const res = await fetch(
+        `/api/v2/work-hours/totals?enrollmentId=${currentEnrollmentId}`,
+      );
+      if (!res.ok) return;
+      const json = await res.json();
+      if (json.success) setTotals(json.data);
+    } catch (err) {
+      console.error('Error fetching work hours totals:', err);
+    }
+  }, [currentEnrollmentId]);
+
   useEffect(() => {
     setEntries([]);
     fetchEntries();
-  }, [fetchEntries]);
+    fetchTotals();
+  }, [fetchEntries, fetchTotals]);
 
   const handleNewClick = () => {
     if (!selectedLearner) return;
@@ -75,6 +94,7 @@ export default function WorkHoursPage() {
       if (json.success) {
         setDeleteConfirmId(null);
         fetchEntries();
+        fetchTotals();
       }
     } catch (err) {
       console.error('Error deleting entry:', err);
@@ -87,6 +107,7 @@ export default function WorkHoursPage() {
     setShowForm(false);
     setEditingEntry(null);
     fetchEntries();
+    fetchTotals();
   };
 
   // Daily total
@@ -127,6 +148,36 @@ export default function WorkHoursPage() {
           + New
         </button>
       </div>
+
+      {/* Progress bar (G13) — shown only when the qualification has a requirement */}
+      {totals && totals.requiredWorkHours && totals.requiredWorkHours > 0 && (() => {
+        const requiredMinutes = totals.requiredWorkHours * 60;
+        const pct = Math.min(100, Math.round((totals.totalMinutes / requiredMinutes) * 100));
+        const met = totals.totalMinutes >= requiredMinutes;
+        const accumH = Math.floor(totals.totalMinutes / 60);
+        const accumM = totals.totalMinutes % 60;
+        return (
+          <div
+            data-testid="work-hours-progress"
+            className="mb-4 p-4 rounded-[8px] border border-gray-200 bg-white"
+          >
+            <div className="flex items-center justify-between mb-2">
+              <span className="text-sm font-medium text-gray-700">
+                {accumH}h {accumM}m / {totals.requiredWorkHours}h required
+              </span>
+              <span className={`text-sm font-semibold ${met ? 'text-green-600' : 'text-gray-700'}`}>
+                {met ? 'Requirement met' : `${pct}%`}
+              </span>
+            </div>
+            <div className="h-2 w-full rounded-full bg-gray-100 overflow-hidden">
+              <div
+                className={`h-full rounded-full transition-all ${met ? 'bg-green-500' : 'bg-brand-500'}`}
+                style={{ width: `${pct}%` }}
+              />
+            </div>
+          </div>
+        );
+      })()}
 
       {/* Day navigator */}
       <DayNavigator date={selectedDate} onDateChange={setSelectedDate} />

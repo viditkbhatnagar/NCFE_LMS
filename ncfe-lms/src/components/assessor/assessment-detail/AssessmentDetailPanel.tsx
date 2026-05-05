@@ -195,6 +195,7 @@ export default function AssessmentDetailPanel({
       <DetailHeader
         date={editState.date}
         title={editState.title}
+        assessmentId={assessmentId}
         signOffs={signOffs}
         saveStatus={saveStatus}
         status={editState.status}

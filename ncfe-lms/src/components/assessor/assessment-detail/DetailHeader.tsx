@@ -5,6 +5,7 @@ import type { SignOffEntry, AssessmentStatus } from '@/types';
 interface DetailHeaderProps {
   date: string;
   title: string;
+  assessmentId?: string;
   signOffs: SignOffEntry[];
   saveStatus: 'saved' | 'saving' | 'unsaved';
   status: AssessmentStatus;
@@ -55,6 +56,7 @@ const ROLE_ICONS: Record<string, { label: string; icon: React.ReactNode }> = {
 export default function DetailHeader({
   date,
   title,
+  assessmentId,
   signOffs,
   saveStatus,
   status,
@@ -169,6 +171,20 @@ export default function DetailHeader({
             Published
           </span>
         ) : null}
+
+        {/* Download PDF — visible whenever we have an assessmentId */}
+        {assessmentId && (
+          <a
+            href={`/api/v2/assessments/${assessmentId}/pdf`}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="px-3 py-1 text-xs font-medium text-gray-700 border border-gray-300 rounded-[6px] hover:bg-gray-50"
+            title="Download PDF"
+            data-testid="assessment-pdf-button"
+          >
+            PDF
+          </a>
+        )}
 
         {/* Delete — hidden for read-only */}
         {!readOnly && (

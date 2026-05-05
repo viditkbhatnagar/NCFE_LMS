@@ -8,6 +8,7 @@ export interface IQualification extends Document {
   awardingBody: string;
   description: string;
   status: 'active' | 'inactive';
+  requiredWorkHours?: number;
   createdAt: Date;
   updatedAt: Date;
 }
@@ -50,6 +51,10 @@ const QualificationSchema = new Schema<IQualification>(
       type: String,
       enum: ['active', 'inactive'],
       default: 'active',
+    },
+    requiredWorkHours: {
+      type: Number,
+      min: 0,
     },
   },
   {

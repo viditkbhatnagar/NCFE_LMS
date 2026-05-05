@@ -3,6 +3,7 @@ import dbConnect from '@/lib/db';
 import { withAuth } from '@/lib/route-guard';
 import { createAuditLog } from '@/lib/audit';
 import User from '@/models/User';
+import Enrolment from '@/models/Enrolment';
 import '@/models/Centre';
 import { adminUserUpdateSchema } from '@/lib/validators';
 
@@ -67,6 +68,32 @@ export async function PUT(
     .select('-passwordHash')
     .lean();
 
+  // G16 — when an existing student is promoted/demoted to a non-student role,
+  // withdraw all of their active enrolments (they can't be a learner anymore).
+  let withdrawnEnrolments = 0;
+  if (
+    validation.data.role &&
+    validation.data.role !== 'student' &&
+    (old as { role?: string }).role === 'student'
+  ) {
+    const result = await Enrolment.updateMany(
+      { userId: id, status: { $in: ['enrolled', 'in_progress'] } },
+      { $set: { status: 'withdrawn' } }
+    );
+    withdrawnEnrolments = result.modifiedCount;
+  }
+
+  if (validation.data.role && validation.data.role !== (old as { role?: string }).role) {
+    await createAuditLog({
+      userId: session!.user.id,
+      action: 'USER_ROLE_CHANGED',
+      entityType: 'User',
+      entityId: id,
+      oldValue: { role: (old as { role?: string }).role },
+      newValue: { role: validation.data.role, withdrawnEnrolments },
+    });
+  }
+
   await createAuditLog({
     userId: session!.user.id,
     action: 'USER_UPDATED',
@@ -76,7 +103,7 @@ export async function PUT(
     newValue: validation.data,
   });
 
-  return NextResponse.json({ success: true, data: updated });
+  return NextResponse.json({ success: true, data: updated, withdrawnEnrolments });
 }
 
 export async function DELETE(

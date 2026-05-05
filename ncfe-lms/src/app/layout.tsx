@@ -1,6 +1,7 @@
 import type { Metadata } from 'next';
 import { Inter } from 'next/font/google';
 import SessionProvider from '@/components/providers/SessionProvider';
+import CookieConsentBanner from '@/components/CookieConsentBanner';
 import './globals.css';
 
 const inter = Inter({
@@ -22,6 +23,7 @@ export default function RootLayout({
     <html lang="en">
       <body className={`${inter.variable} antialiased`}>
         <SessionProvider>{children}</SessionProvider>
+        <CookieConsentBanner />
       </body>
     </html>
   );
