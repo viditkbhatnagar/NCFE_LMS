@@ -3,9 +3,9 @@ import bcrypt from 'bcryptjs';
 import dbConnect from '@/lib/db';
 import { withAuth } from '@/lib/route-guard';
 import { createAuditLog } from '@/lib/audit';
+import { sendWelcomeEmail } from '@/lib/email';
+import { generatePassword } from '@/lib/password-generator';
 import User from '@/models/User';
-import { adminPasswordResetSchema } from '@/lib/validators';
-import { sendPasswordResetEmail } from '@/lib/email';
 
 export async function POST(
   req: NextRequest,
@@ -17,21 +17,13 @@ export async function POST(
   await dbConnect();
 
   const { id } = await params;
-  const body = await req.json();
-  const validation = adminPasswordResetSchema.safeParse(body);
-  if (!validation.success) {
-    return NextResponse.json(
-      { success: false, errors: validation.error.flatten().fieldErrors },
-      { status: 400 }
-    );
-  }
-
   const user = await User.findById(id);
   if (!user) {
     return NextResponse.json({ success: false, error: 'Not found' }, { status: 404 });
   }
 
-  const hashedPassword = await bcrypt.hash(validation.data.newPassword, 12);
+  const newPassword = generatePassword();
+  const hashedPassword = await bcrypt.hash(newPassword, 12);
   await User.collection.updateOne(
     { _id: user._id },
     { $set: { passwordHash: hashedPassword, updatedAt: new Date() } }
@@ -42,12 +34,14 @@ export async function POST(
     action: 'PASSWORD_RESET',
     entityType: 'User',
     entityId: id,
+    newValue: { trigger: 'resend_welcome' },
   });
 
-  const emailResult = await sendPasswordResetEmail({
+  const emailResult = await sendWelcomeEmail({
     name: user.name,
     email: user.email,
-    password: validation.data.newPassword,
+    password: newPassword,
+    role: user.role,
     loginUrl: `${process.env.APP_BASE_URL || ''}/sign-in`,
   });
 
@@ -57,12 +51,13 @@ export async function POST(
     entityType: 'User',
     entityId: id,
     newValue: emailResult.ok
-      ? { template: 'password_reset', messageId: emailResult.messageId }
-      : { template: 'password_reset', error: emailResult.error },
+      ? { template: 'welcome', messageId: emailResult.messageId, trigger: 'resend' }
+      : { template: 'welcome', error: emailResult.error, trigger: 'resend' },
   });
 
   return NextResponse.json({
     success: true,
+    password: newPassword,
     emailSent: emailResult.ok,
     ...(emailResult.ok ? {} : { emailError: emailResult.error }),
   });

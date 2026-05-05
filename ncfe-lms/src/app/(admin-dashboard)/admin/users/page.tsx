@@ -11,11 +11,15 @@ interface CreatedCredentials {
   email: string;
   role: string;
   password: string;
+  emailSent: boolean;
+  emailError?: string;
 }
 
 interface ResetCredentials {
   email: string;
   password: string;
+  emailSent: boolean;
+  emailError?: string;
 }
 
 interface User {
@@ -155,6 +159,29 @@ export default function AdminUsersPage() {
     }
   };
 
+  const handleResendWelcome = async (u: User) => {
+    if (!confirm(`Resend welcome email to ${u.email}? This will generate a new password.`)) return;
+    try {
+      const res = await fetch(`/api/v2/admin/users/${u._id}/resend-welcome`, { method: 'POST' });
+      const data = await res.json();
+      if (data.success) {
+        setLastCreated({
+          name: u.name,
+          email: u.email,
+          role: u.role,
+          password: data.password,
+          emailSent: !!data.emailSent,
+          emailError: data.emailError,
+        });
+      } else {
+        alert(`Resend failed: ${data.error || 'Unknown error'}`);
+      }
+    } catch (err) {
+      console.error('Resend welcome failed:', err);
+      alert('Resend failed — see console for details.');
+    }
+  };
+
   const handleCopyResetCredentials = async () => {
     if (!lastReset) return;
     const block = `Email: ${lastReset.email}\nPassword: ${lastReset.password}\nLogin: ${SIGN_IN_URL}`;
@@ -192,6 +219,8 @@ export default function AdminUsersPage() {
             email: form.email,
             role: form.role,
             password: form.password,
+            emailSent: !!data.emailSent,
+            emailError: data.emailError,
           });
         }
         resetForm();
@@ -243,7 +272,12 @@ export default function AdminUsersPage() {
       if (data.success) {
         const targetUser = users.find((u) => u._id === resetId);
         if (targetUser) {
-          setLastReset({ email: targetUser.email, password: newPassword });
+          setLastReset({
+            email: targetUser.email,
+            password: newPassword,
+            emailSent: !!data.emailSent,
+            emailError: data.emailError,
+          });
         }
         setResetId(null);
         setNewPassword('');
@@ -486,6 +520,13 @@ export default function AdminUsersPage() {
                       >
                         Reset PW
                       </button>
+                      <button
+                        onClick={() => handleResendWelcome(u)}
+                        className="text-blue-600 hover:underline text-xs"
+                        title="Resend welcome email with a fresh password"
+                      >
+                        Resend
+                      </button>
                       {u.status === 'active' ? (
                         <button onClick={() => setConfirmAction({ id: u._id, action: 'deactivate' })} className="text-red-600 hover:underline text-xs">
                           Deactivate
@@ -642,11 +683,26 @@ export default function AdminUsersPage() {
               <div className="flex"><dt className="w-24 text-gray-500">Role:</dt><dd className="flex-1 font-medium text-gray-900 capitalize">{lastCreated.role}</dd></div>
               <div className="flex items-center"><dt className="w-24 text-gray-500">Password:</dt><dd className="flex-1 font-mono text-gray-900 break-all">{lastCreated.password}</dd></div>
             </dl>
-            <div className="mt-4 p-3 rounded-[6px] bg-amber-50 border border-amber-200 text-xs text-amber-800 flex items-start gap-2">
+            {lastCreated.emailSent ? (
+              <div className="mt-4 p-3 rounded-[6px] bg-green-50 border border-green-200 text-xs text-green-800 flex items-start gap-2">
+                <svg className="w-4 h-4 flex-shrink-0 mt-0.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                </svg>
+                <span>Email sent to <strong>{lastCreated.email}</strong> ✓ — they&rsquo;ll receive these credentials in their inbox.</span>
+              </div>
+            ) : (
+              <div className="mt-4 p-3 rounded-[6px] bg-amber-50 border border-amber-200 text-xs text-amber-800 flex items-start gap-2">
+                <svg className="w-4 h-4 flex-shrink-0 mt-0.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+                </svg>
+                <span>Email failed — please share these credentials manually. {lastCreated.emailError ? <em>Reason: {lastCreated.emailError}</em> : null}</span>
+              </div>
+            )}
+            <div className="mt-3 p-3 rounded-[6px] bg-amber-50 border border-amber-200 text-xs text-amber-800 flex items-start gap-2">
               <svg className="w-4 h-4 flex-shrink-0 mt-0.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
               </svg>
-              <span>This password won&rsquo;t be shown again. Copy it now and send it to the user.</span>
+              <span>This password won&rsquo;t be shown again. Copy it now if you need a backup.</span>
             </div>
             <div className="flex justify-end gap-3 mt-4">
               <button
@@ -681,12 +737,21 @@ export default function AdminUsersPage() {
               <div className="flex"><dt className="w-28 text-gray-500">Email:</dt><dd className="flex-1 font-medium text-gray-900 break-all">{lastReset.email}</dd></div>
               <div className="flex items-center"><dt className="w-28 text-gray-500">New password:</dt><dd className="flex-1 font-mono text-gray-900 break-all">{lastReset.password}</dd></div>
             </dl>
-            <div className="mt-4 p-3 rounded-[6px] bg-amber-50 border border-amber-200 text-xs text-amber-800 flex items-start gap-2">
-              <svg className="w-4 h-4 flex-shrink-0 mt-0.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
-              </svg>
-              <span>This password won&rsquo;t be shown again. Copy it now and send it to the user.</span>
-            </div>
+            {lastReset.emailSent ? (
+              <div className="mt-4 p-3 rounded-[6px] bg-green-50 border border-green-200 text-xs text-green-800 flex items-start gap-2">
+                <svg className="w-4 h-4 flex-shrink-0 mt-0.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                </svg>
+                <span>Email sent to <strong>{lastReset.email}</strong> ✓ — the new password is on the way.</span>
+              </div>
+            ) : (
+              <div className="mt-4 p-3 rounded-[6px] bg-amber-50 border border-amber-200 text-xs text-amber-800 flex items-start gap-2">
+                <svg className="w-4 h-4 flex-shrink-0 mt-0.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+                </svg>
+                <span>Email failed — please share this password manually. {lastReset.emailError ? <em>Reason: {lastReset.emailError}</em> : null}</span>
+              </div>
+            )}
             <div className="flex justify-end gap-3 mt-4">
               <button
                 onClick={handleCopyResetCredentials}

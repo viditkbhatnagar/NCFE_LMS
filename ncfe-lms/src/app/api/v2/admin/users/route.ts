@@ -5,6 +5,7 @@ import { createAuditLog } from '@/lib/audit';
 import User from '@/models/User';
 import '@/models/Centre';
 import { adminUserCreateSchema } from '@/lib/validators';
+import { sendWelcomeEmail } from '@/lib/email';
 
 export async function GET(req: NextRequest) {
   const { error } = await withAuth(['admin']);
@@ -88,8 +89,28 @@ export async function POST(req: NextRequest) {
     newValue: { name: validation.data.name, email: validation.data.email, role: validation.data.role },
   });
 
+  const emailResult = await sendWelcomeEmail({
+    name: user.name,
+    email: user.email,
+    password: validation.data.password,
+    role: user.role,
+    loginUrl: `${process.env.APP_BASE_URL || ''}/sign-in`,
+  });
+
+  await createAuditLog({
+    userId: session!.user.id,
+    action: emailResult.ok ? 'EMAIL_SENT' : 'EMAIL_FAILED',
+    entityType: 'User',
+    entityId: String(user._id),
+    newValue: emailResult.ok
+      ? { template: 'welcome', messageId: emailResult.messageId }
+      : { template: 'welcome', error: emailResult.error },
+  });
+
   return NextResponse.json({
     success: true,
     data: { _id: user._id, name: user.name, email: user.email, role: user.role, status: user.status },
+    emailSent: emailResult.ok,
+    ...(emailResult.ok ? {} : { emailError: emailResult.error }),
   }, { status: 201 });
 }

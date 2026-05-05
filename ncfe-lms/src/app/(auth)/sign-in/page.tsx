@@ -93,8 +93,8 @@ export default function SignInPage() {
             />
 
             <div className="flex items-center justify-end">
-              <Link href="/forgot-password" className="text-sm text-primary hover:text-primary-dark">
-                Forgot password?
+              <Link href="/forgot-password" className="text-sm text-text-secondary hover:text-primary">
+                Forgot password? Contact admin
               </Link>
             </div>
 
