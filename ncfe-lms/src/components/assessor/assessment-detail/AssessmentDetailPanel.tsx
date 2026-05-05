@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useCallback } from 'react';
 import { useAutoSave } from '@/hooks/useAutoSave';
+import ConfirmDialog from '@/components/admin/ConfirmDialog';
 import DetailHeader from './DetailHeader';
 import AssessmentKindSelector from './AssessmentKindSelector';
 import PlanSection from './PlanSection';
@@ -63,6 +64,8 @@ export default function AssessmentDetailPanel({
   const [evidenceMap, setEvidenceMap] = useState<EvidenceMapEntry[]>([]);
   const [signOffs, setSignOffs] = useState<SignOffEntry[]>([]);
   const [remarks, setRemarks] = useState<RemarkEntry[]>([]);
+  const [confirmDelete, setConfirmDelete] = useState(false);
+  const [deleting, setDeleting] = useState(false);
 
   // Auto-save hook
   const { saveStatus, scheduleUpdate, setSaveStatus } = useAutoSave<EditState>({
@@ -150,23 +153,29 @@ export default function AssessmentDetailPanel({
     }
   };
 
-  // Delete handler
-  const handleDelete = async () => {
+  // Delete handler — opens ConfirmDialog instead of native window.confirm
+  const handleDelete = () => {
     if (readOnly) return;
-    if (!window.confirm('Delete this assessment? This action cannot be undone.')) return;
+    setConfirmDelete(true);
+  };
 
+  const performDelete = async () => {
+    setDeleting(true);
     try {
       const res = await fetch(`/api/v2/assessments/${assessmentId}`, {
         method: 'DELETE',
       });
       const json = await res.json();
       if (json.success) {
+        setConfirmDelete(false);
         onDeleted();
       } else {
         alert(json.error || 'Failed to delete assessment');
       }
     } catch (err) {
       console.error('Error deleting assessment:', err);
+    } finally {
+      setDeleting(false);
     }
   };
 
@@ -264,6 +273,17 @@ export default function AssessmentDetailPanel({
           onAdded={refreshDetail}
         />
       </div>
+
+      <ConfirmDialog
+        open={confirmDelete}
+        title="Delete this assessment?"
+        message="This permanently removes the assessment and all linked criteria mappings, evidence mappings, sign-offs, remarks, and notifications. This cannot be undone."
+        confirmLabel="Delete assessment"
+        destructive
+        loading={deleting}
+        onConfirm={performDelete}
+        onCancel={() => setConfirmDelete(false)}
+      />
     </div>
   );
 }

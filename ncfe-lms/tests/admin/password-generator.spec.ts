@@ -16,7 +16,7 @@ test.describe('Admin — auto-password generator UX (Phase 1.5)', () => {
     context,
     created,
   }) => {
-    test.setTimeout(60_000);
+    test.setTimeout(180_000);
     await context.grantPermissions(['clipboard-read', 'clipboard-write']);
     await page.goto('/admin/users');
 
@@ -59,9 +59,11 @@ test.describe('Admin — auto-password generator UX (Phase 1.5)', () => {
     const finalPassword = await passwordInput.inputValue();
     await page.getByRole('button', { name: 'Create' }).click();
 
-    // Success modal with the same password
-    await expect(page.getByText('User created')).toBeVisible({ timeout: 15_000 });
-    await expect(page.getByText(finalPassword)).toBeVisible();
+    // Success modal with the same password.
+    // Brevo rejects @example.invalid recipients, so the welcome-email
+    // round-trip can take 30-60s before the route returns. Generous timeout.
+    await expect(page.getByText('User created')).toBeVisible({ timeout: 90_000 });
+    await expect(page.getByText(finalPassword).first()).toBeVisible();
 
     // Copy all credentials → clipboard contains 4-line block with prod login URL
     await page.getByRole('button', { name: /^Copy all credentials$/ }).click();

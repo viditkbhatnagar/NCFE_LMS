@@ -9,6 +9,7 @@ import FileListView from '@/components/assessor/FileListView';
 import FileUploadModal from '@/components/assessor/FileUploadModal';
 import NewFolderModal from '@/components/assessor/NewFolderModal';
 import FilePreviewModal from '@/components/assessor/FilePreviewModal';
+import ConfirmDialog from '@/components/admin/ConfirmDialog';
 import type { FileItem, FolderBreadcrumb, MaterialItem } from '@/types';
 
 type ViewMode = 'grid' | 'list';
@@ -46,6 +47,7 @@ export default function MaterialsPage() {
   const [showUploadModal, setShowUploadModal] = useState(false);
   const [showFolderModal, setShowFolderModal] = useState(false);
   const [deleteConfirmId, setDeleteConfirmId] = useState<string | null>(null);
+  const [deleting, setDeleting] = useState(false);
   const [previewItem, setPreviewItem] = useState<FileItem | null>(null);
 
   const fetchItems = useCallback(async () => {
@@ -124,13 +126,15 @@ export default function MaterialsPage() {
     }
   };
 
-  const handleDelete = async (id: string) => {
-    if (deleteConfirmId !== id) {
-      setDeleteConfirmId(id);
-      return;
-    }
+  const handleDelete = (id: string) => {
+    setDeleteConfirmId(id);
+  };
+
+  const performDelete = async () => {
+    if (!deleteConfirmId) return;
+    setDeleting(true);
     try {
-      const res = await fetch(`/api/v2/materials/${id}`, { method: 'DELETE' });
+      const res = await fetch(`/api/v2/materials/${deleteConfirmId}`, { method: 'DELETE' });
       const json = await res.json();
       if (json.success) {
         setDeleteConfirmId(null);
@@ -138,6 +142,8 @@ export default function MaterialsPage() {
       }
     } catch (err) {
       console.error('Error deleting:', err);
+    } finally {
+      setDeleting(false);
     }
   };
 
@@ -212,18 +218,16 @@ export default function MaterialsPage() {
         )}
       </div>
 
-      {/* Delete confirmation */}
-      {deleteConfirmId && (
-        <div className="fixed bottom-6 left-1/2 -translate-x-1/2 z-50 bg-gray-900 text-white px-4 py-2.5 rounded-lg shadow-lg flex items-center gap-3 text-sm">
-          <span>Click delete again to confirm</span>
-          <button
-            onClick={() => setDeleteConfirmId(null)}
-            className="text-gray-400 hover:text-white"
-          >
-            Cancel
-          </button>
-        </div>
-      )}
+      <ConfirmDialog
+        open={!!deleteConfirmId}
+        title="Delete this item?"
+        message="This permanently removes the material from storage. This action cannot be undone."
+        confirmLabel="Delete"
+        destructive
+        loading={deleting}
+        onConfirm={performDelete}
+        onCancel={() => setDeleteConfirmId(null)}
+      />
 
       {/* Modals */}
       <FileUploadModal

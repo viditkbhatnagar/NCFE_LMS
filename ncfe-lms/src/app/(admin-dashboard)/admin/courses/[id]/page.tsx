@@ -1,8 +1,9 @@
 'use client';
 
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { useParams } from 'next/navigation';
 import Link from 'next/link';
+import ConfirmDialog from '@/components/admin/ConfirmDialog';
 
 interface AssessmentCriteria {
   _id: string;
@@ -50,6 +51,24 @@ export default function CourseDetailPage() {
   const [acForm, setAcForm] = useState({ acNumber: '', description: '', evidenceRequirements: '' });
   const [showAcForm, setShowAcForm] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
+
+  // G9 — confirm dialog state for inline curriculum-tree deletes
+  const [confirmDelete, setConfirmDelete] = useState<
+    | { kind: 'unit'; id: string; label: string }
+    | { kind: 'lo'; id: string; unitId: string; label: string }
+    | { kind: 'ac'; id: string; loId: string; label: string }
+    | null
+  >(null);
+  const [confirmDeleting, setConfirmDeleting] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  // G10 — CSV import state
+  const csvFileRef = useRef<HTMLInputElement>(null);
+  const [csvText, setCsvText] = useState('');
+  const [csvDryRun, setCsvDryRun] = useState<{ units: number; los: number; acs: number; warnings: string[] } | null>(null);
+  const [csvImporting, setCsvImporting] = useState(false);
+  const [csvResult, setCsvResult] = useState<{ created: { units: number; los: number; acs: number }; skipped: { units: number; los: number; acs: number } } | null>(null);
+  const [showCsvDialog, setShowCsvDialog] = useState(false);
 
   const fetchQualification = useCallback(async () => {
     const res = await fetch(`/api/v2/admin/qualifications/${id}`);
@@ -150,19 +169,112 @@ export default function CourseDetailPage() {
     setSaving(false);
   };
 
-  const handleDeleteUnit = async (unitId: string) => {
-    await fetch(`/api/v2/admin/units/${unitId}`, { method: 'DELETE' });
-    fetchUnits();
+  const handleDeleteUnit = (unit: Unit) => {
+    setConfirmDelete({ kind: 'unit', id: unit._id, label: `${unit.unitReference} – ${unit.title}` });
   };
 
-  const handleDeleteLO = async (loId: string, unitId: string) => {
-    await fetch(`/api/v2/admin/learning-outcomes/${loId}`, { method: 'DELETE' });
-    fetchLOs(unitId);
+  const handleDeleteLO = (lo: LearningOutcome, unitId: string) => {
+    setConfirmDelete({ kind: 'lo', id: lo._id, unitId, label: `${lo.loNumber}: ${lo.description}` });
   };
 
-  const handleDeleteAC = async (acId: string, loId: string) => {
-    await fetch(`/api/v2/admin/assessment-criteria/${acId}`, { method: 'DELETE' });
-    fetchACs(loId);
+  const handleDeleteAC = (ac: AssessmentCriteria, loId: string) => {
+    setConfirmDelete({ kind: 'ac', id: ac._id, loId, label: `${ac.acNumber}: ${ac.description}` });
+  };
+
+  const performConfirmedDelete = async () => {
+    if (!confirmDelete) return;
+    setConfirmDeleting(true);
+    setError(null);
+    try {
+      let url: string;
+      if (confirmDelete.kind === 'unit') url = `/api/v2/admin/units/${confirmDelete.id}`;
+      else if (confirmDelete.kind === 'lo') url = `/api/v2/admin/learning-outcomes/${confirmDelete.id}`;
+      else url = `/api/v2/admin/assessment-criteria/${confirmDelete.id}`;
+      const res = await fetch(url, { method: 'DELETE' });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok || data.success === false) {
+        setError(data.error || `Delete failed (HTTP ${res.status})`);
+        return;
+      }
+      if (confirmDelete.kind === 'unit') fetchUnits();
+      else if (confirmDelete.kind === 'lo') fetchLOs(confirmDelete.unitId);
+      else fetchACs(confirmDelete.loId);
+      setConfirmDelete(null);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Network error');
+    } finally {
+      setConfirmDeleting(false);
+    }
+  };
+
+  // G10 — CSV curriculum import. Format: "Unit Reference, LO Number, AC Number, Description, [Evidence Requirements]"
+  const parseCsv = (text: string): Array<{ unitRef: string; loNum: string; acNum: string; desc: string; evidence: string }> => {
+    const out: Array<{ unitRef: string; loNum: string; acNum: string; desc: string; evidence: string }> = [];
+    const lines = text.split(/\r?\n/).map((l) => l.trim()).filter(Boolean);
+    if (lines.length === 0) return out;
+    // Skip header if first row looks like one
+    const startIdx = /unit\s*reference/i.test(lines[0]) ? 1 : 0;
+    for (let i = startIdx; i < lines.length; i++) {
+      // simple CSV split: respect quoted commas
+      const fields: string[] = [];
+      let cur = '';
+      let inQ = false;
+      for (const c of lines[i]) {
+        if (c === '"') { inQ = !inQ; continue; }
+        if (c === ',' && !inQ) { fields.push(cur.trim()); cur = ''; continue; }
+        cur += c;
+      }
+      fields.push(cur.trim());
+      if (fields.length < 4) continue;
+      const [unitRef, loNum, acNum, desc, evidence = ''] = fields;
+      if (!unitRef || !loNum || !acNum || !desc) continue;
+      out.push({ unitRef, loNum, acNum, desc, evidence });
+    }
+    return out;
+  };
+
+  const handleCsvFile = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    const text = await file.text();
+    setCsvText(text);
+    const rows = parseCsv(text);
+    const unitSet = new Set(rows.map((r) => r.unitRef));
+    const loSet = new Set(rows.map((r) => `${r.unitRef}::${r.loNum}`));
+    const warnings: string[] = [];
+    if (rows.length === 0) warnings.push('No valid rows detected.');
+    setCsvDryRun({ units: unitSet.size, los: loSet.size, acs: rows.length, warnings });
+  };
+
+  const submitCsvImport = async () => {
+    if (!qualification || !csvText) return;
+    setCsvImporting(true);
+    try {
+      const res = await fetch(`/api/v2/admin/qualifications/${qualification._id}/curriculum/import`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ csv: csvText }),
+      });
+      const data = await res.json();
+      if (!res.ok || !data.success) {
+        setError(data.error || `Import failed (HTTP ${res.status})`);
+        return;
+      }
+      setCsvResult(data.data);
+      fetchUnits();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Network error');
+    } finally {
+      setCsvImporting(false);
+    }
+  };
+
+  const closeCsvDialog = () => {
+    setShowCsvDialog(false);
+    setCsvText('');
+    setCsvDryRun(null);
+    setCsvResult(null);
+    if (csvFileRef.current) csvFileRef.current.value = '';
   };
 
   if (loading) {
@@ -179,16 +291,29 @@ export default function CourseDetailPage() {
         </p>
       </div>
 
+      {error && (
+        <div className="p-3 rounded-[6px] bg-red-50 border border-red-200 text-sm text-red-700">{error}</div>
+      )}
+
       {/* Units */}
       <div className="space-y-3">
         <div className="flex items-center justify-between">
           <h2 className="text-base font-semibold text-gray-900">Units ({units.length})</h2>
-          <button
-            onClick={() => setShowUnitForm(true)}
-            className="px-3 py-1.5 text-xs font-medium text-white bg-primary rounded-[6px] hover:bg-primary/90"
-          >
-            Add Unit
-          </button>
+          <div className="flex items-center gap-2">
+            <button
+              onClick={() => { setShowCsvDialog(true); setCsvText(''); setCsvDryRun(null); setCsvResult(null); }}
+              className="px-3 py-1.5 text-xs font-medium text-gray-700 border border-gray-300 rounded-[6px] hover:bg-gray-50"
+              title="Bulk-import Units, Learning Outcomes, and Assessment Criteria from CSV"
+            >
+              Import CSV
+            </button>
+            <button
+              onClick={() => setShowUnitForm(true)}
+              className="px-3 py-1.5 text-xs font-medium text-white bg-primary rounded-[6px] hover:bg-primary/90"
+            >
+              Add Unit
+            </button>
+          </div>
         </div>
 
         {showUnitForm && (
@@ -230,7 +355,7 @@ export default function CourseDetailPage() {
               </div>
               <div className="flex items-center gap-2">
                 <button
-                  onClick={(e) => { e.stopPropagation(); handleDeleteUnit(unit._id); }}
+                  onClick={(e) => { e.stopPropagation(); handleDeleteUnit(unit); }}
                   className="text-xs text-red-500 hover:underline"
                 >
                   Delete
@@ -283,7 +408,7 @@ export default function CourseDetailPage() {
                       </span>
                       <div className="flex items-center gap-2 shrink-0 ml-2">
                         <button
-                          onClick={(e) => { e.stopPropagation(); handleDeleteLO(lo._id, unit._id); }}
+                          onClick={(e) => { e.stopPropagation(); handleDeleteLO(lo, unit._id); }}
                           className="text-xs text-red-500 hover:underline"
                         >
                           Delete
@@ -331,7 +456,7 @@ export default function CourseDetailPage() {
                               <strong>{ac.acNumber}</strong> - {ac.description}
                             </span>
                             <button
-                              onClick={() => handleDeleteAC(ac._id, lo._id)}
+                              onClick={() => handleDeleteAC(ac, lo._id)}
                               className="text-xs text-red-500 hover:underline shrink-0 ml-2"
                             >
                               Delete
@@ -357,10 +482,119 @@ export default function CourseDetailPage() {
 
         {units.length === 0 && (
           <div className="bg-white rounded-[8px] border border-gray-200 p-8 text-center text-sm text-gray-400">
-            No units added yet. Click "Add Unit" to get started.
+            No units added yet. Click &ldquo;Add Unit&rdquo; to get started.
           </div>
         )}
       </div>
+
+      <ConfirmDialog
+        open={!!confirmDelete}
+        title={
+          confirmDelete?.kind === 'unit'
+            ? 'Delete this unit?'
+            : confirmDelete?.kind === 'lo'
+            ? 'Delete this learning outcome?'
+            : 'Delete this assessment criterion?'
+        }
+        message={
+          confirmDelete
+            ? `${confirmDelete.label}\n\nThis cannot be undone${
+                confirmDelete.kind === 'unit'
+                  ? ' and any nested learning outcomes / criteria will also be removed'
+                  : confirmDelete.kind === 'lo'
+                  ? ' and any nested criteria will also be removed'
+                  : ''
+              }.`
+            : ''
+        }
+        confirmLabel="Delete"
+        destructive
+        loading={confirmDeleting}
+        onConfirm={performConfirmedDelete}
+        onCancel={() => setConfirmDelete(null)}
+      />
+
+      {showCsvDialog && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center" role="dialog" aria-modal="true">
+          <div className="absolute inset-0 bg-black/50" onClick={closeCsvDialog} />
+          <div className="relative bg-white rounded-[8px] shadow-xl max-w-xl w-full mx-4 p-6 max-h-[90vh] overflow-auto">
+            <h3 className="text-lg font-semibold text-gray-900">Import curriculum from CSV</h3>
+            <p className="text-xs text-gray-600 mt-1">
+              CSV with header row. Columns: <code className="bg-gray-100 px-1 rounded">Unit Reference, LO Number, AC Number, Description, [Evidence Requirements]</code>.
+              Existing Units / LOs / ACs are matched by their reference and skipped (deduped).
+            </p>
+            <div className="mt-4 space-y-3">
+              <input
+                ref={csvFileRef}
+                type="file"
+                accept=".csv,text/csv"
+                onChange={handleCsvFile}
+                className="text-sm"
+                aria-label="CSV file"
+              />
+              <textarea
+                value={csvText}
+                onChange={(e) => { setCsvText(e.target.value); setCsvDryRun(null); }}
+                placeholder="…or paste CSV content here"
+                rows={8}
+                className="w-full px-3 py-2 text-xs font-mono border border-gray-300 rounded-[6px] focus:outline-none focus:ring-2 focus:ring-primary/50"
+              />
+              <button
+                type="button"
+                onClick={() => {
+                  const rows = parseCsv(csvText);
+                  const unitSet = new Set(rows.map((r) => r.unitRef));
+                  const loSet = new Set(rows.map((r) => `${r.unitRef}::${r.loNum}`));
+                  const warnings: string[] = [];
+                  if (rows.length === 0) warnings.push('No valid rows detected.');
+                  setCsvDryRun({ units: unitSet.size, los: loSet.size, acs: rows.length, warnings });
+                }}
+                disabled={!csvText}
+                className="px-3 py-1.5 text-xs font-medium text-gray-700 border border-gray-300 rounded-[6px] hover:bg-gray-50 disabled:opacity-50"
+              >
+                Preview
+              </button>
+
+              {csvDryRun && !csvResult && (
+                <div className="p-3 rounded-[6px] bg-blue-50 border border-blue-200 text-xs text-blue-800">
+                  Will create up to <strong>{csvDryRun.units}</strong> units, <strong>{csvDryRun.los}</strong> learning outcomes, <strong>{csvDryRun.acs}</strong> assessment criteria.
+                  {csvDryRun.warnings.length > 0 && (
+                    <ul className="mt-2 list-disc pl-4">
+                      {csvDryRun.warnings.map((w, i) => (
+                        <li key={i}>{w}</li>
+                      ))}
+                    </ul>
+                  )}
+                </div>
+              )}
+
+              {csvResult && (
+                <div className="p-3 rounded-[6px] bg-green-50 border border-green-200 text-xs text-green-800">
+                  Created <strong>{csvResult.created.units}</strong> units / <strong>{csvResult.created.los}</strong> LOs / <strong>{csvResult.created.acs}</strong> ACs.
+                  Skipped (already existed) <strong>{csvResult.skipped.units}</strong> / <strong>{csvResult.skipped.los}</strong> / <strong>{csvResult.skipped.acs}</strong>.
+                </div>
+              )}
+            </div>
+            <div className="flex justify-end gap-3 mt-4">
+              <button
+                onClick={closeCsvDialog}
+                className="px-4 py-2 text-sm font-medium text-gray-700 border border-gray-300 rounded-[6px]"
+              >
+                Close
+              </button>
+              {!csvResult && (
+                <button
+                  onClick={submitCsvImport}
+                  disabled={!csvDryRun || csvDryRun.acs === 0 || csvImporting}
+                  className="px-4 py-2 text-sm font-medium text-white bg-primary rounded-[6px] hover:bg-primary/90 disabled:opacity-50"
+                >
+                  {csvImporting ? 'Importing…' : 'Import'}
+                </button>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

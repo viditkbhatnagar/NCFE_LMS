@@ -5,6 +5,7 @@ import { useAssessorCourse } from '@/contexts/AssessorCourseContext';
 import DayNavigator from '@/components/assessor/DayNavigator';
 import WorkHourEntry from '@/components/assessor/WorkHourEntry';
 import WorkHourEntryForm from '@/components/assessor/WorkHourEntryForm';
+import ConfirmDialog from '@/components/admin/ConfirmDialog';
 import type { WorkHourEntryItem } from '@/types';
 
 function formatDateParam(date: Date): string {
@@ -24,6 +25,7 @@ export default function WorkHoursPage() {
   const [showForm, setShowForm] = useState(false);
   const [editingEntry, setEditingEntry] = useState<WorkHourEntryItem | null>(null);
   const [deleteConfirmId, setDeleteConfirmId] = useState<string | null>(null);
+  const [deleting, setDeleting] = useState(false);
 
   const fetchEntries = useCallback(async () => {
     if (!currentEnrollmentId) return;
@@ -60,13 +62,15 @@ export default function WorkHoursPage() {
     setShowForm(true);
   };
 
-  const handleDelete = async (id: string) => {
-    if (deleteConfirmId !== id) {
-      setDeleteConfirmId(id);
-      return;
-    }
+  const handleDelete = (id: string) => {
+    setDeleteConfirmId(id);
+  };
+
+  const performDelete = async () => {
+    if (!deleteConfirmId) return;
+    setDeleting(true);
     try {
-      const res = await fetch(`/api/v2/work-hours/${id}`, { method: 'DELETE' });
+      const res = await fetch(`/api/v2/work-hours/${deleteConfirmId}`, { method: 'DELETE' });
       const json = await res.json();
       if (json.success) {
         setDeleteConfirmId(null);
@@ -74,6 +78,8 @@ export default function WorkHoursPage() {
       }
     } catch (err) {
       console.error('Error deleting entry:', err);
+    } finally {
+      setDeleting(false);
     }
   };
 
@@ -177,18 +183,16 @@ export default function WorkHoursPage() {
         </div>
       )}
 
-      {/* Delete confirmation */}
-      {deleteConfirmId && (
-        <div className="fixed bottom-6 left-1/2 -translate-x-1/2 z-50 bg-gray-900 text-white px-4 py-2.5 rounded-lg shadow-lg flex items-center gap-3 text-sm">
-          <span>Click delete again to confirm</span>
-          <button
-            onClick={() => setDeleteConfirmId(null)}
-            className="text-gray-400 hover:text-white"
-          >
-            Cancel
-          </button>
-        </div>
-      )}
+      <ConfirmDialog
+        open={!!deleteConfirmId}
+        title="Delete this entry?"
+        message="This work-hours entry will be permanently removed. The action cannot be undone."
+        confirmLabel="Delete"
+        destructive
+        loading={deleting}
+        onConfirm={performDelete}
+        onCancel={() => setDeleteConfirmId(null)}
+      />
     </div>
   );
 }
