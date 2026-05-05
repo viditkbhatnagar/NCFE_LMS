@@ -72,11 +72,13 @@ test.describe('Authentication — public flows', () => {
     await expect(page.getByText(/passwords do not match/i)).toBeVisible();
   });
 
-  test('forgot-password: submission shows confirmation', async ({ page }) => {
+  test('forgot-password: directs to contact administrator', async ({ page }) => {
+    // Self-service password reset has been disabled — students cannot reset
+    // their own password. The /forgot-password page now points users at
+    // their centre administrator instead.
     await page.goto('/forgot-password');
-    await page.getByLabel('Email').fill('does-not-need-to-exist@example.invalid');
-    await page.getByRole('button', { name: /send reset link/i }).click();
-    await expect(page.getByText(/check your email/i)).toBeVisible({ timeout: 10_000 });
+    await expect(page.getByRole('heading', { name: /contact your administrator/i })).toBeVisible();
+    await expect(page.getByRole('link', { name: /back to sign in/i })).toBeVisible();
   });
 
   test('unauthenticated /c redirects to /sign-in', async ({ page }) => {
