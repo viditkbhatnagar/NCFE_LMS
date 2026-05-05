@@ -22,6 +22,10 @@ function getClient(): BrevoClient | null {
 function buildSender() {
   return {
     email: process.env.BREVO_SENDER_EMAIL || 'noreply@example.invalid',
+    // Sender display name — overridden by BREVO_SENDER_NAME if set, but
+    // we default to "NCFE LMS" (no centre prefix) so the inbox header
+    // reads cleanly. To change in production, edit BREVO_SENDER_NAME on
+    // Render → service → Environment.
     name: process.env.BREVO_SENDER_NAME || 'NCFE LMS',
   };
 }
@@ -66,7 +70,7 @@ const wrapper = (inner: string): string => `
 <html><body style="margin:0;padding:24px;background:#f3f4f6;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,sans-serif;color:#111827;line-height:1.5;">
 ${cardOpen}
 ${inner}
-<p style="margin:32px 0 0;font-size:13px;color:#6b7280;">— Learners Education NCFE LMS</p>
+<p style="margin:32px 0 0;font-size:13px;color:#6b7280;">— NCFE LMS</p>
 ${cardClose}
 </body></html>`;
 
