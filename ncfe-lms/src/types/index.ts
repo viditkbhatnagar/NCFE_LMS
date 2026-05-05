@@ -28,6 +28,7 @@ export interface SessionUser {
   name: string;
   role: UserRole;
   centreId: string;
+  mustChangePassword?: boolean;
 }
 
 // Phase 2: Assessment list item (from GET /api/v2/assessments)

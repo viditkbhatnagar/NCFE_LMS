@@ -3,6 +3,7 @@ import dbConnect from '@/lib/db';
 import { withAuth } from '@/lib/route-guard';
 import { createAuditLog } from '@/lib/audit';
 import User from '@/models/User';
+import Enrolment from '@/models/Enrolment';
 import '@/models/Centre';
 import { adminUserCreateSchema } from '@/lib/validators';
 import { sendWelcomeEmail } from '@/lib/email';
@@ -41,9 +42,30 @@ export async function GET(req: NextRequest) {
     User.countDocuments(filter),
   ]);
 
+  // G2 — enrich student rows with enrolmentCount in a single aggregate.
+  const studentIds = users
+    .filter((u) => u.role === 'student')
+    .map((u) => u._id);
+  const enrolmentCounts = studentIds.length
+    ? await Enrolment.aggregate([
+        { $match: { userId: { $in: studentIds } } },
+        { $group: { _id: '$userId', count: { $sum: 1 } } },
+      ])
+    : [];
+  const countByUser = new Map<string, number>(
+    enrolmentCounts.map((row: { _id: { toString(): string }; count: number }) => [
+      row._id.toString(),
+      row.count,
+    ]),
+  );
+  const enriched = users.map((u) => ({
+    ...u,
+    enrolmentCount: u.role === 'student' ? countByUser.get(u._id.toString()) ?? 0 : undefined,
+  }));
+
   return NextResponse.json({
     success: true,
-    data: users,
+    data: enriched,
     pagination: { page, limit, total, totalPages: Math.ceil(total / limit) },
   });
 }
@@ -79,6 +101,9 @@ export async function POST(req: NextRequest) {
     role: validation.data.role,
     phone: validation.data.phone,
     status: validation.data.status,
+    // Admin-issued credentials must be changed on first login so the admin
+    // doesn't retain knowledge of the user's working password.
+    mustChangePassword: true,
   });
 
   await createAuditLog({

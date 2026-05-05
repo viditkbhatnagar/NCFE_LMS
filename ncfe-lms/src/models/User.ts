@@ -12,6 +12,12 @@ export interface IUser extends Document {
   avatar?: string;
   status: UserStatus;
   phone?: string;
+  mustChangePassword?: boolean;
+  notificationPreferences?: {
+    signOff?: boolean;
+    iqaDecision?: boolean;
+    newEnrolment?: boolean;
+  };
   createdAt: Date;
   updatedAt: Date;
   comparePassword(candidatePassword: string): Promise<boolean>;
@@ -63,6 +69,15 @@ const UserSchema = new Schema<IUser>(
     phone: {
       type: String,
       trim: true,
+    },
+    mustChangePassword: {
+      type: Boolean,
+      default: false,
+    },
+    notificationPreferences: {
+      signOff: { type: Boolean, default: true },
+      iqaDecision: { type: Boolean, default: true },
+      newEnrolment: { type: Boolean, default: true },
     },
   },
   {

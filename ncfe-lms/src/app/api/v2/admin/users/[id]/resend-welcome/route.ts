@@ -26,7 +26,7 @@ export async function POST(
   const hashedPassword = await bcrypt.hash(newPassword, 12);
   await User.collection.updateOne(
     { _id: user._id },
-    { $set: { passwordHash: hashedPassword, updatedAt: new Date() } }
+    { $set: { passwordHash: hashedPassword, mustChangePassword: true, updatedAt: new Date() } }
   );
 
   await createAuditLog({

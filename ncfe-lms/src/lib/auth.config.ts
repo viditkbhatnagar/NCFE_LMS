@@ -26,6 +26,18 @@ export const authConfig: NextAuthConfig = {
         if (!isLoggedIn) return false; // Redirect to sign-in
 
         const role = (auth?.user as Record<string, unknown> | undefined)?.role;
+        const mustChangePassword =
+          (auth?.user as Record<string, unknown> | undefined)?.mustChangePassword === true;
+
+        // Force first-login password change. Allow only the change-password
+        // page itself, sign-out, and the API endpoint that clears the flag.
+        const isChangePasswordPath =
+          nextUrl.pathname === '/profile/change-password' ||
+          nextUrl.pathname.startsWith('/api/auth') ||
+          nextUrl.pathname.startsWith('/api/v2/users/me');
+        if (mustChangePassword && !isChangePasswordPath) {
+          return Response.redirect(new URL('/profile/change-password', nextUrl));
+        }
 
         // Protect /admin/* routes: only admin can access
         if (nextUrl.pathname.startsWith('/admin')) {
@@ -80,6 +92,7 @@ export const authConfig: NextAuthConfig = {
         token.id = user.id;
         token.role = (user as Record<string, unknown>).role;
         token.centreId = (user as Record<string, unknown>).centreId;
+        token.mustChangePassword = (user as Record<string, unknown>).mustChangePassword === true;
       }
       return token;
     },
@@ -88,6 +101,8 @@ export const authConfig: NextAuthConfig = {
         session.user.id = token.id as string;
         (session.user as unknown as Record<string, unknown>).role = token.role;
         (session.user as unknown as Record<string, unknown>).centreId = token.centreId;
+        (session.user as unknown as Record<string, unknown>).mustChangePassword =
+          token.mustChangePassword === true;
       }
       return session;
     },
