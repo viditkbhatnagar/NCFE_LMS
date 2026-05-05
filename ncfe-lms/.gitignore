@@ -58,3 +58,10 @@ next-env.d.ts
 
 # Generated fixture binaries (regenerated on demand via files-generate.ts / ffmpeg)
 /tests/fixtures/files/
+
+# Demo credentials (not for git)
+/tests/DEMO_CREDENTIALS.md
+
+# Production-test artefacts
+/tests/playwright-results-prod.json
+/tests/.auth/prod-admin.json
