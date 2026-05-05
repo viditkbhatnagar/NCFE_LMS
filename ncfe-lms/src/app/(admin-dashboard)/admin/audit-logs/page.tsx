@@ -14,7 +14,13 @@ interface AuditLog {
   timestamp: string;
 }
 
-const entityTypes = ['All', 'User', 'Qualification', 'Unit', 'LearningOutcome', 'AssessmentCriteria', 'Enrolment'];
+const entityTypes = ['All', 'User', 'Qualification', 'Unit', 'LearningOutcome', 'AssessmentCriteria', 'Enrolment', 'Assessment', 'Evidence', 'IQADecision', 'IQASample', 'AuditLog'];
+
+interface UserOption {
+  _id: string;
+  name: string;
+  email: string;
+}
 
 export default function AdminAuditLogsPage() {
   const [logs, setLogs] = useState<AuditLog[]>([]);
@@ -22,16 +28,53 @@ export default function AdminAuditLogsPage() {
   const [pagination, setPagination] = useState({ page: 1, total: 0, totalPages: 0 });
   const [entityTypeFilter, setEntityTypeFilter] = useState('All');
   const [actionFilter, setActionFilter] = useState('');
+  const [userIdFilter, setUserIdFilter] = useState('');
+  const [userSearch, setUserSearch] = useState('');
+  const [userOptions, setUserOptions] = useState<UserOption[]>([]);
+  const [fromDate, setFromDate] = useState('');
+  const [toDate, setToDate] = useState('');
+  const [sortDir, setSortDir] = useState<'desc' | 'asc'>('desc');
   const [expandedId, setExpandedId] = useState<string | null>(null);
+  const [exporting, setExporting] = useState(false);
 
-  const fetchLogs = useCallback(async () => {
-    setLoading(true);
+  // Search-as-you-type for user filter
+  useEffect(() => {
+    if (!userSearch || userSearch.length < 2) {
+      setUserOptions([]);
+      return;
+    }
+    let active = true;
+    const t = setTimeout(async () => {
+      try {
+        const res = await fetch(`/api/v2/admin/users?search=${encodeURIComponent(userSearch)}&limit=8`);
+        const data = await res.json();
+        if (active && data.success) setUserOptions(data.data as UserOption[]);
+      } catch {
+        /* ignore */
+      }
+    }, 250);
+    return () => {
+      active = false;
+      clearTimeout(t);
+    };
+  }, [userSearch]);
+
+  const buildParams = useCallback((extra?: Record<string, string>) => {
     const params = new URLSearchParams({ page: String(pagination.page), limit: '50' });
     if (entityTypeFilter !== 'All') params.set('entityType', entityTypeFilter);
     if (actionFilter) params.set('action', actionFilter);
+    if (userIdFilter) params.set('userId', userIdFilter);
+    if (fromDate) params.set('from', fromDate);
+    if (toDate) params.set('to', toDate);
+    if (sortDir === 'asc') params.set('sort', 'asc');
+    if (extra) for (const [k, v] of Object.entries(extra)) params.set(k, v);
+    return params;
+  }, [pagination.page, entityTypeFilter, actionFilter, userIdFilter, fromDate, toDate, sortDir]);
 
+  const fetchLogs = useCallback(async () => {
+    setLoading(true);
     try {
-      const res = await fetch(`/api/v2/admin/audit-logs?${params}`);
+      const res = await fetch(`/api/v2/admin/audit-logs?${buildParams()}`);
       const data = await res.json();
       if (data.success) {
         setLogs(data.data);
@@ -42,7 +85,30 @@ export default function AdminAuditLogsPage() {
     } finally {
       setLoading(false);
     }
-  }, [pagination.page, entityTypeFilter, actionFilter]);
+  }, [buildParams]);
+
+  const handleExport = async () => {
+    setExporting(true);
+    try {
+      const params = buildParams({ export: 'csv' });
+      const res = await fetch(`/api/v2/admin/audit-logs?${params}`);
+      if (!res.ok) {
+        alert(`Export failed (HTTP ${res.status})`);
+        return;
+      }
+      const blob = await res.blob();
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `audit-logs-${new Date().toISOString().slice(0, 10)}.csv`;
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      URL.revokeObjectURL(url);
+    } finally {
+      setExporting(false);
+    }
+  };
 
   useEffect(() => {
     fetchLogs();
@@ -56,23 +122,104 @@ export default function AdminAuditLogsPage() {
       </div>
 
       {/* Filters */}
-      <div className="flex flex-col sm:flex-row gap-3">
-        <select
-          value={entityTypeFilter}
-          onChange={(e) => { setEntityTypeFilter(e.target.value); setPagination((p) => ({ ...p, page: 1 })); }}
-          className="px-3 py-2 text-sm border border-gray-300 rounded-[6px] focus:outline-none focus:ring-2 focus:ring-primary/50"
-        >
-          {entityTypes.map((t) => (
-            <option key={t} value={t}>{t}</option>
-          ))}
-        </select>
-        <input
-          type="text"
-          placeholder="Filter by action..."
-          value={actionFilter}
-          onChange={(e) => { setActionFilter(e.target.value); setPagination((p) => ({ ...p, page: 1 })); }}
-          className="px-4 py-2 text-sm border border-gray-300 rounded-[6px] focus:outline-none focus:ring-2 focus:ring-primary/50 max-w-xs"
-        />
+      <div className="space-y-3">
+        <div className="flex flex-wrap gap-3 items-end">
+          <div>
+            <label className="block text-xs text-gray-500 mb-1">Entity type</label>
+            <select
+              value={entityTypeFilter}
+              onChange={(e) => { setEntityTypeFilter(e.target.value); setPagination((p) => ({ ...p, page: 1 })); }}
+              className="px-3 py-2 text-sm border border-gray-300 rounded-[6px] focus:outline-none focus:ring-2 focus:ring-primary/50"
+            >
+              {entityTypes.map((t) => (
+                <option key={t} value={t}>{t}</option>
+              ))}
+            </select>
+          </div>
+          <div>
+            <label className="block text-xs text-gray-500 mb-1">Action contains</label>
+            <input
+              type="text"
+              placeholder="USER_CREATED, EMAIL_SENT…"
+              value={actionFilter}
+              onChange={(e) => { setActionFilter(e.target.value); setPagination((p) => ({ ...p, page: 1 })); }}
+              className="px-3 py-2 text-sm border border-gray-300 rounded-[6px] focus:outline-none focus:ring-2 focus:ring-primary/50 w-56"
+            />
+          </div>
+          <div>
+            <label className="block text-xs text-gray-500 mb-1">From</label>
+            <input
+              type="date"
+              value={fromDate}
+              onChange={(e) => { setFromDate(e.target.value); setPagination((p) => ({ ...p, page: 1 })); }}
+              className="px-3 py-2 text-sm border border-gray-300 rounded-[6px] focus:outline-none focus:ring-2 focus:ring-primary/50"
+            />
+          </div>
+          <div>
+            <label className="block text-xs text-gray-500 mb-1">To</label>
+            <input
+              type="date"
+              value={toDate}
+              onChange={(e) => { setToDate(e.target.value); setPagination((p) => ({ ...p, page: 1 })); }}
+              className="px-3 py-2 text-sm border border-gray-300 rounded-[6px] focus:outline-none focus:ring-2 focus:ring-primary/50"
+            />
+          </div>
+          <div className="flex items-center gap-2 mt-5">
+            <button
+              type="button"
+              onClick={() => { setSortDir((d) => d === 'desc' ? 'asc' : 'desc'); setPagination((p) => ({ ...p, page: 1 })); }}
+              className="px-3 py-2 text-xs border border-gray-300 rounded-[6px] hover:bg-gray-50"
+              title="Toggle sort direction"
+            >
+              {sortDir === 'desc' ? '↓ Newest first' : '↑ Oldest first'}
+            </button>
+            <button
+              type="button"
+              onClick={handleExport}
+              disabled={exporting}
+              className="px-3 py-2 text-xs font-medium text-white bg-primary rounded-[6px] hover:bg-primary/90 disabled:opacity-50"
+              title="Export the current filtered view as CSV"
+            >
+              {exporting ? 'Exporting…' : 'Export CSV'}
+            </button>
+          </div>
+        </div>
+        <div className="flex flex-wrap gap-3 items-end">
+          <div className="relative">
+            <label className="block text-xs text-gray-500 mb-1">Filter by user</label>
+            <input
+              type="text"
+              placeholder="Type a name or email…"
+              value={userSearch}
+              onChange={(e) => setUserSearch(e.target.value)}
+              className="px-3 py-2 text-sm border border-gray-300 rounded-[6px] focus:outline-none focus:ring-2 focus:ring-primary/50 w-72"
+            />
+            {userOptions.length > 0 && !userIdFilter && (
+              <div className="absolute z-10 mt-1 w-72 max-h-60 overflow-auto bg-white border border-gray-200 rounded-[6px] shadow">
+                {userOptions.map((u) => (
+                  <button
+                    key={u._id}
+                    type="button"
+                    onClick={() => { setUserIdFilter(u._id); setUserSearch(u.name); setUserOptions([]); setPagination((p) => ({ ...p, page: 1 })); }}
+                    className="w-full text-left px-3 py-2 text-xs hover:bg-gray-50"
+                  >
+                    <div className="font-medium text-gray-900">{u.name}</div>
+                    <div className="text-gray-500">{u.email}</div>
+                  </button>
+                ))}
+              </div>
+            )}
+          </div>
+          {userIdFilter && (
+            <button
+              type="button"
+              onClick={() => { setUserIdFilter(''); setUserSearch(''); setPagination((p) => ({ ...p, page: 1 })); }}
+              className="text-xs text-primary hover:underline mt-5"
+            >
+              Clear user filter
+            </button>
+          )}
+        </div>
       </div>
 
       {/* Table */}
