@@ -3,9 +3,10 @@ import dbConnect from '@/lib/db';
 import { withAuth } from '@/lib/route-guard';
 import { createAuditLog } from '@/lib/audit';
 import Enrolment from '@/models/Enrolment';
-import '@/models/User';
-import '@/models/Qualification';
+import User from '@/models/User';
+import Qualification from '@/models/Qualification';
 import { adminEnrolmentCreateSchema } from '@/lib/validators';
+import { sendNewEnrolmentEmail } from '@/lib/email';
 
 export async function GET(req: NextRequest) {
   const { error } = await withAuth(['admin']);
@@ -19,11 +20,13 @@ export async function GET(req: NextRequest) {
   const qualificationId = searchParams.get('qualificationId');
   const status = searchParams.get('status');
   const assessorId = searchParams.get('assessorId');
+  const userId = searchParams.get('userId');
 
   const filter: Record<string, unknown> = {};
   if (qualificationId) filter.qualificationId = qualificationId;
   if (status) filter.status = status;
   if (assessorId) filter.assessorId = assessorId;
+  if (userId) filter.userId = userId;
 
   const [enrolments, total] = await Promise.all([
     Enrolment.find(filter)
@@ -84,5 +87,55 @@ export async function POST(req: NextRequest) {
     newValue: validation.data,
   });
 
+  // G7 — email the student that they've been enrolled (soft-fail, opt-out aware).
+  void notifyStudentOfEnrolment(
+    validation.data.userId,
+    validation.data.qualificationId,
+    validation.data.assessorId,
+    String(enrolment._id),
+    session!.user.id,
+  );
+
   return NextResponse.json({ success: true, data: enrolment }, { status: 201 });
+}
+
+async function notifyStudentOfEnrolment(
+  userId: string,
+  qualificationId: string,
+  assessorId: string | undefined,
+  enrolmentId: string,
+  adminUserId: string,
+): Promise<void> {
+  try {
+    const [student, qualification, assessor] = await Promise.all([
+      User.findById(userId).lean<{ name: string; email: string; role: string; notificationPreferences?: { newEnrolment?: boolean } } | null>(),
+      Qualification.findById(qualificationId).lean<{ title: string } | null>(),
+      assessorId
+        ? User.findById(assessorId).lean<{ name: string } | null>()
+        : Promise.resolve(null),
+    ]);
+    if (!student || !qualification) return;
+    if (student.role !== 'student') return;
+    if (student.notificationPreferences?.newEnrolment === false) return;
+
+    const result = await sendNewEnrolmentEmail({
+      studentName: student.name,
+      studentEmail: student.email,
+      qualificationTitle: qualification.title,
+      assessorName: assessor?.name,
+      loginUrl: `${process.env.APP_BASE_URL || ''}/sign-in`,
+    });
+
+    await createAuditLog({
+      userId: adminUserId,
+      action: result.ok ? 'EMAIL_SENT' : 'EMAIL_FAILED',
+      entityType: 'Enrolment',
+      entityId: enrolmentId,
+      newValue: result.ok
+        ? { template: 'new_enrolment', messageId: result.messageId, recipient: userId }
+        : { template: 'new_enrolment', error: result.error, recipient: userId },
+    });
+  } catch (err) {
+    console.warn('[notifyStudentOfEnrolment] soft-fail:', err);
+  }
 }

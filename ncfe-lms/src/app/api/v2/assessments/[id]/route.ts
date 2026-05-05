@@ -8,7 +8,10 @@ import AssessmentEvidenceMap from '@/models/AssessmentEvidenceMap';
 import SignOff from '@/models/SignOff';
 import Remark from '@/models/Remark';
 import Notification from '@/models/Notification';
+import User from '@/models/User';
 import { createNotification } from '@/lib/notifications';
+import { sendSignOffEmail } from '@/lib/email';
+import { createAuditLog } from '@/lib/audit';
 import '@/models/AssessmentCriteria'; // register schema for populate
 import '@/models/Unit'; // register schema for nested populate
 import '@/models/LearningOutcome'; // register schema for nested populate
@@ -185,6 +188,8 @@ export async function PUT(
           entityType: 'Assessment',
           entityId: assessment._id.toString(),
         });
+        // G7 — email the student (soft-fail, opt-out aware)
+        void notifyLearnerOfSignOff(learnerId, assessment._id.toString(), assessment.title, session!.user.id);
       }
     }
 
@@ -263,5 +268,50 @@ export async function DELETE(
       { success: false, error: 'Internal server error' },
       { status: 500 }
     );
+  }
+}
+
+// G7 — email the learner that their assessment has been signed off.
+// Honors notificationPreferences.signOff (defaults to true if unset).
+// Soft-fail: never throws; audit-logs every attempt.
+async function notifyLearnerOfSignOff(
+  learnerId: string,
+  assessmentId: string,
+  assessmentTitle: string,
+  assessorId: string,
+): Promise<void> {
+  try {
+    const [learner, assessor, latestRemark] = await Promise.all([
+      User.findById(learnerId).lean<{ name: string; email: string; notificationPreferences?: { signOff?: boolean } } | null>(),
+      User.findById(assessorId).lean<{ name: string } | null>(),
+      Remark.findOne({ assessmentId }).sort({ createdAt: -1 }).lean<{ content?: string } | null>(),
+    ]);
+    if (!learner) return;
+    if (learner.notificationPreferences?.signOff === false) return;
+
+    const baseUrl = process.env.APP_BASE_URL || '';
+    const assessmentUrl = `${baseUrl}/c?focus=${assessmentId}`;
+    const remarksExcerpt = (latestRemark?.content ?? '').slice(0, 200);
+
+    const result = await sendSignOffEmail({
+      studentName: learner.name,
+      studentEmail: learner.email,
+      assessmentTitle,
+      assessorName: assessor?.name ?? 'Your assessor',
+      remarksExcerpt,
+      assessmentUrl,
+    });
+
+    await createAuditLog({
+      userId: assessorId,
+      action: result.ok ? 'EMAIL_SENT' : 'EMAIL_FAILED',
+      entityType: 'Assessment',
+      entityId: assessmentId,
+      newValue: result.ok
+        ? { template: 'sign_off', messageId: result.messageId, recipient: learnerId }
+        : { template: 'sign_off', error: result.error, recipient: learnerId },
+    });
+  } catch (err) {
+    console.warn('[notifyLearnerOfSignOff] soft-fail:', err);
   }
 }

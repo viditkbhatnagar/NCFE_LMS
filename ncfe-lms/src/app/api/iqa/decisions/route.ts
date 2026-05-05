@@ -5,6 +5,9 @@ import { createAuditLog } from '@/lib/audit';
 import { iqaDecisionSchema } from '@/lib/validators';
 import IQADecision from '@/models/IQADecision';
 import IQASample from '@/models/IQASample';
+import User from '@/models/User';
+import Assessment from '@/models/Assessment';
+import { sendIqaDecisionEmail } from '@/lib/email';
 
 export async function POST(request: Request) {
   try {
@@ -67,6 +70,17 @@ export async function POST(request: Request) {
         decision,
       },
     });
+
+    // G7 — email assessor + learner about the decision (soft-fail, opt-out aware).
+    void notifyIqaDecisionRecipients(
+      sample.assessorId?.toString(),
+      sample.learnerId?.toString(),
+      sample.unitId?.toString(),
+      iqaDecision._id.toString(),
+      decision,
+      actionsForAssessor || rationale,
+      session!.user.id,
+    );
 
     return NextResponse.json(
       { success: true, data: iqaDecision },
@@ -135,5 +149,54 @@ export async function GET(request: Request) {
       { success: false, error: 'Internal server error' },
       { status: 500 }
     );
+  }
+}
+
+async function notifyIqaDecisionRecipients(
+  assessorId: string | undefined,
+  learnerId: string | undefined,
+  unitId: string | undefined,
+  decisionId: string,
+  decision: string,
+  comment: string,
+  iqaUserId: string,
+): Promise<void> {
+  try {
+    // Find an assessment matching this learner+unit so the email can deep-link
+    const assessment = unitId && learnerId
+      ? await Assessment.findOne({ learnerId, unitId, status: { $in: ['published', 'published_modified'] } })
+          .sort({ updatedAt: -1 })
+          .lean<{ _id: { toString(): string }; title: string } | null>()
+      : null;
+    const assessmentTitle = assessment?.title ?? 'your assessment';
+    const baseUrl = process.env.APP_BASE_URL || '';
+    const assessmentUrl = assessment ? `${baseUrl}/c?focus=${assessment._id.toString()}` : `${baseUrl}/c`;
+
+    const recipientIds = [assessorId, learnerId].filter((id): id is string => !!id);
+    for (const id of recipientIds) {
+      const user = await User.findById(id).lean<{ name: string; email: string; notificationPreferences?: { iqaDecision?: boolean } } | null>();
+      if (!user) continue;
+      if (user.notificationPreferences?.iqaDecision === false) continue;
+
+      const result = await sendIqaDecisionEmail({
+        recipientName: user.name,
+        recipientEmail: user.email,
+        assessmentTitle,
+        decision,
+        comment,
+        assessmentUrl,
+      });
+      await createAuditLog({
+        userId: iqaUserId,
+        action: result.ok ? 'EMAIL_SENT' : 'EMAIL_FAILED',
+        entityType: 'IQADecision',
+        entityId: decisionId,
+        newValue: result.ok
+          ? { template: 'iqa_decision', messageId: result.messageId, recipient: id }
+          : { template: 'iqa_decision', error: result.error, recipient: id },
+      });
+    }
+  } catch (err) {
+    console.warn('[notifyIqaDecisionRecipients] soft-fail:', err);
   }
 }

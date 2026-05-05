@@ -171,3 +171,131 @@ export async function sendPasswordResetEmail(args: {
     html,
   );
 }
+
+// ---------------------------------------------------------------------------
+// G7 — Notification emails for sign-off, IQA decision, new enrolment
+// ---------------------------------------------------------------------------
+
+function signOffHtmlTemplate(args: {
+  studentName: string;
+  assessmentTitle: string;
+  assessorName: string;
+  remarksExcerpt: string;
+  assessmentUrl: string;
+}): string {
+  const excerpt = args.remarksExcerpt
+    ? `<p style="margin:0 0 16px;color:#374151;"><em>"${escapeHtml(args.remarksExcerpt)}"</em></p>`
+    : '';
+  return wrapper(`
+    <h1 style="margin:0 0 8px;font-size:22px;color:#111827;">Your assessment has been reviewed</h1>
+    <p style="margin:0 0 16px;color:#374151;">Hi ${escapeHtml(args.studentName)},</p>
+    <p style="margin:0 0 16px;color:#374151;">${escapeHtml(args.assessorName)} has signed off your assessment <strong>${escapeHtml(args.assessmentTitle)}</strong>.</p>
+    ${excerpt}
+    <p style="margin:24px 0;text-align:center;"><a href="${escapeAttr(args.assessmentUrl)}" style="display:inline-block;padding:12px 24px;background:#15803d;color:#ffffff;text-decoration:none;border-radius:6px;font-weight:600;">View assessment</a></p>
+  `);
+}
+
+function iqaDecisionHtmlTemplate(args: {
+  recipientName: string;
+  assessmentTitle: string;
+  decision: string;
+  comment: string;
+  assessmentUrl: string;
+}): string {
+  const decisionLabel: Record<string, string> = {
+    approved: '✅ Approved',
+    action_required: '⚠️ Action required',
+    reassessment_required: '↻ Reassessment required',
+  };
+  return wrapper(`
+    <h1 style="margin:0 0 8px;font-size:22px;color:#111827;">IQA decision recorded</h1>
+    <p style="margin:0 0 16px;color:#374151;">Hi ${escapeHtml(args.recipientName)},</p>
+    <p style="margin:0 0 16px;color:#374151;">An Internal Quality Assurer has recorded a decision for assessment <strong>${escapeHtml(args.assessmentTitle)}</strong>.</p>
+    <div style="margin:20px 0;padding:16px;background:#f9fafb;border-radius:6px;border:1px solid #e5e7eb;font-size:14px;">
+      <div><span style="color:#6b7280;display:inline-block;width:90px;">Decision:</span><strong>${escapeHtml(decisionLabel[args.decision] ?? args.decision)}</strong></div>
+      ${args.comment ? `<div style="margin-top:8px;color:#374151;">${escapeHtml(args.comment)}</div>` : ''}
+    </div>
+    <p style="margin:24px 0;text-align:center;"><a href="${escapeAttr(args.assessmentUrl)}" style="display:inline-block;padding:12px 24px;background:#15803d;color:#ffffff;text-decoration:none;border-radius:6px;font-weight:600;">View assessment</a></p>
+  `);
+}
+
+function newEnrolmentHtmlTemplate(args: {
+  studentName: string;
+  qualificationTitle: string;
+  assessorName?: string;
+  loginUrl: string;
+}): string {
+  return wrapper(`
+    <h1 style="margin:0 0 8px;font-size:22px;color:#111827;">You've been enrolled in a new course</h1>
+    <p style="margin:0 0 16px;color:#374151;">Hi ${escapeHtml(args.studentName)},</p>
+    <p style="margin:0 0 16px;color:#374151;">You've been enrolled in <strong>${escapeHtml(args.qualificationTitle)}</strong>${args.assessorName ? ` under <strong>${escapeHtml(args.assessorName)}</strong>` : ''}. Sign in to start uploading evidence and tracking your progress.</p>
+    ${cta(args.loginUrl)}
+  `);
+}
+
+export async function sendSignOffEmail(args: {
+  studentName: string;
+  studentEmail: string;
+  assessmentTitle: string;
+  assessorName: string;
+  remarksExcerpt?: string;
+  assessmentUrl: string;
+}): Promise<SendResult> {
+  const html = signOffHtmlTemplate({
+    studentName: args.studentName,
+    assessmentTitle: args.assessmentTitle,
+    assessorName: args.assessorName,
+    remarksExcerpt: args.remarksExcerpt ?? '',
+    assessmentUrl: args.assessmentUrl,
+  });
+  return send(
+    'sign_off',
+    { email: args.studentEmail, name: args.studentName },
+    `Your assessment has been reviewed: ${args.assessmentTitle}`,
+    html,
+  );
+}
+
+export async function sendIqaDecisionEmail(args: {
+  recipientName: string;
+  recipientEmail: string;
+  assessmentTitle: string;
+  decision: string;
+  comment?: string;
+  assessmentUrl: string;
+}): Promise<SendResult> {
+  const html = iqaDecisionHtmlTemplate({
+    recipientName: args.recipientName,
+    assessmentTitle: args.assessmentTitle,
+    decision: args.decision,
+    comment: args.comment ?? '',
+    assessmentUrl: args.assessmentUrl,
+  });
+  return send(
+    'iqa_decision',
+    { email: args.recipientEmail, name: args.recipientName },
+    `IQA decision recorded for ${args.assessmentTitle}`,
+    html,
+  );
+}
+
+export async function sendNewEnrolmentEmail(args: {
+  studentName: string;
+  studentEmail: string;
+  qualificationTitle: string;
+  assessorName?: string;
+  loginUrl: string;
+}): Promise<SendResult> {
+  const html = newEnrolmentHtmlTemplate({
+    studentName: args.studentName,
+    qualificationTitle: args.qualificationTitle,
+    assessorName: args.assessorName,
+    loginUrl: args.loginUrl,
+  });
+  return send(
+    'new_enrolment',
+    { email: args.studentEmail, name: args.studentName },
+    `You've been enrolled in ${args.qualificationTitle}`,
+    html,
+  );
+}
