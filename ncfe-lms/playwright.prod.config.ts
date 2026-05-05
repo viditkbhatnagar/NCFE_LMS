@@ -37,11 +37,30 @@ export default defineConfig({
     {
       name: 'prod',
       testMatch: /prod\/.*\.spec\.ts/,
+      testIgnore: /prod\/(mobile|firefox|webkit)/,
       use: {
         ...devices['Desktop Chrome'],
         storageState: 'tests/.auth/prod-admin.json',
       },
       dependencies: ['prod-auth-setup'],
+    },
+    // Cross-browser thin smoke — sign-in only (Firefox)
+    {
+      name: 'prod-firefox',
+      testMatch: /prod\/smoke\.spec\.ts/,
+      use: { ...devices['Desktop Firefox'] },
+    },
+    // Cross-browser thin smoke — sign-in only (WebKit / Safari)
+    {
+      name: 'prod-webkit',
+      testMatch: /prod\/smoke\.spec\.ts/,
+      use: { ...devices['Desktop Safari'] },
+    },
+    // Mobile pass — uses iPhone 13 viewport for the existing mobile-smoke spec
+    {
+      name: 'prod-mobile',
+      testMatch: /prod\/mobile-smoke\.spec\.ts/,
+      use: { ...devices['iPhone 13'] },
     },
   ],
   // No webServer — production is already running.
