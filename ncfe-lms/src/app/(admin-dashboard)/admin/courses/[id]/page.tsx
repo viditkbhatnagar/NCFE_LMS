@@ -27,6 +27,14 @@ interface Unit {
   unitReference: string;
   title: string;
   description: string;
+  moduleId?: string | null;
+}
+
+interface CourseModule {
+  _id: string;
+  title: string;
+  description: string;
+  order: number;
 }
 
 interface Qualification {
@@ -41,6 +49,7 @@ export default function CourseDetailPage() {
   const { id } = useParams<{ id: string }>();
   const [qualification, setQualification] = useState<Qualification | null>(null);
   const [units, setUnits] = useState<Unit[]>([]);
+  const [modules, setModules] = useState<CourseModule[]>([]);
   const [expandedUnit, setExpandedUnit] = useState<string | null>(null);
   const [los, setLos] = useState<Record<string, LearningOutcome[]>>({});
   const [acs, setAcs] = useState<Record<string, AssessmentCriteria[]>>({});
@@ -50,6 +59,12 @@ export default function CourseDetailPage() {
 
   // Form states
   const [unitForm, setUnitForm] = useState({ unitReference: '', title: '', description: '' });
+  // Which module a newly-created unit belongs to. `null` while the form is
+  // closed; '' means "Ungrouped"; otherwise a module _id.
+  const [unitFormModuleId, setUnitFormModuleId] = useState<string | null>(null);
+  const [moduleForm, setModuleForm] = useState({ title: '', description: '' });
+  const [showModuleForm, setShowModuleForm] = useState(false);
+  const [editingModuleId, setEditingModuleId] = useState<string | null>(null);
   const [showUnitForm, setShowUnitForm] = useState(false);
   const [loForm, setLoForm] = useState({ loNumber: '', description: '' });
   const [showLoForm, setShowLoForm] = useState<string | null>(null);
@@ -59,6 +74,7 @@ export default function CourseDetailPage() {
 
   // G9 — confirm dialog state for inline curriculum-tree deletes
   const [confirmDelete, setConfirmDelete] = useState<
+    | { kind: 'module'; id: string; label: string }
     | { kind: 'unit'; id: string; label: string }
     | { kind: 'lo'; id: string; unitId: string; label: string }
     | { kind: 'ac'; id: string; loId: string; label: string }
@@ -106,11 +122,23 @@ export default function CourseDetailPage() {
     }
   }, [id]);
 
+  const fetchModules = useCallback(async () => {
+    try {
+      const res = await fetch(`/api/v2/admin/modules?qualificationId=${id}`);
+      if (!res.ok) return;
+      const data = await res.json();
+      if (data.success) setModules(data.data);
+    } catch {
+      /* modules are non-critical for page load — soft-fail */
+    }
+  }, [id]);
+
   const refetchAll = useCallback(() => {
     setLoadError(null);
     fetchQualification();
+    fetchModules();
     fetchUnits();
-  }, [fetchQualification, fetchUnits]);
+  }, [fetchQualification, fetchModules, fetchUnits]);
 
   const fetchLOs = useCallback(async (unitId: string) => {
     const res = await fetch(`/api/v2/admin/learning-outcomes?unitId=${unitId}`);
@@ -126,8 +154,9 @@ export default function CourseDetailPage() {
 
   useEffect(() => {
     fetchQualification();
+    fetchModules();
     fetchUnits();
-  }, [fetchQualification, fetchUnits]);
+  }, [fetchQualification, fetchModules, fetchUnits]);
 
   const toggleUnit = (unitId: string) => {
     if (expandedUnit === unitId) {
@@ -153,15 +182,62 @@ export default function CourseDetailPage() {
     const res = await fetch('/api/v2/admin/units', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ ...unitForm, qualificationId: id }),
+      body: JSON.stringify({
+        ...unitForm,
+        qualificationId: id,
+        ...(unitFormModuleId ? { moduleId: unitFormModuleId } : {}),
+      }),
     });
     const data = await res.json();
     if (data.success) {
       setShowUnitForm(false);
+      setUnitFormModuleId(null);
       setUnitForm({ unitReference: '', title: '', description: '' });
       fetchUnits();
     }
     setSaving(false);
+  };
+
+  const openUnitForm = (moduleId: string | null) => {
+    setUnitFormModuleId(moduleId);
+    setUnitForm({ unitReference: '', title: '', description: '' });
+    setShowUnitForm(true);
+  };
+
+  const handleSaveModule = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setSaving(true);
+    try {
+      const url = editingModuleId
+        ? `/api/v2/admin/modules/${editingModuleId}`
+        : '/api/v2/admin/modules';
+      const res = await fetch(url, {
+        method: editingModuleId ? 'PUT' : 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(
+          editingModuleId
+            ? { title: moduleForm.title, description: moduleForm.description }
+            : { ...moduleForm, qualificationId: id, order: modules.length },
+        ),
+      });
+      const data = await res.json();
+      if (data.success) {
+        setShowModuleForm(false);
+        setEditingModuleId(null);
+        setModuleForm({ title: '', description: '' });
+        fetchModules();
+      } else {
+        setError(data.error || 'Failed to save module');
+      }
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const handleEditModule = (m: CourseModule) => {
+    setEditingModuleId(m._id);
+    setModuleForm({ title: m.title, description: m.description || '' });
+    setShowModuleForm(true);
   };
 
   const handleAddLO = async (e: React.FormEvent, unitId: string) => {
@@ -216,7 +292,8 @@ export default function CourseDetailPage() {
     setError(null);
     try {
       let url: string;
-      if (confirmDelete.kind === 'unit') url = `/api/v2/admin/units/${confirmDelete.id}`;
+      if (confirmDelete.kind === 'module') url = `/api/v2/admin/modules/${confirmDelete.id}`;
+      else if (confirmDelete.kind === 'unit') url = `/api/v2/admin/units/${confirmDelete.id}`;
       else if (confirmDelete.kind === 'lo') url = `/api/v2/admin/learning-outcomes/${confirmDelete.id}`;
       else url = `/api/v2/admin/assessment-criteria/${confirmDelete.id}`;
       const res = await fetch(url, { method: 'DELETE' });
@@ -225,7 +302,8 @@ export default function CourseDetailPage() {
         setError(data.error || `Delete failed (HTTP ${res.status})`);
         return;
       }
-      if (confirmDelete.kind === 'unit') fetchUnits();
+      if (confirmDelete.kind === 'module') { fetchModules(); fetchUnits(); }
+      else if (confirmDelete.kind === 'unit') fetchUnits();
       else if (confirmDelete.kind === 'lo') fetchLOs(confirmDelete.unitId);
       else fetchACs(confirmDelete.loId);
       setConfirmDelete(null);
@@ -320,10 +398,12 @@ export default function CourseDetailPage() {
         <div className="p-3 rounded-[6px] bg-red-50 border border-red-200 text-sm text-red-700">{error}</div>
       )}
 
-      {/* Units */}
+      {/* Modules & Units */}
       <div className="space-y-3">
         <div className="flex items-center justify-between">
-          <h2 className="text-base font-semibold text-gray-900">Units ({units.length})</h2>
+          <h2 className="text-base font-semibold text-gray-900">
+            Curriculum — {modules.length} module{modules.length === 1 ? '' : 's'}, {units.length} unit{units.length === 1 ? '' : 's'}
+          </h2>
           <div className="flex items-center gap-2">
             <button
               onClick={() => { setShowCsvDialog(true); setCsvText(''); setCsvDryRun(null); setCsvResult(null); }}
@@ -333,16 +413,58 @@ export default function CourseDetailPage() {
               Import CSV
             </button>
             <button
-              onClick={() => setShowUnitForm(true)}
-              className="px-3 py-1.5 text-xs font-medium text-white bg-primary rounded-[6px] hover:bg-primary/90"
+              onClick={() => openUnitForm(null)}
+              className="px-3 py-1.5 text-xs font-medium text-gray-700 border border-gray-300 rounded-[6px] hover:bg-gray-50"
             >
               Add Unit
+            </button>
+            <button
+              onClick={() => { setEditingModuleId(null); setModuleForm({ title: '', description: '' }); setShowModuleForm(true); }}
+              className="px-3 py-1.5 text-xs font-medium text-white bg-primary rounded-[6px] hover:bg-primary/90"
+            >
+              Add Module
             </button>
           </div>
         </div>
 
+        {showModuleForm && (
+          <form onSubmit={handleSaveModule} className="bg-white rounded-[8px] border border-gray-200 p-4 space-y-3">
+            <p className="text-sm font-semibold text-gray-900">
+              {editingModuleId ? 'Edit Module' : 'New Module'}
+            </p>
+            <input
+              placeholder="Module title (e.g. Module 1 — Principles of Assessment)"
+              value={moduleForm.title}
+              onChange={(e) => setModuleForm({ ...moduleForm, title: e.target.value })}
+              className="w-full px-3 py-2 text-sm border border-gray-300 rounded-[6px] focus:outline-none focus:ring-2 focus:ring-primary/50"
+            />
+            <input
+              placeholder="Short description (optional)"
+              value={moduleForm.description}
+              onChange={(e) => setModuleForm({ ...moduleForm, description: e.target.value })}
+              className="w-full px-3 py-2 text-sm border border-gray-300 rounded-[6px] focus:outline-none focus:ring-2 focus:ring-primary/50"
+            />
+            <div className="flex gap-2">
+              <button type="submit" disabled={saving || !moduleForm.title.trim()} className="px-3 py-1.5 text-xs font-medium text-white bg-primary rounded-[6px] disabled:opacity-50">
+                {saving ? 'Saving...' : editingModuleId ? 'Update Module' : 'Create Module'}
+              </button>
+              <button type="button" onClick={() => { setShowModuleForm(false); setEditingModuleId(null); }} className="px-3 py-1.5 text-xs font-medium text-gray-600 border border-gray-300 rounded-[6px]">
+                Cancel
+              </button>
+            </div>
+          </form>
+        )}
+
         {showUnitForm && (
           <form onSubmit={handleAddUnit} className="bg-white rounded-[8px] border border-gray-200 p-4 space-y-3">
+            <p className="text-sm font-semibold text-gray-900">
+              New Unit
+              <span className="ml-2 text-xs font-normal text-gray-400">
+                {unitFormModuleId
+                  ? `in ${modules.find((m) => m._id === unitFormModuleId)?.title ?? 'module'}`
+                  : 'ungrouped (no module)'}
+              </span>
+            </p>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
               <input
                 placeholder="Unit Reference (e.g. Unit 301)"
@@ -371,25 +493,26 @@ export default function CourseDetailPage() {
         <ListStateBoundary
           loading={loading}
           error={loadError}
-          isEmpty={units.length === 0}
+          isEmpty={units.length === 0 && modules.length === 0}
           onRetry={refetchAll}
           skeleton={<DefaultListSkeleton rows={4} />}
           emptyContent={
             <EmptyState
-              title="No units yet"
-              description="Add units, learning outcomes, and assessment criteria to build out the curriculum for this qualification."
+              title="No modules or units yet"
+              description="Add a module to group units, then add units, learning outcomes, and assessment criteria to build out the curriculum."
               cta={
                 <button
-                  onClick={() => setShowUnitForm(true)}
+                  onClick={() => { setEditingModuleId(null); setModuleForm({ title: '', description: '' }); setShowModuleForm(true); }}
                   className="px-4 py-2 text-sm font-medium text-white bg-primary rounded-[6px] hover:bg-primary/90"
                 >
-                  Add a unit
+                  Add a module
                 </button>
               }
             />
           }
         >
-        {units.map((unit) => (
+        {(() => {
+          const renderUnit = (unit: Unit) => (
           <div key={unit._id} className="bg-white rounded-[8px] border border-gray-200">
             <button
               onClick={() => toggleUnit(unit._id)}
@@ -524,14 +647,84 @@ export default function CourseDetailPage() {
               </div>
             )}
           </div>
-        ))}
+          );
+
+          // Group units under their module; units with no moduleId are "ungrouped".
+          const unitsFor = (moduleId: string | null) =>
+            units.filter((u) => (u.moduleId ?? null) === moduleId);
+          const ungrouped = unitsFor(null);
+
+          return (
+            <div className="space-y-4">
+              {modules.map((m) => {
+                const moduleUnits = unitsFor(m._id);
+                return (
+                  <div key={m._id} className="rounded-[8px] border border-gray-200 bg-gray-50/60">
+                    <div className="flex items-center justify-between px-4 py-2.5 border-b border-gray-200">
+                      <div>
+                        <span className="text-sm font-semibold text-gray-900">{m.title}</span>
+                        <span className="ml-2 text-xs text-gray-400">
+                          {moduleUnits.length} unit{moduleUnits.length === 1 ? '' : 's'}
+                        </span>
+                        {m.description && (
+                          <p className="text-xs text-gray-500 mt-0.5">{m.description}</p>
+                        )}
+                      </div>
+                      <div className="flex items-center gap-3">
+                        <button
+                          onClick={() => openUnitForm(m._id)}
+                          className="text-xs font-medium text-primary hover:underline"
+                        >
+                          + Add Unit
+                        </button>
+                        <button
+                          onClick={() => handleEditModule(m)}
+                          className="text-xs text-gray-500 hover:underline"
+                        >
+                          Edit
+                        </button>
+                        <button
+                          onClick={() => setConfirmDelete({ kind: 'module', id: m._id, label: m.title })}
+                          className="text-xs text-red-500 hover:underline"
+                        >
+                          Delete
+                        </button>
+                      </div>
+                    </div>
+                    <div className="p-3 space-y-3">
+                      {moduleUnits.length === 0 ? (
+                        <p className="text-xs text-gray-400">No units in this module yet.</p>
+                      ) : (
+                        moduleUnits.map(renderUnit)
+                      )}
+                    </div>
+                  </div>
+                );
+              })}
+
+              {ungrouped.length > 0 && (
+                <div className="rounded-[8px] border border-dashed border-gray-300">
+                  <div className="px-4 py-2.5 border-b border-gray-200">
+                    <span className="text-sm font-semibold text-gray-700">Ungrouped units</span>
+                    <span className="ml-2 text-xs text-gray-400">
+                      not assigned to a module
+                    </span>
+                  </div>
+                  <div className="p-3 space-y-3">{ungrouped.map(renderUnit)}</div>
+                </div>
+              )}
+            </div>
+          );
+        })()}
         </ListStateBoundary>
       </div>
 
       <ConfirmDialog
         open={!!confirmDelete}
         title={
-          confirmDelete?.kind === 'unit'
+          confirmDelete?.kind === 'module'
+            ? 'Delete this module?'
+            : confirmDelete?.kind === 'unit'
             ? 'Delete this unit?'
             : confirmDelete?.kind === 'lo'
             ? 'Delete this learning outcome?'
@@ -540,7 +733,9 @@ export default function CourseDetailPage() {
         message={
           confirmDelete
             ? `${confirmDelete.label}\n\nThis cannot be undone${
-                confirmDelete.kind === 'unit'
+                confirmDelete.kind === 'module'
+                  ? '. Units in this module are kept — they move to "Ungrouped units"'
+                  : confirmDelete.kind === 'unit'
                   ? ' and any nested learning outcomes / criteria will also be removed'
                   : confirmDelete.kind === 'lo'
                   ? ' and any nested criteria will also be removed'

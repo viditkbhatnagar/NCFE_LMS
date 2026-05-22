@@ -209,6 +209,7 @@ export const qualificationCreateSchema = z.object({
   description: z.string().optional().default(''),
   status: z.enum(['active', 'inactive']).optional().default('active'),
   requiredWorkHours: z.number().int().min(0).max(10000).optional(),
+  assessorIds: z.array(z.string()).optional(),
 });
 
 export const qualificationUpdateSchema = qualificationCreateSchema.partial();
@@ -218,9 +219,39 @@ export const unitCreateSchema = z.object({
   title: z.string().min(1, 'Unit title is required'),
   description: z.string().optional().default(''),
   qualificationId: z.string().min(1, 'Qualification ID is required'),
+  moduleId: z.string().optional(),
 });
 
 export const unitUpdateSchema = unitCreateSchema.partial().omit({ qualificationId: true });
+
+export const moduleCreateSchema = z.object({
+  qualificationId: z.string().min(1, 'Qualification ID is required'),
+  title: z.string().min(1, 'Module title is required'),
+  description: z.string().optional().default(''),
+  order: z.number().int().min(0).optional().default(0),
+});
+
+export const moduleUpdateSchema = moduleCreateSchema.partial().omit({ qualificationId: true });
+
+export const liveSessionCreateSchema = z.object({
+  qualificationId: z.string().min(1, 'Qualification ID is required'),
+  cohortId: z.string().optional().default(''),
+  title: z.string().min(1, 'Title is required'),
+  description: z.string().optional().default(''),
+  meetingLink: z.string().url('A valid meeting link URL is required'),
+  scheduledAt: z.string().min(1, 'Scheduled date/time is required'),
+  durationMinutes: z.number().int().min(5).max(600).optional().default(60),
+});
+
+export const liveSessionUpdateSchema = z.object({
+  cohortId: z.string().optional(),
+  title: z.string().min(1).optional(),
+  description: z.string().optional(),
+  meetingLink: z.string().url('A valid meeting link URL is required').optional(),
+  scheduledAt: z.string().min(1).optional(),
+  durationMinutes: z.number().int().min(5).max(600).optional(),
+  status: z.enum(['scheduled', 'completed', 'cancelled']).optional(),
+});
 
 export const learningOutcomeCreateSchema = z.object({
   unitId: z.string().min(1, 'Unit ID is required'),

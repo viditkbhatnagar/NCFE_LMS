@@ -5,6 +5,7 @@ export interface IUnit extends Document {
   title: string;
   description: string;
   qualificationId: mongoose.Types.ObjectId;
+  moduleId?: mongoose.Types.ObjectId;
   createdAt: Date;
   updatedAt: Date;
 }
@@ -30,6 +31,12 @@ const UnitSchema = new Schema<IUnit>(
       ref: 'Qualification',
       required: [true, 'Qualification ID is required'],
     },
+    // Optional — units created before the Module layer have no moduleId and
+    // are surfaced under an "Ungrouped" section in the admin UI.
+    moduleId: {
+      type: Schema.Types.ObjectId,
+      ref: 'Module',
+    },
   },
   {
     timestamps: true,
@@ -37,6 +44,7 @@ const UnitSchema = new Schema<IUnit>(
 );
 
 UnitSchema.index({ qualificationId: 1 });
+UnitSchema.index({ moduleId: 1 });
 
 const Unit: Model<IUnit> =
   mongoose.models.Unit || mongoose.model<IUnit>('Unit', UnitSchema);
