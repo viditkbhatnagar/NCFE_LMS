@@ -15,6 +15,14 @@ const securityHeaders = [
       "img-src 'self' data: https: blob:",
       "font-src 'self' data:",
       "connect-src 'self' https:",
+      "media-src 'self' https: blob:",
+      // frame-src: lets the in-app file preview embed S3 signed URLs and the
+      // Microsoft Office Online viewer in an <iframe>. Without this it falls
+      // back to default-src 'self' and the browser blocks the preview.
+      "frame-src 'self' https: blob:",
+      "object-src 'self' https: blob:",
+      // frame-ancestors / X-Frame-Options still prevent OUR pages being framed
+      // by third parties — this only governs what we are allowed to embed.
       "frame-ancestors 'none'",
       "base-uri 'self'",
       "form-action 'self'",

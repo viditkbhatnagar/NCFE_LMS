@@ -37,24 +37,9 @@ const TYPE_ICONS: Record<string, string> = {
 const FALLBACK_ICON =
   'M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9';
 
-function getNotificationUrl(n: Notification, courseSlug: string | null): string | null {
-  const base = courseSlug ? `/c/${courseSlug}` : null;
-  if (!base) return null;
-
-  switch (n.type) {
-    case 'assessment_published':
-    case 'assessment_updated':
-    case 'assessment_created':
-    case 'sign_off_assessor':
-    case 'sign_off_learner':
-    case 'sign_off_iqa':
-    case 'remark_added':
-      return n.entityId ? `${base}/assessment?id=${n.entityId}` : `${base}/assessment`;
-    case 'evidence_uploaded':
-      return `${base}/portfolio`;
-    default:
-      return null;
-  }
+// Navigation is resolved server-side — see /api/notifications/[id]/go.
+function notificationGoUrl(id: string): string {
+  return `/api/notifications/${id}/go`;
 }
 
 function formatFullTimestamp(dateStr: string): string {
@@ -67,23 +52,7 @@ export default function NotificationsPage() {
   const [loading, setLoading] = useState(true);
   const [page, setPage] = useState(1);
   const [hasMore, setHasMore] = useState(true);
-  const [courseSlug, setCourseSlug] = useState<string | null>(null);
   const limit = 20;
-
-  // Fetch the first available course slug for building notification URLs
-  useEffect(() => {
-    (async () => {
-      try {
-        const res = await fetch('/api/v2/assessor/courses');
-        const json = await res.json();
-        if (json.success && json.data.length > 0) {
-          setCourseSlug(json.data[0].slug);
-        }
-      } catch {
-        // silently fail
-      }
-    })();
-  }, []);
 
   const fetchNotifications = useCallback(async (pageNum: number) => {
     try {
@@ -135,9 +104,8 @@ export default function NotificationsPage() {
   }
 
   function handleClick(n: Notification) {
-    if (!n.isRead) markAsRead(n._id);
-    const url = getNotificationUrl(n, courseSlug);
-    if (url) window.location.href = url;
+    // Resolver route marks-read + redirects to the correct page.
+    window.location.href = notificationGoUrl(n._id);
   }
 
   const unreadCount = notifications.filter((n) => !n.isRead).length;
@@ -199,14 +167,13 @@ export default function NotificationsPage() {
         <>
           <div className="space-y-2">
             {notifications.map((n) => {
-              const url = getNotificationUrl(n, courseSlug);
               return (
                 <button
                   key={n._id}
                   onClick={() => handleClick(n)}
-                  className={`w-full text-left bg-white rounded-[8px] border p-4 flex gap-3 hover:shadow-sm transition-all ${
+                  className={`w-full text-left bg-white rounded-[8px] border p-4 flex gap-3 hover:shadow-sm transition-all cursor-pointer ${
                     !n.isRead ? 'border-l-4 border-l-primary bg-primary/5 border-gray-200' : 'border-gray-200'
-                  } ${url ? 'cursor-pointer' : ''}`}
+                  }`}
                 >
                   {/* Icon */}
                   <div className="shrink-0 mt-0.5">
@@ -244,13 +211,11 @@ export default function NotificationsPage() {
                   </div>
 
                   {/* Arrow */}
-                  {url && (
-                    <div className="shrink-0 self-center">
-                      <svg className="w-4 h-4 text-gray-300" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
-                      </svg>
-                    </div>
-                  )}
+                  <div className="shrink-0 self-center">
+                    <svg className="w-4 h-4 text-gray-300" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+                    </svg>
+                  </div>
                 </button>
               );
             })}

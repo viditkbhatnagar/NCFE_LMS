@@ -43,25 +43,12 @@ function formatTimestamp(dateStr: string): string {
   return `${date.toLocaleDateString([], { day: 'numeric', month: 'short' })} at ${date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}`;
 }
 
-/** Build a URL to navigate to based on notification type and entity */
-function getNotificationUrl(n: NotificationItem, courseSlug: string | null): string | null {
-  const base = courseSlug ? `/c/${courseSlug}` : null;
-  if (!base) return null;
-
-  switch (n.type) {
-    case 'assessment_published':
-    case 'assessment_updated':
-    case 'assessment_created':
-    case 'sign_off_assessor':
-    case 'sign_off_learner':
-    case 'sign_off_iqa':
-    case 'remark_added':
-      return n.entityId ? `${base}/assessment?id=${n.entityId}` : `${base}/assessment`;
-    case 'evidence_uploaded':
-      return `${base}/portfolio`;
-    default:
-      return null;
-  }
+// Navigation is resolved server-side: /api/notifications/{id}/go marks the
+// notification read and 307-redirects to the correct course page. This works
+// from any path (the old client-side resolver returned null whenever the URL
+// had no /c/{slug}/ segment, which silently broke notification clicks).
+function notificationGoUrl(id: string): string {
+  return `/api/notifications/${id}/go`;
 }
 
 const TYPE_ICONS: Record<string, string> = {
@@ -150,26 +137,11 @@ export default function NotificationBell() {
     return () => document.removeEventListener('mousedown', handleClickOutside);
   }, []);
 
-  async function handleNotificationClick(n: NotificationItem) {
-    // Mark as read if unread
-    if (!n.isRead) {
-      try {
-        await fetch(`/api/notifications/${n._id}/read`, { method: 'PUT' });
-        setNotifications((prev) =>
-          prev.map((item) => (item._id === n._id ? { ...item, isRead: true } : item))
-        );
-        setUnreadCount((c) => Math.max(0, c - 1));
-      } catch {
-        // silently fail
-      }
-    }
-
-    // Navigate to relevant page
-    const url = getNotificationUrl(n, courseSlug);
-    if (url) {
-      setOpen(false);
-      window.location.href = url;
-    }
+  function handleNotificationClick(n: NotificationItem) {
+    // The resolver route marks the notification read and redirects to the
+    // correct page, so we just navigate straight to it.
+    setOpen(false);
+    window.location.href = notificationGoUrl(n._id);
   }
 
   async function markAllAsRead() {
@@ -265,14 +237,13 @@ export default function NotificationBell() {
               </div>
             ) : (
               notifications.map((n) => {
-                const url = getNotificationUrl(n, courseSlug);
                 return (
                   <button
                     key={n._id}
                     onClick={() => handleNotificationClick(n)}
-                    className={`w-full text-left px-4 py-3 flex gap-3 hover:bg-gray-50 transition-colors border-b border-gray-50 last:border-b-0 ${
+                    className={`w-full text-left px-4 py-3 flex gap-3 hover:bg-gray-50 transition-colors border-b border-gray-50 last:border-b-0 cursor-pointer ${
                       !n.isRead ? 'bg-primary/5' : ''
-                    } ${url ? 'cursor-pointer' : ''}`}
+                    }`}
                   >
                     {/* Icon */}
                     <div className="shrink-0 mt-0.5">
@@ -308,13 +279,11 @@ export default function NotificationBell() {
                       </p>
                     </div>
                     {/* Link arrow indicator */}
-                    {url && (
-                      <div className="shrink-0 self-center">
-                        <svg className="w-4 h-4 text-gray-300" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
-                        </svg>
-                      </div>
-                    )}
+                    <div className="shrink-0 self-center">
+                      <svg className="w-4 h-4 text-gray-300" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+                      </svg>
+                    </div>
                   </button>
                 );
               })
