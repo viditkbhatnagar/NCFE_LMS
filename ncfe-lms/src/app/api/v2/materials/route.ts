@@ -8,7 +8,7 @@ import Enrolment from '@/models/Enrolment';
 
 export async function GET(request: Request) {
   try {
-    const { session, error } = await withAuth(['assessor', 'student']);
+    const { session, error } = await withAuth(['assessor', 'student', 'admin']);
     if (error) return error;
 
     const { searchParams } = new URL(request.url);
@@ -80,7 +80,7 @@ export async function GET(request: Request) {
 
 export async function POST(request: Request) {
   try {
-    const { session, error } = await withAuth(['assessor']);
+    const { session, error } = await withAuth(['assessor', 'admin']);
     if (error) return error;
 
     await dbConnect();

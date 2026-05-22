@@ -29,10 +29,25 @@ export default function AdminCoursesPage() {
   const [showForm, setShowForm] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [form, setForm] = useState({ title: '', level: 3, code: '', awardingBody: 'NCFE/CACHE', description: '', requiredWorkHours: '' });
+  const [assessorIds, setAssessorIds] = useState<string[]>([]);
+  const [assessorOptions, setAssessorOptions] = useState<{ _id: string; name: string; email: string }[]>([]);
   const [saving, setSaving] = useState(false);
   const [errors, setErrors] = useState<Record<string, string[]>>({});
   const [confirmDelete, setConfirmDelete] = useState<string | null>(null);
   const [deleting, setDeleting] = useState(false);
+
+  // Load assessors once for the course-assignment multi-select.
+  useEffect(() => {
+    (async () => {
+      try {
+        const res = await fetch('/api/v2/admin/users?role=assessor&limit=200');
+        const data = await res.json();
+        if (data.success) setAssessorOptions(data.data);
+      } catch {
+        /* non-critical */
+      }
+    })();
+  }, []);
 
   const fetchQualifications = useCallback(async () => {
     setLoading(true);
@@ -63,12 +78,13 @@ export default function AdminCoursesPage() {
 
   const resetForm = () => {
     setForm({ title: '', level: 3, code: '', awardingBody: 'NCFE/CACHE', description: '', requiredWorkHours: '' });
+    setAssessorIds([]);
     setEditingId(null);
     setShowForm(false);
     setErrors({});
   };
 
-  const handleEdit = (q: Qualification) => {
+  const handleEdit = async (q: Qualification) => {
     setForm({
       title: q.title,
       level: q.level,
@@ -77,8 +93,25 @@ export default function AdminCoursesPage() {
       description: '',
       requiredWorkHours: q.requiredWorkHours != null ? String(q.requiredWorkHours) : '',
     });
+    setAssessorIds([]);
     setEditingId(q._id);
     setShowForm(true);
+    // Pull the full record for the current assessor assignment.
+    try {
+      const res = await fetch(`/api/v2/admin/qualifications/${q._id}`);
+      const data = await res.json();
+      if (data.success && Array.isArray(data.data?.assessorIds)) {
+        setAssessorIds(data.data.assessorIds.map((a: unknown) => String(a)));
+      }
+    } catch {
+      /* leave assessor selection empty on failure */
+    }
+  };
+
+  const toggleAssessor = (id: string) => {
+    setAssessorIds((prev) =>
+      prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id],
+    );
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -103,6 +136,7 @@ export default function AdminCoursesPage() {
         const n = parseInt(form.requiredWorkHours, 10);
         if (!isNaN(n)) payload.requiredWorkHours = n;
       }
+      payload.assessorIds = assessorIds;
       const res = await fetch(url, {
         method,
         headers: { 'Content-Type': 'application/json' },
@@ -242,6 +276,32 @@ export default function AdminCoursesPage() {
                 rows={2}
                 className="w-full px-3 py-2 text-sm border border-gray-300 rounded-[6px] focus:outline-none focus:ring-2 focus:ring-primary/50"
               />
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">
+                Assigned assessors <span className="text-xs text-gray-400">(optional)</span>
+              </label>
+              <p className="text-xs text-gray-500 mb-2">
+                Assessors ticked here see this course in their dashboard immediately — even before any students are enrolled.
+              </p>
+              {assessorOptions.length === 0 ? (
+                <p className="text-xs text-gray-400">No assessors found.</p>
+              ) : (
+                <div className="max-h-40 overflow-y-auto border border-gray-200 rounded-[6px] divide-y divide-gray-100">
+                  {assessorOptions.map((a) => (
+                    <label key={a._id} className="flex items-center gap-2 px-3 py-2 text-sm hover:bg-gray-50 cursor-pointer">
+                      <input
+                        type="checkbox"
+                        checked={assessorIds.includes(a._id)}
+                        onChange={() => toggleAssessor(a._id)}
+                        className="h-4 w-4 rounded border-gray-300 text-primary focus:ring-primary/50"
+                      />
+                      <span className="text-gray-900">{a.name}</span>
+                      <span className="text-gray-400 text-xs">{a.email}</span>
+                    </label>
+                  ))}
+                </div>
+              )}
             </div>
             <div className="flex gap-3">
               <button

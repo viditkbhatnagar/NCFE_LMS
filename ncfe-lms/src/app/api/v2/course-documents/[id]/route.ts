@@ -11,7 +11,7 @@ export async function GET(
 ) {
   try {
     const { id } = await params;
-    const { session, error } = await withAuth(['assessor', 'student']);
+    const { session, error } = await withAuth(['assessor', 'student', 'admin']);
     if (error) return error;
 
     await dbConnect();
@@ -65,7 +65,7 @@ export async function PUT(
 ) {
   try {
     const { id } = await params;
-    const { session, error } = await withAuth(['assessor']);
+    const { session, error } = await withAuth(['assessor', 'admin']);
     if (error) return error;
 
     const body = await request.json();
@@ -147,7 +147,7 @@ export async function DELETE(
 ) {
   try {
     const { id } = await params;
-    const { session, error } = await withAuth(['assessor']);
+    const { session, error } = await withAuth(['assessor', 'admin']);
     if (error) return error;
 
     await dbConnect();

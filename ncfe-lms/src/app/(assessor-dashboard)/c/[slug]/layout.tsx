@@ -22,7 +22,7 @@ export default async function CourseLayout({ children, params }: Props) {
 
   const user = session.user as { id?: string; role?: UserRole; name?: string | null };
 
-  if (user.role !== 'assessor' && user.role !== 'student') {
+  if (user.role !== 'assessor' && user.role !== 'student' && user.role !== 'admin') {
     redirect('/dashboard');
   }
 
@@ -41,19 +41,18 @@ export default async function CourseLayout({ children, params }: Props) {
     );
   }
 
-  const enrollments = user.role === 'student'
-    ? await Enrolment.find({
-        userId: user.id,
-        qualificationId: qualification._id,
-      })
-        .populate('userId', 'name email')
-        .lean()
-    : await Enrolment.find({
-        assessorId: user.id,
-        qualificationId: qualification._id,
-      })
-        .populate('userId', 'name email')
-        .lean();
+  // Student → their own enrolment; assessor → enrolments they assess;
+  // admin → every enrolment on the course (admin manages all learners).
+  const enrolmentFilter =
+    user.role === 'student'
+      ? { userId: user.id, qualificationId: qualification._id }
+      : user.role === 'admin'
+        ? { qualificationId: qualification._id }
+        : { assessorId: user.id, qualificationId: qualification._id };
+
+  const enrollments = await Enrolment.find(enrolmentFilter)
+    .populate('userId', 'name email')
+    .lean();
 
   const serializedQualification = {
     _id: qualification._id.toString(),

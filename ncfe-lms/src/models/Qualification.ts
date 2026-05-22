@@ -9,6 +9,7 @@ export interface IQualification extends Document {
   description: string;
   status: 'active' | 'inactive';
   requiredWorkHours?: number;
+  assessorIds: mongoose.Types.ObjectId[];
   createdAt: Date;
   updatedAt: Date;
 }
@@ -56,6 +57,15 @@ const QualificationSchema = new Schema<IQualification>(
       type: Number,
       min: 0,
     },
+    // Assessors directly assigned to this course. Makes the course visible
+    // to an assessor on /c even before any students are enrolled — the old
+    // model only surfaced courses an assessor had an Enrolment.assessorId on.
+    assessorIds: [
+      {
+        type: Schema.Types.ObjectId,
+        ref: 'User',
+      },
+    ],
   },
   {
     timestamps: true,
