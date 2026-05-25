@@ -19,6 +19,10 @@ export interface ILiveSession extends Document {
   recordingStorageKey?: string;
   recordingStorageProvider?: 'local' | 's3';
   recordingStorageBucket?: string;
+  // External recording link (Google Drive / OneDrive / YouTube). When set,
+  // the "Watch recording" button opens this URL in a new tab — used as an
+  // alternative to uploading the file directly into S3 for large recordings.
+  recordingLink?: string;
   status: LiveSessionStatus;
   createdAt: Date;
   updatedAt: Date;
@@ -69,6 +73,7 @@ const LiveSessionSchema = new Schema<ILiveSession>(
     recordingStorageKey: { type: String, trim: true },
     recordingStorageProvider: { type: String, enum: ['local', 's3'] },
     recordingStorageBucket: { type: String, trim: true },
+    recordingLink: { type: String, trim: true },
     status: {
       type: String,
       enum: ['scheduled', 'completed', 'cancelled'],

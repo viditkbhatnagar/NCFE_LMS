@@ -116,11 +116,13 @@ export default function AssessorTopNav({ userName, userRole = 'assessor', onMenu
         </button>
       )}
 
-      {/* Logos */}
-      <div className="flex items-center gap-3 mr-4">
-        <img src="/skillhub-logo.jpeg" alt="Skill Hub" className="h-8 w-auto object-contain" />
-        <div className="hidden sm:block h-6 w-px bg-gray-200" />
-        <img src="/ncfe-logo.jpg" alt="NCFE" className="hidden sm:block h-6 w-auto object-contain" />
+      {/* Logo */}
+      <div className="flex items-center mr-4">
+        <img
+          src="/ncfe-logo.jpg"
+          alt="NCFE"
+          className="h-9 w-auto object-contain rounded"
+        />
       </div>
 
       {/* Search Bar */}

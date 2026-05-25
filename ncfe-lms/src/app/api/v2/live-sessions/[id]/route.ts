@@ -50,6 +50,11 @@ export async function PUT(
   if (validation.data.scheduledAt) {
     update.scheduledAt = new Date(validation.data.scheduledAt);
   }
+  // Adding a recording link flips status to "completed" so it appears in
+  // the past-sessions list and exposes the Watch button.
+  if (validation.data.recordingLink && !validation.data.status) {
+    update.status = 'completed';
+  }
 
   const updated = await LiveSession.findByIdAndUpdate(id, update, { new: true });
 

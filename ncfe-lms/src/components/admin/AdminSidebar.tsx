@@ -46,6 +46,15 @@ const navItems = [
     ),
   },
   {
+    label: 'Live Sessions',
+    href: '/admin/live-sessions',
+    icon: (
+      <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 10l4.553-2.276A1 1 0 0121 8.618v6.764a1 1 0 01-1.447.894L15 14M5 18h8a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v8a2 2 0 002 2z" />
+      </svg>
+    ),
+  },
+  {
     label: 'Audit Logs',
     href: '/admin/audit-logs',
     icon: (
@@ -69,10 +78,12 @@ export default function AdminSidebar({ userName }: AdminSidebarProps) {
       {/* Logos */}
       <div className="flex items-center justify-between p-4 border-b border-secondary-light">
         {!collapsed && (
-          <div className="flex items-center gap-2">
-            <img src="/skillhub-logo.jpeg" alt="Skill Hub" className="h-8 w-auto object-contain" />
-            <div className="h-5 w-px bg-gray-500" />
-            <img src="/ncfe-logo.jpg" alt="NCFE" className="h-5 w-auto object-contain brightness-0 invert" />
+          <div className="flex items-center">
+            <img
+              src="/ncfe-logo.jpg"
+              alt="NCFE"
+              className="h-10 w-auto object-contain rounded bg-white px-1.5 py-1"
+            />
           </div>
         )}
         <button

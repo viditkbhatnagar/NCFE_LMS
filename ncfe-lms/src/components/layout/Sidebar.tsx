@@ -223,10 +223,12 @@ export default function Sidebar({ role, userName }: SidebarProps) {
       {/* Logos */}
       <div className="flex items-center justify-between p-4 border-b border-secondary-light">
         {!collapsed && (
-          <div className="flex items-center gap-2">
-            <img src="/skillhub-logo.jpeg" alt="Skill Hub" className="h-8 w-auto object-contain" />
-            <div className="h-5 w-px bg-gray-500" />
-            <img src="/ncfe-logo.jpg" alt="NCFE" className="h-5 w-auto object-contain brightness-0 invert" />
+          <div className="flex items-center">
+            <img
+              src="/ncfe-logo.jpg"
+              alt="NCFE"
+              className="h-10 w-auto object-contain rounded bg-white px-1.5 py-1"
+            />
           </div>
         )}
         <button

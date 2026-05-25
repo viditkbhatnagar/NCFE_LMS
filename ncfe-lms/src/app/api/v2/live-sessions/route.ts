@@ -5,6 +5,7 @@ import { createAuditLog } from '@/lib/audit';
 import { createNotification } from '@/lib/notifications';
 import LiveSession from '@/models/LiveSession';
 import Enrolment from '@/models/Enrolment';
+import Qualification from '@/models/Qualification';
 import { liveSessionCreateSchema } from '@/lib/validators';
 
 // GET /api/v2/live-sessions?qualificationId=X
@@ -17,14 +18,37 @@ export async function GET(req: NextRequest) {
   await dbConnect();
 
   const qualificationId = req.nextUrl.searchParams.get('qualificationId');
+  const user = session!.user;
+
+  // Admin without a qualificationId → cross-course view (the dedicated
+  // /admin/live-sessions page). Returns every session with the course title
+  // joined in, so the admin UI can render "course — session" rows.
   if (!qualificationId) {
-    return NextResponse.json(
-      { success: false, error: 'qualificationId is required' },
-      { status: 400 },
+    if (user.role !== 'admin') {
+      return NextResponse.json(
+        { success: false, error: 'qualificationId is required' },
+        { status: 400 },
+      );
+    }
+    const sessions = await LiveSession.find({})
+      .sort({ scheduledAt: -1 })
+      .lean();
+    const qids = Array.from(new Set(sessions.map((s) => String(s.qualificationId))));
+    const quals = await Qualification.find({ _id: { $in: qids } })
+      .select('title slug code')
+      .lean();
+    const byId = new Map(
+      quals.map((q) => [String(q._id), { title: q.title, slug: q.slug, code: q.code }]),
     );
+    return NextResponse.json({
+      success: true,
+      data: sessions.map((s) => ({
+        ...s,
+        qualification: byId.get(String(s.qualificationId)) ?? null,
+      })),
+    });
   }
 
-  const user = session!.user;
   const filter: Record<string, unknown> = { qualificationId };
 
   // Students are scoped to their cohort(s) + any all-cohort sessions.
@@ -83,7 +107,10 @@ export async function POST(req: NextRequest) {
     scheduledAt: new Date(data.scheduledAt),
     durationMinutes: data.durationMinutes ?? 60,
     createdBy: session!.user.id,
-    status: 'scheduled',
+    recordingLink: data.recordingLink || undefined,
+    // If a recording link is provided up front, mark the session as completed
+    // (typical case: admin schedules a past session retroactively + paste link).
+    status: data.recordingLink ? 'completed' : 'scheduled',
   });
 
   await createAuditLog({

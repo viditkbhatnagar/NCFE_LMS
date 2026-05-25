@@ -1,7 +1,6 @@
 'use client';
 
 import { useState, useEffect, useCallback, useRef } from 'react';
-import { useAssessorCourse } from '@/contexts/AssessorCourseContext';
 import ConfirmDialog from '@/components/admin/ConfirmDialog';
 import ListStateBoundary, {
   DefaultListSkeleton,
@@ -10,6 +9,7 @@ import ListStateBoundary, {
 
 interface LiveSession {
   _id: string;
+  qualificationId: string;
   title: string;
   description: string;
   cohortId: string;
@@ -19,9 +19,17 @@ interface LiveSession {
   status: 'scheduled' | 'completed' | 'cancelled';
   recordingUrl?: string;
   recordingLink?: string;
+  qualification?: { title: string; slug: string; code: string } | null;
+}
+
+interface CourseOption {
+  _id: string;
+  title: string;
+  code: string;
 }
 
 const EMPTY_FORM = {
+  qualificationId: '',
   title: '',
   description: '',
   cohortId: '',
@@ -43,14 +51,13 @@ function fmtDateTime(iso: string): string {
   });
 }
 
-export default function LiveSessionsPage() {
-  const { qualification, userRole } = useAssessorCourse();
-  const canManage = userRole === 'assessor' || userRole === 'admin';
-
+export default function AdminLiveSessionsPage() {
   const [sessions, setSessions] = useState<LiveSession[]>([]);
-  const [cohorts, setCohorts] = useState<string[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+
+  const [courseOptions, setCourseOptions] = useState<CourseOption[]>([]);
+  const [cohortsForCourse, setCohortsForCourse] = useState<string[]>([]);
 
   const [showForm, setShowForm] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
@@ -68,29 +75,57 @@ export default function LiveSessionsPage() {
     setLoading(true);
     setError(null);
     try {
-      const res = await fetch(`/api/v2/live-sessions?qualificationId=${qualification._id}`);
+      const res = await fetch('/api/v2/live-sessions');
       if (!res.ok) {
         setError('The server returned an error. Please try again.');
         return;
       }
       const json = await res.json();
-      if (json.success) {
-        setSessions(json.data);
-        setCohorts(json.cohorts || []);
-      } else {
-        setError(json.error || 'Failed to load live sessions.');
-      }
+      if (json.success) setSessions(json.data);
+      else setError(json.error || 'Failed to load live sessions.');
     } catch (err) {
       console.error('Error fetching live sessions:', err);
       setError('Network error. Check your connection and retry.');
     } finally {
       setLoading(false);
     }
-  }, [qualification._id]);
+  }, []);
+
+  // Load courses once for the create form's course picker.
+  useEffect(() => {
+    (async () => {
+      try {
+        const res = await fetch('/api/v2/admin/qualifications?limit=200&status=active');
+        const json = await res.json();
+        if (json.success) setCourseOptions(json.data);
+      } catch {
+        /* non-critical */
+      }
+    })();
+  }, []);
 
   useEffect(() => {
     fetchSessions();
   }, [fetchSessions]);
+
+  // When the form's course changes, pull that course's cohorts for the picker.
+  useEffect(() => {
+    if (!form.qualificationId) {
+      setCohortsForCourse([]);
+      return;
+    }
+    let cancelled = false;
+    (async () => {
+      try {
+        const res = await fetch(`/api/v2/live-sessions?qualificationId=${form.qualificationId}`);
+        const json = await res.json();
+        if (!cancelled && json.success) setCohortsForCourse(json.cohorts || []);
+      } catch {
+        /* ignore */
+      }
+    })();
+    return () => { cancelled = true; };
+  }, [form.qualificationId]);
 
   const openCreate = () => {
     setEditingId(null);
@@ -102,11 +137,11 @@ export default function LiveSessionsPage() {
   const openEdit = (s: LiveSession) => {
     setEditingId(s._id);
     setForm({
+      qualificationId: s.qualificationId,
       title: s.title,
       description: s.description || '',
       cohortId: s.cohortId || '',
       meetingLink: s.meetingLink,
-      // datetime-local wants 'YYYY-MM-DDTHH:mm'
       scheduledAt: new Date(s.scheduledAt).toISOString().slice(0, 16),
       durationMinutes: s.durationMinutes,
       recordingLink: s.recordingLink || '',
@@ -127,14 +162,12 @@ export default function LiveSessionsPage() {
         method: editingId ? 'PUT' : 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          ...(editingId ? {} : { qualificationId: qualification._id }),
+          ...(editingId ? {} : { qualificationId: form.qualificationId }),
           title: form.title,
           description: form.description,
           cohortId: form.cohortId,
           meetingLink: form.meetingLink,
-          scheduledAt: form.scheduledAt
-            ? new Date(form.scheduledAt).toISOString()
-            : '',
+          scheduledAt: form.scheduledAt ? new Date(form.scheduledAt).toISOString() : '',
           durationMinutes: Number(form.durationMinutes) || 60,
           recordingLink: form.recordingLink || '',
         }),
@@ -191,51 +224,47 @@ export default function LiveSessionsPage() {
     }
   };
 
-  const now = Date.now();
-  const upcoming = sessions.filter(
-    (s) => s.status !== 'cancelled' && new Date(s.scheduledAt).getTime() >= now,
-  );
-  const past = sessions.filter(
-    (s) => s.status === 'cancelled' || new Date(s.scheduledAt).getTime() < now,
-  );
+  // Group sessions by course title for the rendered list.
+  const byCourse = sessions.reduce<Record<string, LiveSession[]>>((acc, s) => {
+    const key = s.qualification?.title || '— unknown course —';
+    (acc[key] ||= []).push(s);
+    return acc;
+  }, {});
 
-  const renderCard = (s: LiveSession) => {
-    const isPast = s.status === 'cancelled' || new Date(s.scheduledAt).getTime() < now;
+  const renderRow = (s: LiveSession) => {
+    const isPast =
+      s.status === 'cancelled' || new Date(s.scheduledAt).getTime() < Date.now();
     return (
-      <div key={s._id} className="bg-white rounded-[8px] border border-gray-200 p-4">
-        <div className="flex items-start justify-between gap-3">
-          <div className="min-w-0">
-            <p className="text-sm font-semibold text-gray-900">{s.title}</p>
-            <p className="text-xs text-gray-500 mt-0.5">
-              {fmtDateTime(s.scheduledAt)} · {s.durationMinutes} min
-              {s.cohortId ? ` · Cohort ${s.cohortId}` : ' · All cohorts'}
-            </p>
-            {s.description && (
-              <p className="text-xs text-gray-600 mt-1.5">{s.description}</p>
-            )}
+      <div key={s._id} className="flex items-start gap-3 px-4 py-3 border-b border-gray-100 last:border-b-0">
+        <div className="flex-1 min-w-0">
+          <div className="flex items-center gap-2">
+            <p className="text-sm font-medium text-gray-900 truncate">{s.title}</p>
+            <span
+              className={`shrink-0 px-2 py-0.5 rounded-full text-[10px] font-medium ${
+                s.status === 'cancelled'
+                  ? 'bg-red-50 text-red-600'
+                  : isPast
+                    ? 'bg-gray-100 text-gray-600'
+                    : 'bg-green-50 text-green-700'
+              }`}
+            >
+              {s.status === 'cancelled' ? 'Cancelled' : isPast ? 'Past' : 'Upcoming'}
+            </span>
           </div>
-          <span
-            className={`shrink-0 px-2 py-0.5 rounded-full text-[10px] font-medium ${
-              s.status === 'cancelled'
-                ? 'bg-red-50 text-red-600'
-                : isPast
-                  ? 'bg-gray-100 text-gray-600'
-                  : 'bg-green-50 text-green-700'
-            }`}
-          >
-            {s.status === 'cancelled' ? 'Cancelled' : isPast ? 'Past' : 'Upcoming'}
-          </span>
+          <p className="text-xs text-gray-500 mt-0.5">
+            {fmtDateTime(s.scheduledAt)} · {s.durationMinutes} min ·{' '}
+            {s.cohortId ? `Cohort ${s.cohortId}` : 'All cohorts'}
+          </p>
         </div>
-
-        <div className="flex flex-wrap items-center gap-2 mt-3">
+        <div className="flex flex-wrap items-center gap-2 shrink-0">
           {!isPast && s.status !== 'cancelled' && (
             <a
               href={s.meetingLink}
               target="_blank"
               rel="noopener noreferrer"
-              className="px-3 py-1.5 text-xs font-medium text-white bg-primary rounded-[6px] hover:bg-primary/90"
+              className="px-2.5 py-1 text-xs font-medium text-white bg-primary rounded-[6px] hover:bg-primary/90"
             >
-              Join class
+              Join
             </a>
           )}
           {(s.recordingLink || s.recordingUrl) && (
@@ -243,60 +272,53 @@ export default function LiveSessionsPage() {
               href={s.recordingLink || `/api/v2/live-sessions/${s._id}/recording/download`}
               target="_blank"
               rel="noopener noreferrer"
-              className="px-3 py-1.5 text-xs font-medium text-gray-700 border border-gray-300 rounded-[6px] hover:bg-gray-50"
+              className="px-2.5 py-1 text-xs font-medium text-gray-700 border border-gray-300 rounded-[6px] hover:bg-gray-50"
             >
-              Watch recording
+              Watch
             </a>
           )}
-          {canManage && isPast && !s.recordingLink && !s.recordingUrl && (
+          {!s.recordingLink && !s.recordingUrl && (
             <button
               onClick={() => { setUploadingFor(s._id); fileRef.current?.click(); }}
-              className="px-3 py-1.5 text-xs font-medium text-gray-700 border border-gray-300 rounded-[6px] hover:bg-gray-50"
+              className="px-2.5 py-1 text-xs font-medium text-gray-700 border border-gray-300 rounded-[6px] hover:bg-gray-50"
             >
-              Upload recording
+              Upload
             </button>
           )}
-          {canManage && (
-            <>
-              <button
-                onClick={() => openEdit(s)}
-                className="px-3 py-1.5 text-xs font-medium text-gray-600 hover:underline"
-              >
-                Edit
-              </button>
-              <button
-                onClick={() => setDeleteId(s._id)}
-                className="px-3 py-1.5 text-xs font-medium text-red-500 hover:underline"
-              >
-                Delete
-              </button>
-            </>
-          )}
+          <button
+            onClick={() => openEdit(s)}
+            className="px-2.5 py-1 text-xs font-medium text-gray-600 hover:underline"
+          >
+            Edit
+          </button>
+          <button
+            onClick={() => setDeleteId(s._id)}
+            className="px-2.5 py-1 text-xs font-medium text-red-500 hover:underline"
+          >
+            Delete
+          </button>
         </div>
       </div>
     );
   };
 
   return (
-    <div className="p-6 space-y-6">
+    <div className="space-y-6">
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-2xl font-bold text-gray-900">Live Classes</h1>
+          <h1 className="text-2xl font-bold text-gray-900">Live Sessions</h1>
           <p className="text-sm text-gray-400 mt-0.5">
-            Scheduled live sessions and recordings for this course
+            Schedule and manage live classes across every course
           </p>
         </div>
-        {canManage && (
-          <button
-            onClick={openCreate}
-            className="px-4 py-2 text-sm font-medium text-white bg-primary rounded-[6px] hover:bg-primary/90"
-          >
-            Schedule a session
-          </button>
-        )}
+        <button
+          onClick={openCreate}
+          className="px-4 py-2 text-sm font-medium text-white bg-primary rounded-[6px] hover:bg-primary/90"
+        >
+          Schedule a session
+        </button>
       </div>
 
-      {/* Hidden file input for recording uploads */}
       <input
         ref={fileRef}
         type="file"
@@ -305,18 +327,36 @@ export default function LiveSessionsPage() {
         onChange={handleRecordingPick}
       />
 
-      {/* Create / edit form */}
       {showForm && (
         <form onSubmit={handleSubmit} className="bg-white rounded-[8px] border border-gray-200 p-5 space-y-3">
           <p className="text-sm font-semibold text-gray-900">
             {editingId ? 'Edit live session' : 'Schedule a live session'}
           </p>
           {formError && <p className="text-xs text-red-600">{formError}</p>}
+          {!editingId && (
+            <div>
+              <label className="block text-xs text-gray-500 mb-1">Course</label>
+              <select
+                required
+                value={form.qualificationId}
+                onChange={(e) => setForm({ ...form, qualificationId: e.target.value, cohortId: '' })}
+                className="w-full px-3 py-2 text-sm border border-gray-300 rounded-[6px] focus:outline-none focus:ring-2 focus:ring-primary/50"
+              >
+                <option value="">Select a course…</option>
+                {courseOptions.map((c) => (
+                  <option key={c._id} value={c._id}>
+                    {c.title} ({c.code})
+                  </option>
+                ))}
+              </select>
+            </div>
+          )}
           <input
             placeholder="Session title (e.g. Week 3 — Observation practice)"
             value={form.title}
             onChange={(e) => setForm({ ...form, title: e.target.value })}
             className="w-full px-3 py-2 text-sm border border-gray-300 rounded-[6px] focus:outline-none focus:ring-2 focus:ring-primary/50"
+            required
           />
           <textarea
             placeholder="Description (optional)"
@@ -326,10 +366,12 @@ export default function LiveSessionsPage() {
             className="w-full px-3 py-2 text-sm border border-gray-300 rounded-[6px] focus:outline-none focus:ring-2 focus:ring-primary/50"
           />
           <input
+            type="url"
             placeholder="Meeting link (Zoom / Google Meet / Teams URL)"
             value={form.meetingLink}
             onChange={(e) => setForm({ ...form, meetingLink: e.target.value })}
             className="w-full px-3 py-2 text-sm border border-gray-300 rounded-[6px] focus:outline-none focus:ring-2 focus:ring-primary/50"
+            required
           />
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
             <div>
@@ -339,6 +381,7 @@ export default function LiveSessionsPage() {
                 value={form.scheduledAt}
                 onChange={(e) => setForm({ ...form, scheduledAt: e.target.value })}
                 className="w-full px-3 py-2 text-sm border border-gray-300 rounded-[6px] focus:outline-none focus:ring-2 focus:ring-primary/50"
+                required
               />
             </div>
             <div>
@@ -358,9 +401,10 @@ export default function LiveSessionsPage() {
                 value={form.cohortId}
                 onChange={(e) => setForm({ ...form, cohortId: e.target.value })}
                 className="w-full px-3 py-2 text-sm border border-gray-300 rounded-[6px] focus:outline-none focus:ring-2 focus:ring-primary/50"
+                disabled={!form.qualificationId && !editingId}
               >
                 <option value="">All cohorts</option>
-                {cohorts.map((c) => (
+                {cohortsForCourse.map((c) => (
                   <option key={c} value={c}>{c}</option>
                 ))}
               </select>
@@ -368,7 +412,7 @@ export default function LiveSessionsPage() {
           </div>
           <div>
             <label className="block text-xs text-gray-500 mb-1">
-              Recording link <span className="text-gray-400">(optional — Google Drive, OneDrive, YouTube, etc.)</span>
+              Recording link <span className="text-gray-400">(optional — Google Drive, OneDrive, YouTube)</span>
             </label>
             <input
               type="url"
@@ -378,7 +422,7 @@ export default function LiveSessionsPage() {
               className="w-full px-3 py-2 text-sm border border-gray-300 rounded-[6px] focus:outline-none focus:ring-2 focus:ring-primary/50"
             />
             <p className="text-xs text-gray-400 mt-1">
-              Paste a link to the recording instead of uploading a file. Either works — the link is shown to learners as a &ldquo;Watch recording&rdquo; button.
+              Paste a link instead of uploading the file — useful for large recordings hosted on Drive / OneDrive.
             </p>
           </div>
           <div className="flex gap-2">
@@ -405,52 +449,41 @@ export default function LiveSessionsPage() {
         error={error}
         isEmpty={sessions.length === 0}
         onRetry={fetchSessions}
-        skeleton={<DefaultListSkeleton rows={3} />}
+        skeleton={<DefaultListSkeleton rows={4} />}
         emptyContent={
           <EmptyState
-            title="No live classes yet"
-            description={
-              canManage
-                ? 'Schedule a live class with a meeting link — enrolled learners will be notified and can join from here.'
-                : 'When your assessor schedules a live class, it will appear here with a join link.'
-            }
+            title="No live sessions scheduled"
+            description="Schedule a live class on any course. Enrolled learners (or just one cohort, if you pick one) will be notified and see a Join button."
             cta={
-              canManage ? (
-                <button
-                  onClick={openCreate}
-                  className="px-4 py-2 text-sm font-medium text-white bg-primary rounded-[6px] hover:bg-primary/90"
-                >
-                  Schedule a session
-                </button>
-              ) : null
+              <button
+                onClick={openCreate}
+                className="px-4 py-2 text-sm font-medium text-white bg-primary rounded-[6px] hover:bg-primary/90"
+              >
+                Schedule a session
+              </button>
             }
           />
         }
       >
-        <div className="space-y-6">
-          {upcoming.length > 0 && (
-            <div>
-              <h2 className="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-2">
-                Upcoming ({upcoming.length})
-              </h2>
-              <div className="space-y-3">{upcoming.map(renderCard)}</div>
+        <div className="space-y-4">
+          {Object.entries(byCourse).map(([course, list]) => (
+            <div key={course} className="bg-white rounded-[8px] border border-gray-200 overflow-hidden">
+              <div className="px-4 py-2.5 bg-gray-50 border-b border-gray-200">
+                <span className="text-sm font-semibold text-gray-900">{course}</span>
+                <span className="ml-2 text-xs text-gray-400">
+                  {list.length} session{list.length === 1 ? '' : 's'}
+                </span>
+              </div>
+              {list.map(renderRow)}
             </div>
-          )}
-          {past.length > 0 && (
-            <div>
-              <h2 className="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-2">
-                Past ({past.length})
-              </h2>
-              <div className="space-y-3">{past.map(renderCard)}</div>
-            </div>
-          )}
+          ))}
         </div>
       </ListStateBoundary>
 
       <ConfirmDialog
         open={!!deleteId}
         title="Delete live session?"
-        message="This removes the scheduled session and its recording (if any). This cannot be undone."
+        message="This removes the scheduled session and any uploaded recording. This cannot be undone."
         confirmLabel="Delete"
         destructive
         loading={deleting}

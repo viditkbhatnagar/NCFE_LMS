@@ -241,6 +241,7 @@ export const liveSessionCreateSchema = z.object({
   meetingLink: z.string().url('A valid meeting link URL is required'),
   scheduledAt: z.string().min(1, 'Scheduled date/time is required'),
   durationMinutes: z.number().int().min(5).max(600).optional().default(60),
+  recordingLink: z.string().url('Recording link must be a valid URL').optional().or(z.literal('')),
 });
 
 export const liveSessionUpdateSchema = z.object({
@@ -251,6 +252,7 @@ export const liveSessionUpdateSchema = z.object({
   scheduledAt: z.string().min(1).optional(),
   durationMinutes: z.number().int().min(5).max(600).optional(),
   status: z.enum(['scheduled', 'completed', 'cancelled']).optional(),
+  recordingLink: z.string().url('Recording link must be a valid URL').optional().or(z.literal('')),
 });
 
 export const learningOutcomeCreateSchema = z.object({
