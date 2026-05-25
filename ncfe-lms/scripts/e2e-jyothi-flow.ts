@@ -197,6 +197,74 @@ const cleanup: Cleanup = {};
   if (seenAfterByStudent?.recordingLink === recordingLink) pass('student sees the recording link');
   else fail('student does NOT see the recording link');
 
+  // ─── 3b. Admin uploads a recording file directly to S3 ──────────────
+  section('3b. Admin uploads recording file (S3 round-trip)');
+  const videoPath = path.join(__dirname, '..', 'tests', 'fixtures', 'files', 'video.mp4');
+  if (!fs.existsSync(videoPath)) {
+    console.log('  ⚠️  tests/fixtures/files/video.mp4 missing — skipping S3 upload check');
+  } else {
+    // First clear the link so we test the upload path specifically.
+    await admin.ctx.put(`/api/v2/live-sessions/${cleanup.sessionId}`, {
+      data: { recordingLink: '' },
+    });
+    const upload = await admin.ctx.post(
+      `/api/v2/live-sessions/${cleanup.sessionId}/recording`,
+      {
+        multipart: {
+          file: {
+            name: `${TAG.toLowerCase()}-recording.mp4`,
+            mimeType: 'video/mp4',
+            buffer: fs.readFileSync(videoPath),
+          },
+        },
+      },
+    );
+    if (upload.status() !== 200) {
+      fail(`recording upload: HTTP ${upload.status()} ${await upload.text()}`);
+    } else {
+      pass('recording uploaded (multipart POST → S3 via uploadFile())');
+
+      // Re-fetch and confirm the session has recordingStorageKey set.
+      const detail = await (
+        await admin.ctx.get(`/api/v2/live-sessions/${cleanup.sessionId}`)
+      ).json();
+      const d = detail.data;
+      if (d.recordingStorageKey) pass(`recordingStorageKey persisted (${d.recordingStorageKey.slice(0, 60)}…)`);
+      else fail('recordingStorageKey was NOT persisted');
+      if (d.recordingStorageProvider === 's3') pass('recordingStorageProvider=s3 ✓');
+      else fail(`recordingStorageProvider=${d.recordingStorageProvider}, expected s3`);
+      if (d.status === 'completed') pass('status flipped to completed on upload');
+      else fail(`status is ${d.status}, expected completed`);
+
+      // Student hits the download endpoint → should redirect to an S3 signed URL.
+      const dl = await student.ctx.get(
+        `/api/v2/live-sessions/${cleanup.sessionId}/recording/download?json=true`,
+      );
+      if (dl.status() === 200) {
+        const body = await dl.json();
+        if (body.url && body.url.includes('amazonaws.com')) {
+          pass('student gets back an S3 signed URL from the download endpoint');
+          // Actually hit the signed URL to verify the file is reachable.
+          const head = await playwrightRequest.newContext().then((c) => c.get(body.url));
+          const sz = Number(head.headers()['content-length'] || 0);
+          if (head.status() === 200 && sz > 0) pass(`S3 signed URL returns the file (${sz} bytes)`);
+          else fail(`S3 signed URL fetch returned ${head.status()} size=${sz}`);
+        } else {
+          fail(`download URL doesn't look like S3: ${body.url}`);
+        }
+      } else {
+        fail(`student download endpoint: HTTP ${dl.status()}`);
+      }
+
+      // Assessor also gets the URL.
+      const dl2 = await assessor.ctx.get(
+        `/api/v2/live-sessions/${cleanup.sessionId}/recording/download?json=true`,
+      );
+      if (dl2.status() === 200 && (await dl2.json()).url) pass('assessor also gets the S3 signed URL');
+      else fail('assessor download endpoint failed');
+    }
+  }
+
   // ─── 4. Student uploads evidence → assessor sees it ──────────────────
   section('4. Student uploads evidence');
   // Tiny PDF fixture if available; else fall back to creating a small text
