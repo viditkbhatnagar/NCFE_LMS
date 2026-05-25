@@ -103,6 +103,17 @@ export default function NotificationsPage() {
     }
   }
 
+  async function deleteNotification(id: string) {
+    try {
+      const res = await fetch(`/api/notifications/${id}`, { method: 'DELETE' });
+      if (res.ok) {
+        setNotifications((prev) => prev.filter((n) => n._id !== id));
+      }
+    } catch {
+      /* silently fail */
+    }
+  }
+
   function handleClick(n: Notification) {
     // Resolver route marks-read + redirects to the correct page.
     window.location.href = notificationGoUrl(n._id);
@@ -209,6 +220,21 @@ export default function NotificationsPage() {
                       {formatFullTimestamp(n.createdAt)}
                     </p>
                   </div>
+
+                  {/* Delete */}
+                  <span
+                    role="button"
+                    tabIndex={0}
+                    onClick={(e) => { e.stopPropagation(); deleteNotification(n._id); }}
+                    onKeyDown={(e) => { if (e.key === 'Enter') { e.stopPropagation(); deleteNotification(n._id); } }}
+                    className="shrink-0 self-center p-1.5 text-gray-300 hover:text-red-500 hover:bg-red-50 rounded cursor-pointer"
+                    title="Delete notification"
+                    aria-label="Delete notification"
+                  >
+                    <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                    </svg>
+                  </span>
 
                   {/* Arrow */}
                   <div className="shrink-0 self-center">

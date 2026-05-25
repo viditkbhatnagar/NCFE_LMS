@@ -52,9 +52,11 @@ export default function AdminEnrolmentsPage() {
   const [assessors, setAssessors] = useState<SelectOption[]>([]);
   const [qualifications, setQualifications] = useState<SelectOption[]>([]);
 
-  // Withdraw
+  // Withdraw (soft) + permanent delete (hard, with cascade)
   const [confirmWithdraw, setConfirmWithdraw] = useState<string | null>(null);
   const [withdrawing, setWithdrawing] = useState(false);
+  const [confirmHardDelete, setConfirmHardDelete] = useState<{ id: string; label: string } | null>(null);
+  const [hardDeleting, setHardDeleting] = useState(false);
 
   const fetchEnrolments = useCallback(async () => {
     setLoading(true);
@@ -232,6 +234,25 @@ export default function AdminEnrolmentsPage() {
       setErrors({ _form: ['An unexpected error occurred'] });
     } finally {
       setSaving(false);
+    }
+  };
+
+  const handleHardDelete = async () => {
+    if (!confirmHardDelete) return;
+    setHardDeleting(true);
+    try {
+      const res = await fetch(`/api/v2/admin/enrolments/${confirmHardDelete.id}?hard=true`, {
+        method: 'DELETE',
+      });
+      if (res.ok) {
+        setConfirmHardDelete(null);
+        fetchEnrolments();
+      } else {
+        const j = await res.json().catch(() => ({}));
+        alert(j.error || 'Delete failed.');
+      }
+    } finally {
+      setHardDeleting(false);
     }
   };
 
@@ -504,6 +525,18 @@ export default function AdminEnrolmentsPage() {
                       {e.status !== 'withdrawn' && (
                         <button onClick={() => setConfirmWithdraw(e._id)} className="text-red-600 hover:underline text-xs">Withdraw</button>
                       )}
+                      <button
+                        onClick={() =>
+                          setConfirmHardDelete({
+                            id: e._id,
+                            label: `${e.userId?.name ?? 'Unknown'} → ${e.qualificationId?.title ?? 'unknown course'}`,
+                          })
+                        }
+                        className="text-red-700 hover:underline text-xs font-medium ml-2"
+                        title="Permanently delete this enrolment and ALL its assessments/evidence/work-hours"
+                      >
+                        Delete
+                      </button>
                     </td>
                   </tr>
                 ))}
@@ -536,6 +569,21 @@ export default function AdminEnrolmentsPage() {
         )}
         </div>
       </ListStateBoundary>
+
+      <ConfirmDialog
+        open={!!confirmHardDelete}
+        title="Permanently delete enrolment?"
+        message={
+          confirmHardDelete
+            ? `Delete ${confirmHardDelete.label} along with EVERY assessment, evidence file, and work-hour entry on this enrolment. The audit log entry remains. This cannot be undone.`
+            : ''
+        }
+        confirmLabel="Permanently delete"
+        destructive
+        loading={hardDeleting}
+        onConfirm={handleHardDelete}
+        onCancel={() => setConfirmHardDelete(null)}
+      />
 
       <ConfirmDialog
         open={!!confirmWithdraw}

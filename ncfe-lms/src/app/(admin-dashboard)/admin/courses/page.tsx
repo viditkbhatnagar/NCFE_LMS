@@ -35,6 +35,8 @@ export default function AdminCoursesPage() {
   const [errors, setErrors] = useState<Record<string, string[]>>({});
   const [confirmDelete, setConfirmDelete] = useState<string | null>(null);
   const [deleting, setDeleting] = useState(false);
+  const [confirmHardDelete, setConfirmHardDelete] = useState<{ id: string; title: string } | null>(null);
+  const [hardDeleting, setHardDeleting] = useState(false);
 
   // Load assessors once for the course-assignment multi-select.
   useEffect(() => {
@@ -155,6 +157,25 @@ export default function AdminCoursesPage() {
       setErrors({ _form: ['An unexpected error occurred'] });
     } finally {
       setSaving(false);
+    }
+  };
+
+  const handleHardDelete = async () => {
+    if (!confirmHardDelete) return;
+    setHardDeleting(true);
+    try {
+      const res = await fetch(`/api/v2/admin/qualifications/${confirmHardDelete.id}?hard=true`, {
+        method: 'DELETE',
+      });
+      if (res.ok) {
+        setConfirmHardDelete(null);
+        fetchQualifications();
+      } else {
+        const j = await res.json().catch(() => ({}));
+        alert(j.error || 'Delete failed.');
+      }
+    } finally {
+      setHardDeleting(false);
     }
   };
 
@@ -393,6 +414,13 @@ export default function AdminCoursesPage() {
                           Deactivate
                         </button>
                       )}
+                      <button
+                        onClick={() => setConfirmHardDelete({ id: q._id, title: q.title })}
+                        className="text-red-700 hover:underline text-xs font-medium"
+                        title="Permanently delete this course and ALL its content"
+                      >
+                        Delete
+                      </button>
                     </td>
                   </tr>
                 ))}
@@ -401,6 +429,21 @@ export default function AdminCoursesPage() {
           </div>
         </div>
       </ListStateBoundary>
+
+      <ConfirmDialog
+        open={!!confirmHardDelete}
+        title="Permanently delete course?"
+        message={
+          confirmHardDelete
+            ? `Delete "${confirmHardDelete.title}" along with EVERY module, unit, learning outcome, criterion, material, course document, live session, enrolment, assessment, and evidence on it. The audit log entry remains. This cannot be undone.`
+            : ''
+        }
+        confirmLabel="Permanently delete"
+        destructive
+        loading={hardDeleting}
+        onConfirm={handleHardDelete}
+        onCancel={() => setConfirmHardDelete(null)}
+      />
 
       <ConfirmDialog
         open={!!confirmDelete}

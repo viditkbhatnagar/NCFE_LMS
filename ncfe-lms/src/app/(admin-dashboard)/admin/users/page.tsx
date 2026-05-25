@@ -86,6 +86,8 @@ export default function AdminUsersPage() {
 
   // Delete/deactivate
   const [confirmAction, setConfirmAction] = useState<{ id: string; action: 'deactivate' | 'activate' } | null>(null);
+  const [confirmHardDelete, setConfirmHardDelete] = useState<{ id: string; name: string; email: string } | null>(null);
+  const [hardDeleting, setHardDeleting] = useState(false);
   const [actionLoading, setActionLoading] = useState(false);
 
   // Password reset
@@ -513,6 +515,25 @@ export default function AdminUsersPage() {
       console.error('Failed to update user:', err);
     } finally {
       setActionLoading(false);
+    }
+  };
+
+  const handleHardDelete = async () => {
+    if (!confirmHardDelete) return;
+    setHardDeleting(true);
+    try {
+      const res = await fetch(`/api/v2/admin/users/${confirmHardDelete.id}?hard=true`, {
+        method: 'DELETE',
+      });
+      if (res.ok) {
+        setConfirmHardDelete(null);
+        fetchUsers();
+      } else {
+        const j = await res.json().catch(() => ({}));
+        alert(j.error || 'Delete failed.');
+      }
+    } finally {
+      setHardDeleting(false);
     }
   };
 
@@ -993,6 +1014,13 @@ export default function AdminUsersPage() {
                           Activate
                         </button>
                       )}
+                      <button
+                        onClick={() => setConfirmHardDelete({ id: u._id, name: u.name, email: u.email })}
+                        className="text-red-700 hover:underline text-xs font-medium"
+                        title="Permanently delete this user and ALL their data"
+                      >
+                        Delete
+                      </button>
                     </td>
                   </tr>
                 ))}
@@ -1097,6 +1125,22 @@ export default function AdminUsersPage() {
           </div>
         </div>
       )}
+
+      {/* Permanent hard-delete confirm */}
+      <ConfirmDialog
+        open={!!confirmHardDelete}
+        title="Permanently delete user?"
+        message={
+          confirmHardDelete
+            ? `Delete "${confirmHardDelete.name}" (${confirmHardDelete.email}) AND every enrolment, assessment, evidence file, work-hour entry, notification, and personal document tied to them. The audit log entry remains. This cannot be undone.`
+            : ''
+        }
+        confirmLabel="Permanently delete"
+        destructive
+        loading={hardDeleting}
+        onConfirm={handleHardDelete}
+        onCancel={() => setConfirmHardDelete(null)}
+      />
 
       {/* Deactivate/Activate confirm */}
       <ConfirmDialog

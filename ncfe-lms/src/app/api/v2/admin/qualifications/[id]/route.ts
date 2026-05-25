@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import dbConnect from '@/lib/db';
 import { withAuth } from '@/lib/route-guard';
 import { createAuditLog } from '@/lib/audit';
+import { hardDeleteQualification } from '@/lib/cascade';
 import Qualification from '@/models/Qualification';
 import { qualificationUpdateSchema } from '@/lib/validators';
 
@@ -62,7 +63,7 @@ export async function PUT(
 }
 
 export async function DELETE(
-  _req: NextRequest,
+  req: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
   const { session, error } = await withAuth(['admin']);
@@ -76,14 +77,27 @@ export async function DELETE(
     return NextResponse.json({ success: false, error: 'Not found' }, { status: 404 });
   }
 
-  await Qualification.findByIdAndUpdate(id, { status: 'inactive' });
+  const hard = req.nextUrl.searchParams.get('hard') === 'true';
 
+  if (hard) {
+    const summary = await hardDeleteQualification(id);
+    await createAuditLog({
+      userId: session!.user.id,
+      action: 'QUALIFICATION_HARD_DELETED',
+      entityType: 'Qualification',
+      entityId: id,
+      oldValue: { title: qualification.title, code: qualification.code },
+      newValue: summary,
+    });
+    return NextResponse.json({ success: true, data: summary });
+  }
+
+  await Qualification.findByIdAndUpdate(id, { status: 'inactive' });
   await createAuditLog({
     userId: session!.user.id,
     action: 'QUALIFICATION_DEACTIVATED',
     entityType: 'Qualification',
     entityId: id,
   });
-
   return NextResponse.json({ success: true });
 }

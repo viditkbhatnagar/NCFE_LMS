@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import dbConnect from '@/lib/db';
 import { withAuth } from '@/lib/route-guard';
 import { createAuditLog } from '@/lib/audit';
+import { hardDeleteEnrolment } from '@/lib/cascade';
 import Enrolment from '@/models/Enrolment';
 import '@/models/User';
 import '@/models/Qualification';
@@ -73,7 +74,7 @@ export async function PUT(
 }
 
 export async function DELETE(
-  _req: NextRequest,
+  req: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
   const { session, error } = await withAuth(['admin']);
@@ -87,14 +88,25 @@ export async function DELETE(
     return NextResponse.json({ success: false, error: 'Not found' }, { status: 404 });
   }
 
-  await Enrolment.findByIdAndUpdate(id, { status: 'withdrawn' });
+  const hard = req.nextUrl.searchParams.get('hard') === 'true';
 
+  if (hard) {
+    await hardDeleteEnrolment(id);
+    await createAuditLog({
+      userId: session!.user.id,
+      action: 'ENROLMENT_HARD_DELETED',
+      entityType: 'Enrolment',
+      entityId: id,
+    });
+    return NextResponse.json({ success: true });
+  }
+
+  await Enrolment.findByIdAndUpdate(id, { status: 'withdrawn' });
   await createAuditLog({
     userId: session!.user.id,
     action: 'ENROLMENT_WITHDRAWN',
     entityType: 'Enrolment',
     entityId: id,
   });
-
   return NextResponse.json({ success: true });
 }

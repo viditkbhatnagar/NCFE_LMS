@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import dbConnect from '@/lib/db';
 import { withAuth } from '@/lib/route-guard';
 import { createAuditLog } from '@/lib/audit';
+import { hardDeleteUser } from '@/lib/cascade';
 import User from '@/models/User';
 import Enrolment from '@/models/Enrolment';
 import '@/models/Centre';
@@ -107,7 +108,7 @@ export async function PUT(
 }
 
 export async function DELETE(
-  _req: NextRequest,
+  req: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
   const { session, error } = await withAuth(['admin']);
@@ -121,14 +122,36 @@ export async function DELETE(
     return NextResponse.json({ success: false, error: 'Not found' }, { status: 404 });
   }
 
-  await User.findByIdAndUpdate(id, { status: 'inactive' });
+  // Admin can't permanently delete themselves — they'd lock themselves out
+  // and the cascade would remove their audit history attribution.
+  if (id === session!.user.id) {
+    return NextResponse.json(
+      { success: false, error: 'You cannot delete your own admin account' },
+      { status: 400 },
+    );
+  }
 
+  const hard = req.nextUrl.searchParams.get('hard') === 'true';
+
+  if (hard) {
+    const summary = await hardDeleteUser(id);
+    await createAuditLog({
+      userId: session!.user.id,
+      action: 'USER_HARD_DELETED',
+      entityType: 'User',
+      entityId: id,
+      oldValue: { name: user.name, email: user.email, role: user.role },
+      newValue: summary,
+    });
+    return NextResponse.json({ success: true, data: summary });
+  }
+
+  await User.findByIdAndUpdate(id, { status: 'inactive' });
   await createAuditLog({
     userId: session!.user.id,
     action: 'USER_DEACTIVATED',
     entityType: 'User',
     entityId: id,
   });
-
   return NextResponse.json({ success: true });
 }
