@@ -305,38 +305,47 @@ export async function sendNewEnrolmentEmail(args: {
 }
 
 // ---------------------------------------------------------------------------
-// Live class reminder — sent ~15-60 mins before scheduledAt by the cron route
+// Live class scheduled — sent once, immediately on creation, to enrolled
+// learners + the assessor on the course. No "starts soon" reminders here:
+// the create flow is the only notification trigger, by design.
 // ---------------------------------------------------------------------------
 
-export async function sendLiveSessionReminderEmail(args: {
+export async function sendLiveSessionScheduledEmail(args: {
   recipientName: string;
   recipientEmail: string;
+  recipientKind: 'student' | 'assessor';
   sessionTitle: string;
   qualificationTitle: string;
   scheduledAt: Date;
+  durationMinutes: number;
   meetingLink: string;
-  minutesUntil: number;
 }): Promise<SendResult> {
   const when = args.scheduledAt.toLocaleString(undefined, {
-    weekday: 'short',
+    weekday: 'long',
     day: 'numeric',
     month: 'short',
+    year: 'numeric',
     hour: '2-digit',
     minute: '2-digit',
   });
+  const intro = args.recipientKind === 'student'
+    ? `A new live class has been scheduled on <em>${escapeHtml(args.qualificationTitle)}</em>. Click below to join when it starts.`
+    : `A live class has been scheduled on your course <em>${escapeHtml(args.qualificationTitle)}</em>. You can use the same link to host the class.`;
   const html = wrapper(`
-    <h1 style="margin:0 0 8px;font-size:22px;color:#111827;">Your live class starts soon</h1>
+    <h1 style="margin:0 0 8px;font-size:22px;color:#111827;">Live class scheduled</h1>
     <p style="margin:0 0 16px;color:#374151;">Hi ${escapeHtml(args.recipientName)},</p>
-    <p style="margin:0 0 16px;color:#374151;">
-      <strong>${escapeHtml(args.sessionTitle)}</strong> (part of <em>${escapeHtml(args.qualificationTitle)}</em>) is scheduled to start in about ${args.minutesUntil} minute${args.minutesUntil === 1 ? '' : 's'} — at ${escapeHtml(when)}.
-    </p>
+    <p style="margin:0 0 16px;color:#374151;">${intro}</p>
+    <div style="margin:20px 0;padding:16px;background:#f9fafb;border-radius:6px;border:1px solid #e5e7eb;font-size:14px;">
+      <div style="margin-bottom:6px;"><strong>${escapeHtml(args.sessionTitle)}</strong></div>
+      <div style="color:#6b7280;">${escapeHtml(when)} &middot; ${args.durationMinutes} min</div>
+    </div>
     ${cta(args.meetingLink)}
-    <p style="margin:16px 0 0;font-size:13px;color:#6b7280;">Tap the button above to open the meeting link.</p>
+    <p style="margin:16px 0 0;font-size:13px;color:#6b7280;">The meeting link above will work at the scheduled time.</p>
   `);
   return send(
-    'live_session_reminder',
+    'live_session_scheduled',
     { email: args.recipientEmail, name: args.recipientName },
-    `Reminder: ${args.sessionTitle} starts soon`,
+    `Live class scheduled: ${args.sessionTitle}`,
     html,
   );
 }
