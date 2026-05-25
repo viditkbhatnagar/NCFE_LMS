@@ -22,8 +22,21 @@ async function slugForQualification(qualificationId: unknown): Promise<string | 
   return q?.slug ?? null;
 }
 
+// Resolve the public base URL we should redirect to. On Render, _req.url
+// resolves to the internal `https://localhost:10000` host — useless to a
+// browser — so we prefer APP_BASE_URL, then the X-Forwarded-Host header
+// (Render sets it), and only fall back to the request URL as a last resort.
+function publicBase(req: NextRequest): string {
+  const env = process.env.APP_BASE_URL?.replace(/\/$/, '');
+  if (env) return env;
+  const xfh = req.headers.get('x-forwarded-host');
+  const xfp = req.headers.get('x-forwarded-proto') || 'https';
+  if (xfh) return `${xfp}://${xfh}`;
+  return new URL(req.url).origin;
+}
+
 export async function GET(
-  _req: NextRequest,
+  req: NextRequest,
   { params }: { params: Promise<{ id: string }> },
 ) {
   const { id } = await params;
@@ -32,6 +45,7 @@ export async function GET(
 
   await dbConnect();
 
+  const base = publicBase(req);
   const notif = await Notification.findById(id);
   // Fall back to a safe landing page rather than erroring on a bad id.
   const fallback = session!.user.role === 'admin' ? '/admin/dashboard'
@@ -39,7 +53,7 @@ export async function GET(
     : '/c';
 
   if (!notif || String(notif.userId) !== session!.user.id) {
-    return NextResponse.redirect(new URL(fallback, _req.url), 307);
+    return NextResponse.redirect(new URL(fallback, base), 307);
   }
 
   // Mark read on the way through.
@@ -83,5 +97,5 @@ export async function GET(
     console.warn('notification-go: resolution failed, using fallback', err);
   }
 
-  return NextResponse.redirect(new URL(target, _req.url), 307);
+  return NextResponse.redirect(new URL(target, base), 307);
 }
