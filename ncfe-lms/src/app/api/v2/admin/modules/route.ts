@@ -3,6 +3,7 @@ import dbConnect from '@/lib/db';
 import { withAuth } from '@/lib/route-guard';
 import { createAuditLog } from '@/lib/audit';
 import Module from '@/models/Module';
+import Qualification from '@/models/Qualification';
 import { moduleCreateSchema } from '@/lib/validators';
 
 export async function GET(req: NextRequest) {
@@ -12,11 +13,24 @@ export async function GET(req: NextRequest) {
   await dbConnect();
 
   const qualificationId = req.nextUrl.searchParams.get('qualificationId');
+
+  // No qualificationId → cross-course list (every module, course title joined).
   if (!qualificationId) {
-    return NextResponse.json(
-      { success: false, error: 'qualificationId is required' },
-      { status: 400 },
+    const modules = await Module.find({}).sort({ qualificationId: 1, order: 1 }).lean();
+    const qids = Array.from(new Set(modules.map((m) => String(m.qualificationId))));
+    const quals = await Qualification.find({ _id: { $in: qids } })
+      .select('title code slug')
+      .lean();
+    const byId = new Map(
+      quals.map((q) => [String(q._id), { title: q.title, code: q.code, slug: q.slug }]),
     );
+    return NextResponse.json({
+      success: true,
+      data: modules.map((m) => ({
+        ...m,
+        qualification: byId.get(String(m.qualificationId)) ?? null,
+      })),
+    });
   }
 
   const modules = await Module.find({ qualificationId })

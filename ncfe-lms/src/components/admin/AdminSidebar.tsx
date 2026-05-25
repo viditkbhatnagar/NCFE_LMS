@@ -28,6 +28,24 @@ const navItems = [
     ),
   },
   {
+    label: 'Modules',
+    href: '/admin/modules',
+    icon: (
+      <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h16M4 18h7" />
+      </svg>
+    ),
+  },
+  {
+    label: 'Units',
+    href: '/admin/units',
+    icon: (
+      <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 11H5m14-4H5m14 8H5m14 4H5" />
+      </svg>
+    ),
+  },
+  {
     label: 'Users',
     href: '/admin/users',
     icon: (

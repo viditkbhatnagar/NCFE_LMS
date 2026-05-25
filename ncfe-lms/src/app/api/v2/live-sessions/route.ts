@@ -20,33 +20,68 @@ export async function GET(req: NextRequest) {
   const qualificationId = req.nextUrl.searchParams.get('qualificationId');
   const user = session!.user;
 
-  // Admin without a qualificationId → cross-course view (the dedicated
-  // /admin/live-sessions page). Returns every session with the course title
-  // joined in, so the admin UI can render "course — session" rows.
+  // No qualificationId → cross-course view.
+  //  - Admin sees every session.
+  //  - Student sees every session for any course they're enrolled in,
+  //    scoped to their own cohort(s) plus all-cohort sessions.
+  //  - Assessor: requires qualificationId (their per-course page handles it).
   if (!qualificationId) {
-    if (user.role !== 'admin') {
-      return NextResponse.json(
-        { success: false, error: 'qualificationId is required' },
-        { status: 400 },
+    if (user.role === 'admin') {
+      const sessions = await LiveSession.find({})
+        .sort({ scheduledAt: -1 })
+        .lean();
+      const qids = Array.from(new Set(sessions.map((s) => String(s.qualificationId))));
+      const quals = await Qualification.find({ _id: { $in: qids } })
+        .select('title slug code')
+        .lean();
+      const byId = new Map(
+        quals.map((q) => [String(q._id), { title: q.title, slug: q.slug, code: q.code }]),
       );
+      return NextResponse.json({
+        success: true,
+        data: sessions.map((s) => ({
+          ...s,
+          qualification: byId.get(String(s.qualificationId)) ?? null,
+        })),
+      });
     }
-    const sessions = await LiveSession.find({})
-      .sort({ scheduledAt: -1 })
-      .lean();
-    const qids = Array.from(new Set(sessions.map((s) => String(s.qualificationId))));
-    const quals = await Qualification.find({ _id: { $in: qids } })
-      .select('title slug code')
-      .lean();
-    const byId = new Map(
-      quals.map((q) => [String(q._id), { title: q.title, slug: q.slug, code: q.code }]),
+
+    if (user.role === 'student') {
+      const myEnrolments = await Enrolment.find({ userId: user.id })
+        .select('qualificationId cohortId')
+        .lean();
+      if (myEnrolments.length === 0) {
+        return NextResponse.json({ success: true, data: [] });
+      }
+      const qids = myEnrolments.map((e) => e.qualificationId);
+      const myCohorts = Array.from(
+        new Set(myEnrolments.map((e) => e.cohortId).filter((c): c is string => !!c)),
+      );
+      const sessions = await LiveSession.find({
+        qualificationId: { $in: qids },
+        cohortId: { $in: ['', ...myCohorts] },
+      })
+        .sort({ scheduledAt: -1 })
+        .lean();
+      const quals = await Qualification.find({ _id: { $in: qids } })
+        .select('title slug code')
+        .lean();
+      const byId = new Map(
+        quals.map((q) => [String(q._id), { title: q.title, slug: q.slug, code: q.code }]),
+      );
+      return NextResponse.json({
+        success: true,
+        data: sessions.map((s) => ({
+          ...s,
+          qualification: byId.get(String(s.qualificationId)) ?? null,
+        })),
+      });
+    }
+
+    return NextResponse.json(
+      { success: false, error: 'qualificationId is required' },
+      { status: 400 },
     );
-    return NextResponse.json({
-      success: true,
-      data: sessions.map((s) => ({
-        ...s,
-        qualification: byId.get(String(s.qualificationId)) ?? null,
-      })),
-    });
   }
 
   const filter: Record<string, unknown> = { qualificationId };
