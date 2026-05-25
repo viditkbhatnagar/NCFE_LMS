@@ -96,11 +96,17 @@ export default function AdminSidebar({ userName }: AdminSidebarProps) {
       {/* Logos */}
       <div className="flex items-center justify-between p-4 border-b border-secondary-light">
         {!collapsed && (
-          <div className="flex items-center">
+          <div className="flex items-center gap-2">
+            <img
+              src="/skillhub-logo.jpeg"
+              alt="Skill Hub"
+              className="h-9 w-auto object-contain rounded"
+            />
+            <div className="h-6 w-px bg-gray-500/60" />
             <img
               src="/ncfe-logo.jpg"
               alt="NCFE"
-              className="h-10 w-auto object-contain rounded bg-white px-1.5 py-1"
+              className="h-9 w-auto object-contain rounded bg-white px-1 py-0.5"
             />
           </div>
         )}
