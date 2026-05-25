@@ -24,6 +24,9 @@ export interface ILiveSession extends Document {
   // alternative to uploading the file directly into S3 for large recordings.
   recordingLink?: string;
   status: LiveSessionStatus;
+  // When the "starts soon" reminder email batch was sent. Set by the cron
+  // route so it doesn't fire twice. Null until the first batch goes out.
+  remindersSentAt?: Date;
   createdAt: Date;
   updatedAt: Date;
 }
@@ -74,6 +77,7 @@ const LiveSessionSchema = new Schema<ILiveSession>(
     recordingStorageProvider: { type: String, enum: ['local', 's3'] },
     recordingStorageBucket: { type: String, trim: true },
     recordingLink: { type: String, trim: true },
+    remindersSentAt: { type: Date },
     status: {
       type: String,
       enum: ['scheduled', 'completed', 'cancelled'],

@@ -303,3 +303,40 @@ export async function sendNewEnrolmentEmail(args: {
     html,
   );
 }
+
+// ---------------------------------------------------------------------------
+// Live class reminder — sent ~15-60 mins before scheduledAt by the cron route
+// ---------------------------------------------------------------------------
+
+export async function sendLiveSessionReminderEmail(args: {
+  recipientName: string;
+  recipientEmail: string;
+  sessionTitle: string;
+  qualificationTitle: string;
+  scheduledAt: Date;
+  meetingLink: string;
+  minutesUntil: number;
+}): Promise<SendResult> {
+  const when = args.scheduledAt.toLocaleString(undefined, {
+    weekday: 'short',
+    day: 'numeric',
+    month: 'short',
+    hour: '2-digit',
+    minute: '2-digit',
+  });
+  const html = wrapper(`
+    <h1 style="margin:0 0 8px;font-size:22px;color:#111827;">Your live class starts soon</h1>
+    <p style="margin:0 0 16px;color:#374151;">Hi ${escapeHtml(args.recipientName)},</p>
+    <p style="margin:0 0 16px;color:#374151;">
+      <strong>${escapeHtml(args.sessionTitle)}</strong> (part of <em>${escapeHtml(args.qualificationTitle)}</em>) is scheduled to start in about ${args.minutesUntil} minute${args.minutesUntil === 1 ? '' : 's'} — at ${escapeHtml(when)}.
+    </p>
+    ${cta(args.meetingLink)}
+    <p style="margin:16px 0 0;font-size:13px;color:#6b7280;">Tap the button above to open the meeting link.</p>
+  `);
+  return send(
+    'live_session_reminder',
+    { email: args.recipientEmail, name: args.recipientName },
+    `Reminder: ${args.sessionTitle} starts soon`,
+    html,
+  );
+}
