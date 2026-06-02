@@ -135,18 +135,20 @@ export async function hardDeleteUser(userId: string | ID): Promise<{
   if (affected.length > 0) {
     const ops = affected.map((e) => {
       const remaining = (e.assessorIds ?? [])
-        .map((a) => String(a))
-        .filter((a) => a !== uidStr);
+        .map((a) => new mongoose.Types.ObjectId(String(a)))
+        .filter((a) => String(a) !== uidStr);
       const wasLead = String(e.assessorId ?? '') === uidStr;
       const newLead = wasLead ? (remaining[0] ?? null) : (e.assessorId ?? null);
       return {
         updateOne: {
-          filter: { _id: e._id },
+          filter: { _id: e._id as mongoose.Types.ObjectId },
           update: { $set: { assessorIds: remaining, assessorId: newLead } },
         },
       };
     });
-    const res = await Enrolment.bulkWrite(ops);
+    const res = await Enrolment.bulkWrite(
+      ops as Parameters<typeof Enrolment.bulkWrite>[0],
+    );
     unassignedCount = res.modifiedCount ?? affected.length;
   }
   // Assessment ownership stays singular — unset the owner if it was them.
