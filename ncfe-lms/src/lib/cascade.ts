@@ -120,45 +120,35 @@ export async function hardDeleteUser(userId: string | ID): Promise<{
   await cascadeEnrolmentIds(enrolIds);
 
   // 2. Where they were an assessor (lead or co-assessor), keep the enrolment
-  //    alive for reassignment.
-  //    Order matters for crash-safety: re-lead FIRST (while uid is still in
-  //    assessorIds), promoting the first OTHER assessor to lead; THEN pull uid
-  //    from the array. If the process dies between the two steps, the critical
-  //    field (assessorId, which a deleted user must never own) is already
-  //    correct; a stale uid left in assessorIds is harmless (the user is gone)
-  //    and the helper dedupes it away on read.
-  const reled = await Enrolment.updateMany(
-    { assessorId: uid },
-    [
-      {
-        $set: {
-          assessorId: {
-            $ifNull: [
-              {
-                // First assessor that is NOT the deleted user. $arrayElemAt
-                // (vs $first) is supported on older MongoDB / Atlas tiers.
-                $arrayElemAt: [
-                  {
-                    $filter: {
-                      input: { $ifNull: ['$assessorIds', []] },
-                      as: 'a',
-                      cond: { $ne: ['$$a', uid] },
-                    },
-                  },
-                  0,
-                ],
-              },
-              null,
-            ],
-          },
+  //    alive for reassignment. Remove them from assessorIds and, if they were
+  //    the lead, promote the first remaining co-assessor.
+  //    Done in plain application code (per-doc bulkWrite) rather than an
+  //    aggregation-pipeline update, so it works on every MongoDB/Atlas tier
+  //    (pipeline-form updates need 4.2+, which this cluster may predate).
+  const uidStr = String(uid);
+  const affected = await Enrolment.find({
+    $or: [{ assessorId: uid }, { assessorIds: uid }],
+  })
+    .select('assessorId assessorIds')
+    .lean();
+  let unassignedCount = 0;
+  if (affected.length > 0) {
+    const ops = affected.map((e) => {
+      const remaining = (e.assessorIds ?? [])
+        .map((a) => String(a))
+        .filter((a) => a !== uidStr);
+      const wasLead = String(e.assessorId ?? '') === uidStr;
+      const newLead = wasLead ? (remaining[0] ?? null) : (e.assessorId ?? null);
+      return {
+        updateOne: {
+          filter: { _id: e._id },
+          update: { $set: { assessorIds: remaining, assessorId: newLead } },
         },
-      },
-    ],
-  );
-  const pulled = await Enrolment.updateMany(
-    { assessorIds: uid },
-    { $pull: { assessorIds: uid } },
-  );
+      };
+    });
+    const res = await Enrolment.bulkWrite(ops);
+    unassignedCount = res.modifiedCount ?? affected.length;
+  }
   // Assessment ownership stays singular — unset the owner if it was them.
   await Assessment.updateMany(
     { assessorId: uid },
@@ -180,7 +170,7 @@ export async function hardDeleteUser(userId: string | ID): Promise<{
 
   return {
     enrolmentsCascaded: enrolIds.length,
-    enrolmentsUnassigned: (pulled.modifiedCount ?? 0) + (reled.modifiedCount ?? 0),
+    enrolmentsUnassigned: unassignedCount,
   };
 }
 
