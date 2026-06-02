@@ -3,6 +3,11 @@ import dbConnect from '@/lib/db';
 import { withAuth } from '@/lib/route-guard';
 import Enrolment from '@/models/Enrolment';
 import User from '@/models/User';
+import {
+  assessorMatch,
+  enrolmentAssessorIds,
+  isEnrolmentAssessor,
+} from '@/lib/enrolment-access';
 
 export async function GET(
   request: Request,
@@ -15,10 +20,11 @@ export async function GET(
 
     await dbConnect();
 
-    // Verify the requesting assessor has at least one enrollment for this qualification
+    // Verify the requesting assessor has at least one enrollment for this
+    // qualification — as lead OR co-assessor.
     const hasAccess = await Enrolment.exists({
       qualificationId,
-      assessorId: session!.user.id,
+      ...assessorMatch(session!.user.id),
     });
     if (!hasAccess) {
       return NextResponse.json(
@@ -32,13 +38,9 @@ export async function GET(
       .populate('userId', 'name email')
       .lean();
 
-    // Gather unique assessor IDs from all enrollments
+    // Gather unique assessor IDs across all enrollments (lead + secondary).
     const assessorIds = [
-      ...new Set(
-        allEnrollments
-          .map((e) => e.assessorId?.toString())
-          .filter(Boolean) as string[]
-      ),
+      ...new Set(allEnrollments.flatMap((e) => enrolmentAssessorIds(e))),
     ];
 
     // Fetch assessors as team members
@@ -55,9 +57,9 @@ export async function GET(
       role: u.role,
     }));
 
-    // Only this assessor's learners for the learner groups view
-    const myEnrollments = allEnrollments.filter(
-      (e) => e.assessorId?.toString() === session!.user.id
+    // Learners where the requester is an assessor (lead or co-assessor).
+    const myEnrollments = allEnrollments.filter((e) =>
+      isEnrolmentAssessor(e, session!.user.id),
     );
 
     // Group by cohortId

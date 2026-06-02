@@ -300,13 +300,17 @@ export const adminPasswordResetSchema = z.object({
 export const adminEnrolmentCreateSchema = z.object({
   userId: z.string().min(1, 'Student ID is required'),
   qualificationId: z.string().min(1, 'Qualification ID is required'),
+  // Legacy single assessor still accepted; new multi-assessor selection comes
+  // through assessorIds. The API merges + derives the lead.
   assessorId: z.string().optional(),
+  assessorIds: z.array(z.string()).optional(),
   cohortId: z.string().optional(),
   status: z.enum(['enrolled', 'in_progress', 'completed', 'withdrawn']).optional().default('enrolled'),
 });
 
 export const adminEnrolmentUpdateSchema = z.object({
   assessorId: z.string().optional(),
+  assessorIds: z.array(z.string()).optional(),
   cohortId: z.string().optional(),
   status: z.enum(['enrolled', 'in_progress', 'completed', 'withdrawn']).optional(),
 });

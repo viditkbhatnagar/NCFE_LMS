@@ -9,6 +9,7 @@ import Enrolment from '@/models/Enrolment';
 import Qualification from '@/models/Qualification';
 import User from '@/models/User';
 import { liveSessionCreateSchema } from '@/lib/validators';
+import { enrolmentAssessorIds } from '@/lib/enrolment-access';
 
 // GET /api/v2/live-sessions?qualificationId=X
 // Returns { sessions, cohorts }. Students only see sessions for their own
@@ -167,17 +168,16 @@ export async function POST(req: NextRequest) {
     };
     if (data.cohortId) enrolFilter.cohortId = data.cohortId;
     const enrolments = await Enrolment.find(enrolFilter)
-      .select('userId assessorId')
+      .select('userId assessorId assessorIds')
       .lean();
 
-    // Recipients = enrolled students + every distinct assessor on those
-    // enrolments, minus the user who just created the session (they don't
-    // need to email themselves).
+    // Recipients = enrolled students + every assessor (lead + co-assessors)
+    // on those enrolments, minus the user who just created the session.
     const studentIds = new Set<string>();
     const assessorIds = new Set<string>();
     for (const e of enrolments) {
       if (e.userId) studentIds.add(String(e.userId));
-      if (e.assessorId) assessorIds.add(String(e.assessorId));
+      for (const aid of enrolmentAssessorIds(e)) assessorIds.add(aid);
     }
     studentIds.delete(session!.user.id);
     assessorIds.delete(session!.user.id);

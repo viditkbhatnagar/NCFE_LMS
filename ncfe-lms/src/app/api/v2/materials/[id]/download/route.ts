@@ -4,6 +4,7 @@ import { withAuth } from '@/lib/route-guard';
 import { getFileDownloadUrl } from '@/lib/upload';
 import LearningMaterial from '@/models/LearningMaterial';
 import Enrolment from '@/models/Enrolment';
+import { assessorMatch } from '@/lib/enrolment-access';
 
 export async function GET(
   request: Request,
@@ -28,7 +29,7 @@ export async function GET(
     const enrollmentFilter =
       user.role === 'student'
         ? { qualificationId: material.qualificationId, userId: user.id }
-        : { qualificationId: material.qualificationId, assessorId: user.id };
+        : { qualificationId: material.qualificationId, ...assessorMatch(user.id) };
     const hasAccess = await Enrolment.exists(enrollmentFilter);
 
     if (!hasAccess) {

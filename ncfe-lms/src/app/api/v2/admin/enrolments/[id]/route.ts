@@ -7,6 +7,7 @@ import Enrolment from '@/models/Enrolment';
 import '@/models/User';
 import '@/models/Qualification';
 import { adminEnrolmentUpdateSchema } from '@/lib/validators';
+import { buildAssessorFields } from '@/lib/enrolment-access';
 
 export async function GET(
   _req: NextRequest,
@@ -22,6 +23,7 @@ export async function GET(
     .populate('userId', 'name email')
     .populate('qualificationId', 'title code')
     .populate('assessorId', 'name email')
+    .populate('assessorIds', 'name email')
     .lean();
 
   if (!enrolment) {
@@ -55,10 +57,23 @@ export async function PUT(
     return NextResponse.json({ success: false, error: 'Not found' }, { status: 404 });
   }
 
-  const updated = await Enrolment.findByIdAndUpdate(id, validation.data, { new: true })
+  // If the assessor selection changed, re-derive both fields together so the
+  // lead (assessorId) and the full set (assessorIds) stay consistent.
+  const update: Record<string, unknown> = { ...validation.data };
+  if (validation.data.assessorIds !== undefined || validation.data.assessorId !== undefined) {
+    const { assessorIds, assessorId } = buildAssessorFields({
+      assessorIds: validation.data.assessorIds,
+      assessorId: validation.data.assessorId,
+    });
+    update.assessorIds = assessorIds;
+    update.assessorId = assessorId ?? null;
+  }
+
+  const updated = await Enrolment.findByIdAndUpdate(id, update, { new: true })
     .populate('userId', 'name email')
     .populate('qualificationId', 'title code')
     .populate('assessorId', 'name email')
+    .populate('assessorIds', 'name email')
     .lean();
 
   await createAuditLog({

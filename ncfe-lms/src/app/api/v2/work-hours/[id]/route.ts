@@ -4,6 +4,7 @@ import { withAuth } from '@/lib/route-guard';
 import { workHoursUpdateSchema } from '@/lib/validators';
 import WorkHoursLog from '@/models/WorkHoursLog';
 import Enrolment from '@/models/Enrolment';
+import { isEnrolmentAssessor } from '@/lib/enrolment-access';
 
 export async function PUT(
   request: Request,
@@ -39,7 +40,7 @@ export async function PUT(
     const isOwner =
       user.role === 'student'
         ? enrollment?.userId?.toString() === user.id
-        : enrollment?.assessorId?.toString() === user.id;
+        : isEnrolmentAssessor(enrollment, user.id);
     if (!enrollment || !isOwner) {
       return NextResponse.json(
         { success: false, error: 'Forbidden' },
@@ -89,7 +90,7 @@ export async function DELETE(
     const isOwner =
       user.role === 'student'
         ? enrollment?.userId?.toString() === user.id
-        : enrollment?.assessorId?.toString() === user.id;
+        : isEnrolmentAssessor(enrollment, user.id);
     if (!enrollment || !isOwner) {
       return NextResponse.json(
         { success: false, error: 'Forbidden' },

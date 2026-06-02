@@ -7,6 +7,7 @@ import Evidence from '@/models/Evidence';
 import Enrolment from '@/models/Enrolment';
 import { createNotification } from '@/lib/notifications';
 import { checkRateLimit, rateLimitIdentity } from '@/lib/rate-limit';
+import { isEnrolmentAssessor, enrolmentAssessorIds } from '@/lib/enrolment-access';
 
 export async function POST(request: Request) {
   try {
@@ -87,7 +88,7 @@ export async function POST(request: Request) {
     const user = session!.user;
     const isOwner =
       user.role === 'assessor'
-        ? enrollment.assessorId?.toString() === user.id
+        ? isEnrolmentAssessor(enrollment, user.id)
         : enrollment.userId?.toString() === user.id;
     if (!isOwner) {
       return NextResponse.json(
@@ -172,10 +173,9 @@ export async function POST(request: Request) {
       }
     }
 
-    // Notify the assessor when student uploads evidence
+    // Notify EVERY assigned assessor when a student uploads evidence.
     if (user.role === 'student') {
-      const assessorId = enrollment.assessorId?.toString();
-      if (assessorId) {
+      for (const assessorId of enrolmentAssessorIds(enrollment)) {
         createNotification({
           userId: assessorId,
           type: 'evidence_uploaded',

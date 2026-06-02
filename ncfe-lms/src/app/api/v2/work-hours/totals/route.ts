@@ -4,6 +4,7 @@ import { withAuth } from '@/lib/route-guard';
 import WorkHoursLog from '@/models/WorkHoursLog';
 import Enrolment from '@/models/Enrolment';
 import Qualification from '@/models/Qualification';
+import { isEnrolmentAssessor } from '@/lib/enrolment-access';
 
 export async function GET(request: Request) {
   try {
@@ -26,7 +27,7 @@ export async function GET(request: Request) {
     const isOwner =
       user.role === 'student'
         ? enrollment?.userId?.toString() === user.id
-        : enrollment?.assessorId?.toString() === user.id;
+        : isEnrolmentAssessor(enrollment, user.id);
     if (!enrollment || !isOwner) {
       return NextResponse.json(
         { success: false, error: 'Forbidden' },

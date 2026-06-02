@@ -7,6 +7,7 @@ import AssessmentCriteria from '@/models/AssessmentCriteria';
 import Assessment from '@/models/Assessment';
 import AssessmentCriteriaMap from '@/models/AssessmentCriteriaMap';
 import Enrolment from '@/models/Enrolment';
+import { isEnrolmentAssessor } from '@/lib/enrolment-access';
 
 export async function GET(
   request: Request,
@@ -31,7 +32,7 @@ export async function GET(
     const isOwner =
       session!.user.role === 'student'
         ? enrollment.userId?.toString() === session!.user.id
-        : enrollment.assessorId?.toString() === session!.user.id;
+        : isEnrolmentAssessor(enrollment, session!.user.id);
 
     if (!isOwner) {
       return NextResponse.json(

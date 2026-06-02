@@ -4,6 +4,7 @@ import { withAuth } from '@/lib/route-guard';
 import { deleteFile } from '@/lib/upload';
 import Evidence from '@/models/Evidence';
 import Enrolment from '@/models/Enrolment';
+import { isEnrolmentAssessor } from '@/lib/enrolment-access';
 
 export async function PUT(
   req: NextRequest,
@@ -36,7 +37,7 @@ export async function PUT(
     const user = session!.user;
     const isOwner =
       user.role === 'assessor'
-        ? enrollment.assessorId?.toString() === user.id
+        ? isEnrolmentAssessor(enrollment, user.id)
         : enrollment.userId?.toString() === user.id;
     if (!isOwner) {
       return NextResponse.json(
@@ -119,7 +120,7 @@ export async function DELETE(
     const user = session!.user;
     const isOwner =
       user.role === 'assessor'
-        ? enrollment.assessorId?.toString() === user.id
+        ? isEnrolmentAssessor(enrollment, user.id)
         : enrollment.userId?.toString() === user.id;
     if (!isOwner) {
       return NextResponse.json(

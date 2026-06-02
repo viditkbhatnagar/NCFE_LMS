@@ -6,6 +6,8 @@ import Assessment from '@/models/Assessment';
 import Evidence from '@/models/Evidence';
 import LearningMaterial from '@/models/LearningMaterial';
 import Enrolment from '@/models/Enrolment';
+import User from '@/models/User';
+import { assessorMatch, enrolmentAssessorIds } from '@/lib/enrolment-access';
 
 export async function GET(
   request: Request,
@@ -21,10 +23,10 @@ export async function GET(
     const url = new URL(request.url);
     const filterEnrollmentId = url.searchParams.get('enrollmentId');
 
-    // All enrollments for this assessor + qualification
+    // All enrollments where this user is an assessor (lead or co-assessor).
     const enrollments = await Enrolment.find({
-      assessorId: session!.user.id,
       qualificationId,
+      ...assessorMatch(session!.user.id),
     })
       .populate('userId', 'name email')
       .lean();
@@ -40,10 +42,12 @@ export async function GET(
       return u?._id;
     }).filter(Boolean);
 
-    // Build assessment query — scope by learner when filtering
+    // Build assessment query — scoped to the enrolments this user assesses
+    // (lead or co-assessor), so co-assessors see all assessments on shared
+    // learners, not just ones they personally created.
     const assessmentQuery: Record<string, unknown> = {
-      assessorId: session!.user.id,
       qualificationId,
+      enrollmentId: { $in: enrollmentIds },
     };
     if (filterEnrollmentId && scopedLearnerIds.length > 0) {
       assessmentQuery.learnerId = { $in: scopedLearnerIds };
@@ -68,27 +72,32 @@ export async function GET(
           .limit(5)
           .lean(),
 
-        Enrolment.find({
-          qualificationId,
-          assessorId: { $exists: true, $ne: new mongoose.Types.ObjectId(session!.user.id) },
-        })
-          .populate('assessorId', 'name email')
-          .lean(),
+        // Every enrolment on the course — we derive the "other assessors"
+        // panel from the full assessor set of each (lead + co-assessors).
+        Enrolment.find({ qualificationId }).select('assessorId assessorIds').lean(),
       ]);
 
-    // Build unique other-assessors with learner counts
-    const assessorMap = new Map<string, { name: string; email: string; count: number }>();
+    // Build unique OTHER assessors (everyone but me) with learner counts.
+    const me = String(session!.user.id);
+    const countByAssessor = new Map<string, number>();
     for (const e of otherAssessorEnrollments) {
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const a = e.assessorId as any;
-      if (!a || !a._id) continue;
-      const key = String(a._id);
-      const existing = assessorMap.get(key);
-      if (existing) {
-        existing.count++;
-      } else {
-        assessorMap.set(key, { name: a.name, email: a.email, count: 1 });
+      for (const aid of enrolmentAssessorIds(e)) {
+        if (aid === me) continue;
+        countByAssessor.set(aid, (countByAssessor.get(aid) ?? 0) + 1);
       }
+    }
+    const otherAssessorUsers = countByAssessor.size
+      ? await User.find({ _id: { $in: [...countByAssessor.keys()] } })
+          .select('name email')
+          .lean()
+      : [];
+    const assessorMap = new Map<string, { name: string; email: string; count: number }>();
+    for (const u of otherAssessorUsers) {
+      assessorMap.set(String(u._id), {
+        name: u.name,
+        email: u.email,
+        count: countByAssessor.get(String(u._id)) ?? 0,
+      });
     }
 
     // Build enrollment ID → learner name map for evidence

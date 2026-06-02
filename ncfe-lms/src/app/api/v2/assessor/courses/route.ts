@@ -36,12 +36,14 @@ export async function GET() {
       });
     }
 
-    // Aggregate: distinct qualificationIds with learner counts for this assessor
-    // Must cast string to ObjectId for aggregation $match
+    // Aggregate: distinct qualificationIds with learner counts for this assessor.
+    // Match either the lead assessorId or any secondary in assessorIds, so a
+    // co-assessor sees the course too.
+    const me = new mongoose.Types.ObjectId(session!.user.id);
     const enrollmentAgg = await Enrolment.aggregate([
       {
         $match: {
-          assessorId: new mongoose.Types.ObjectId(session!.user.id),
+          $or: [{ assessorIds: me }, { assessorId: me }],
         },
       },
       {

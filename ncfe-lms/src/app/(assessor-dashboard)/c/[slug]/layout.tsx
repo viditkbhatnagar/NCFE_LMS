@@ -5,6 +5,7 @@ import Qualification from '@/models/Qualification';
 import Enrolment from '@/models/Enrolment';
 import { AssessorCourseProvider } from '@/contexts/AssessorCourseContext';
 import AssessorSubHeader from '@/components/assessor/AssessorSubHeader';
+import { assessorMatch } from '@/lib/enrolment-access';
 import type { UserRole } from '@/types';
 
 interface Props {
@@ -41,14 +42,17 @@ export default async function CourseLayout({ children, params }: Props) {
     );
   }
 
-  // Student → their own enrolment; assessor → enrolments they assess;
-  // admin → every enrolment on the course (admin manages all learners).
+  // Student → their own enrolment; assessor → enrolments they assess (lead OR
+  // co-assessor); admin → every enrolment on the course.
   const enrolmentFilter =
     user.role === 'student'
       ? { userId: user.id, qualificationId: qualification._id }
       : user.role === 'admin'
         ? { qualificationId: qualification._id }
-        : { assessorId: user.id, qualificationId: qualification._id };
+        : {
+            qualificationId: qualification._id,
+            ...assessorMatch(user.id!),
+          };
 
   const enrollments = await Enrolment.find(enrolmentFilter)
     .populate('userId', 'name email')

@@ -4,6 +4,7 @@ import { withAuth } from '@/lib/route-guard';
 import Enrolment from '@/models/Enrolment';
 import Submission from '@/models/Submission';
 import AssessmentDecision from '@/models/AssessmentDecision';
+import { assessorMatch } from '@/lib/enrolment-access';
 
 export async function GET() {
   try {
@@ -17,8 +18,9 @@ export async function GET() {
 
     const assessorId = session!.user.id;
 
-    // Count assigned learners (unique userId in enrolments where assessorId matches)
-    const enrolments = await Enrolment.find({ assessorId });
+    // Count assigned learners (unique userId in enrolments where this user is
+    // an assessor — lead or co-assessor).
+    const enrolments = await Enrolment.find(assessorMatch(assessorId));
     const uniqueLearnerIds = new Set(enrolments.map((e) => e.userId.toString()));
     const assignedLearnersCount = uniqueLearnerIds.size;
 

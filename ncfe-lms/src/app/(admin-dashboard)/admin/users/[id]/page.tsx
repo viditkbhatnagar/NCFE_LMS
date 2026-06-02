@@ -23,6 +23,7 @@ interface EnrolmentRow {
   enrolledAt?: string;
   qualificationId?: { _id: string; title: string; code?: string } | null;
   assessorId?: { _id: string; name: string; email: string } | null;
+  assessorIds?: { _id: string; name: string; email: string }[];
 }
 
 export default function AdminUserDetailPage() {
@@ -174,7 +175,13 @@ export default function AdminUserDetailPage() {
                         )}
                       </div>
                       <div className="text-xs text-gray-500 mt-0.5">
-                        {e.assessorId?.name && <span>Assessor: {e.assessorId.name}</span>}
+                        {(() => {
+                          const names =
+                            Array.isArray(e.assessorIds) && e.assessorIds.length > 0
+                              ? e.assessorIds.map((a) => a?.name).filter(Boolean).join(', ')
+                              : e.assessorId?.name;
+                          return names ? <span>Assessor{names.includes(',') ? 's' : ''}: {names}</span> : null;
+                        })()}
                         {e.cohortId && <span className="ml-3">Cohort: {e.cohortId}</span>}
                         {e.enrolledAt && (
                           <span className="ml-3">Enrolled {new Date(e.enrolledAt).toLocaleDateString()}</span>

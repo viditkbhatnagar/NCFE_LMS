@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useCallback, useMemo } from 'react';
 import ConfirmDialog from '@/components/admin/ConfirmDialog';
+import AssessorMultiSelect from '@/components/admin/AssessorMultiSelect';
 import ListStateBoundary, {
   DefaultListSkeleton,
   EmptyState,
@@ -9,14 +10,29 @@ import ListStateBoundary, {
 
 type StatusChip = 'all' | 'active' | 'completed' | 'withdrawn';
 
+interface AssessorRef {
+  _id: string;
+  name: string;
+  email: string;
+}
+
 interface Enrolment {
   _id: string;
   userId: { _id: string; name: string; email: string } | null;
   qualificationId: { _id: string; title: string; code: string } | null;
-  assessorId: { _id: string; name: string; email: string } | null;
+  assessorId: AssessorRef | null;
+  assessorIds?: AssessorRef[];
   cohortId: string;
   status: string;
   enrolledAt: string;
+}
+
+/** All assigned assessor names (joined), falling back to the lead. */
+function assessorNames(e: Enrolment): string {
+  if (Array.isArray(e.assessorIds) && e.assessorIds.length > 0) {
+    return e.assessorIds.map((a) => a?.name).filter(Boolean).join(', ');
+  }
+  return e.assessorId?.name || '';
 }
 
 interface SelectOption {
@@ -43,7 +59,8 @@ export default function AdminEnrolmentsPage() {
   // Form states
   const [showForm, setShowForm] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
-  const [form, setForm] = useState({ userId: '', qualificationId: '', assessorId: '', cohortId: '', status: 'enrolled' });
+  const [form, setForm] = useState({ userId: '', qualificationId: '', cohortId: '', status: 'enrolled' });
+  const [formAssessorIds, setFormAssessorIds] = useState<string[]>([]);
   const [saving, setSaving] = useState(false);
   const [errors, setErrors] = useState<Record<string, string[]>>({});
 
@@ -186,7 +203,8 @@ export default function AdminEnrolmentsPage() {
   }, [showForm, fetchOptions]);
 
   const resetForm = () => {
-    setForm({ userId: '', qualificationId: '', assessorId: '', cohortId: '', status: 'enrolled' });
+    setForm({ userId: '', qualificationId: '', cohortId: '', status: 'enrolled' });
+    setFormAssessorIds([]);
     setEditingId(null);
     setShowForm(false);
     setErrors({});
@@ -196,10 +214,17 @@ export default function AdminEnrolmentsPage() {
     setForm({
       userId: e.userId?._id || '',
       qualificationId: e.qualificationId?._id || '',
-      assessorId: e.assessorId?._id || '',
       cohortId: e.cohortId || '',
       status: e.status,
     });
+    // Prefer the full set; fall back to the lead for legacy rows.
+    const ids =
+      Array.isArray(e.assessorIds) && e.assessorIds.length > 0
+        ? e.assessorIds.map((a) => a._id)
+        : e.assessorId
+          ? [e.assessorId._id]
+          : [];
+    setFormAssessorIds(ids);
     setEditingId(e._id);
     setShowForm(true);
   };
@@ -212,8 +237,8 @@ export default function AdminEnrolmentsPage() {
     const url = editingId ? `/api/v2/admin/enrolments/${editingId}` : '/api/v2/admin/enrolments';
     const method = editingId ? 'PUT' : 'POST';
     const body = editingId
-      ? { assessorId: form.assessorId || undefined, cohortId: form.cohortId || undefined, status: form.status }
-      : form;
+      ? { assessorIds: formAssessorIds, cohortId: form.cohortId || undefined, status: form.status }
+      : { ...form, assessorIds: formAssessorIds };
 
     try {
       const res = await fetch(url, {
@@ -394,18 +419,12 @@ export default function AdminEnrolmentsPage() {
                   </div>
                 </>
               )}
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Assessor</label>
-                <select
-                  value={form.assessorId}
-                  onChange={(e) => setForm({ ...form, assessorId: e.target.value })}
-                  className="w-full px-3 py-2 text-sm border border-gray-300 rounded-[6px] focus:outline-none focus:ring-2 focus:ring-primary/50"
-                >
-                  <option value="">No assessor assigned</option>
-                  {assessors.map((a) => (
-                    <option key={a._id} value={a._id}>{a.name} ({a.email})</option>
-                  ))}
-                </select>
+              <div className="md:col-span-2">
+                <AssessorMultiSelect
+                  options={assessors}
+                  selected={formAssessorIds}
+                  onChange={setFormAssessorIds}
+                />
               </div>
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">Cohort ID</label>
@@ -510,7 +529,7 @@ export default function AdminEnrolmentsPage() {
                     </td>
                     <td className="px-5 py-3 font-medium text-gray-900">{e.userId?.name || 'Unknown'}</td>
                     <td className="px-5 py-3 text-gray-600">{e.qualificationId?.title || 'Unknown'}</td>
-                    <td className="px-5 py-3 text-gray-600">{e.assessorId?.name || 'Unassigned'}</td>
+                    <td className="px-5 py-3 text-gray-600">{assessorNames(e) || 'Unassigned'}</td>
                     <td className="px-5 py-3 text-gray-600">{e.cohortId || '-'}</td>
                     <td className="px-5 py-3">
                       <span className={`inline-flex px-2 py-0.5 text-xs font-medium rounded-full ${statusColors[e.status] || 'bg-gray-100 text-gray-600'}`}>

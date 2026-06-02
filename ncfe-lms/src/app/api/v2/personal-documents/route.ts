@@ -4,6 +4,7 @@ import { withAuth } from '@/lib/route-guard';
 import { uploadFile } from '@/lib/upload';
 import PersonalDocument from '@/models/PersonalDocument';
 import Enrolment from '@/models/Enrolment';
+import { assessorMatch } from '@/lib/enrolment-access';
 
 export async function GET(request: Request) {
   try {
@@ -32,10 +33,10 @@ export async function GET(request: Request) {
         );
       }
 
-      // Verify this learner belongs to the assessor's enrollments
+      // Verify this learner belongs to the assessor's enrollments (lead or co-assessor)
       const enrollment = await Enrolment.findOne({
         userId,
-        assessorId: user.id,
+        ...assessorMatch(user.id),
       }).lean();
 
       if (!enrollment) {
@@ -130,10 +131,10 @@ export async function POST(request: Request) {
         );
       }
 
-      // Verify this learner belongs to the assessor's enrollments
+      // Verify this learner belongs to the assessor's enrollments (lead or co-assessor)
       const enrollment = await Enrolment.findOne({
         userId,
-        assessorId: user.id,
+        ...assessorMatch(user.id),
       }).lean();
 
       if (!enrollment) {

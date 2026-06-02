@@ -7,6 +7,7 @@ import User from '@/models/User';
 import Qualification from '@/models/Qualification';
 import { adminEnrolmentCreateSchema } from '@/lib/validators';
 import { sendNewEnrolmentEmail } from '@/lib/email';
+import { buildAssessorFields, assessorMatch } from '@/lib/enrolment-access';
 
 export async function GET(req: NextRequest) {
   const { error } = await withAuth(['admin']);
@@ -25,7 +26,8 @@ export async function GET(req: NextRequest) {
   const filter: Record<string, unknown> = {};
   if (qualificationId) filter.qualificationId = qualificationId;
   if (status) filter.status = status;
-  if (assessorId) filter.assessorId = assessorId;
+  // Match either the lead assessorId or any secondary in assessorIds.
+  if (assessorId) Object.assign(filter, assessorMatch(assessorId));
   if (userId) filter.userId = userId;
 
   const [enrolments, total] = await Promise.all([
@@ -33,6 +35,7 @@ export async function GET(req: NextRequest) {
       .populate('userId', 'name email')
       .populate('qualificationId', 'title code')
       .populate('assessorId', 'name email')
+      .populate('assessorIds', 'name email')
       .sort({ enrolledAt: -1 })
       .skip((page - 1) * limit)
       .limit(limit)
@@ -74,8 +77,16 @@ export async function POST(req: NextRequest) {
     );
   }
 
+  // Multi-assessor: merge legacy single + new array, derive the lead.
+  const { assessorIds, assessorId: leadAssessorId } = buildAssessorFields({
+    assessorIds: validation.data.assessorIds,
+    assessorId: validation.data.assessorId,
+  });
+
   const enrolment = await Enrolment.create({
     ...validation.data,
+    assessorIds,
+    assessorId: leadAssessorId,
     enrolledAt: new Date(),
   });
 
@@ -84,14 +95,14 @@ export async function POST(req: NextRequest) {
     action: 'ENROLMENT_CREATED',
     entityType: 'Enrolment',
     entityId: String(enrolment._id),
-    newValue: validation.data,
+    newValue: { ...validation.data, assessorIds },
   });
 
-  // G7 — email the student that they've been enrolled (soft-fail, opt-out aware).
-  void notifyStudentOfEnrolment(
+  // G7 — email the student + every assigned assessor (soft-fail, opt-out aware).
+  void notifyEnrolment(
     validation.data.userId,
     validation.data.qualificationId,
-    validation.data.assessorId,
+    assessorIds,
     String(enrolment._id),
     session!.user.id,
   );
@@ -99,30 +110,33 @@ export async function POST(req: NextRequest) {
   return NextResponse.json({ success: true, data: enrolment }, { status: 201 });
 }
 
-async function notifyStudentOfEnrolment(
+async function notifyEnrolment(
   userId: string,
   qualificationId: string,
-  assessorId: string | undefined,
+  assessorIds: string[],
   enrolmentId: string,
   adminUserId: string,
 ): Promise<void> {
   try {
-    const [student, qualification, assessor] = await Promise.all([
+    const [student, qualification, assessors] = await Promise.all([
       User.findById(userId).lean<{ name: string; email: string; role: string; notificationPreferences?: { newEnrolment?: boolean } } | null>(),
       Qualification.findById(qualificationId).lean<{ title: string } | null>(),
-      assessorId
-        ? User.findById(assessorId).lean<{ name: string } | null>()
-        : Promise.resolve(null),
+      assessorIds.length
+        ? User.find({ _id: { $in: assessorIds } }).select('name').lean<{ name: string }[]>()
+        : Promise.resolve([] as { name: string }[]),
     ]);
     if (!student || !qualification) return;
     if (student.role !== 'student') return;
     if (student.notificationPreferences?.newEnrolment === false) return;
 
+    // The welcome email names all assigned assessors (comma-joined).
+    const assessorName = assessors.map((a) => a.name).join(', ') || undefined;
+
     const result = await sendNewEnrolmentEmail({
       studentName: student.name,
       studentEmail: student.email,
       qualificationTitle: qualification.title,
-      assessorName: assessor?.name,
+      assessorName,
       loginUrl: `${process.env.APP_BASE_URL || ''}/sign-in`,
     });
 
@@ -136,6 +150,6 @@ async function notifyStudentOfEnrolment(
         : { template: 'new_enrolment', error: result.error, recipient: userId },
     });
   } catch (err) {
-    console.warn('[notifyStudentOfEnrolment] soft-fail:', err);
+    console.warn('[notifyEnrolment] soft-fail:', err);
   }
 }

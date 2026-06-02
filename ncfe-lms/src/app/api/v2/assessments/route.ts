@@ -8,6 +8,7 @@ import SignOff from '@/models/SignOff';
 import Enrolment from '@/models/Enrolment';
 import { createNotification } from '@/lib/notifications';
 import User from '@/models/User';
+import { isEnrolmentAssessor, assessorMatch } from '@/lib/enrolment-access';
 import type { SignOffRole } from '@/types';
 
 export async function GET(request: Request) {
@@ -29,11 +30,24 @@ export async function GET(request: Request) {
 
     await dbConnect();
 
-    const filter: Record<string, unknown> = {
-      assessorId: session!.user.id,
+    // Multi-assessor: an assessor sees ALL assessments on the learners they
+    // assess (lead or co-assessor) for this qualification — not only the ones
+    // they personally created. Scope by the enrolments they assess.
+    const myEnrolments = await Enrolment.find({
       qualificationId,
-    };
-    if (enrollmentId) filter.enrollmentId = enrollmentId;
+      ...assessorMatch(session!.user.id),
+    })
+      .select('_id')
+      .lean();
+    const myEnrolmentIds = myEnrolments.map((e) => String(e._id));
+
+    const filter: Record<string, unknown> = { qualificationId };
+    if (enrollmentId) {
+      // Only honour the requested enrolment if the assessor actually assesses it.
+      filter.enrollmentId = myEnrolmentIds.includes(enrollmentId) ? enrollmentId : '__none__';
+    } else {
+      filter.enrollmentId = { $in: myEnrolmentIds };
+    }
     if (status) filter.status = status;
 
     const assessments = await Assessment.find(filter)
@@ -108,7 +122,8 @@ export async function POST(request: Request) {
         { status: 404 }
       );
     }
-    if (enrollment.assessorId?.toString() !== session!.user.id) {
+    // Any assigned assessor (lead or co-assessor) can create assessments.
+    if (!isEnrolmentAssessor(enrollment, session!.user.id)) {
       return NextResponse.json(
         { success: false, error: 'Forbidden: learner not assigned to you' },
         { status: 403 }

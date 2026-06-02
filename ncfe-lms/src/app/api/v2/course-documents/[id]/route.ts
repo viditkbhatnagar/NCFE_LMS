@@ -4,6 +4,7 @@ import { withAuth } from '@/lib/route-guard';
 import { deleteFile } from '@/lib/upload';
 import { fileRenameSchema } from '@/lib/validators';
 import CourseDoc from '@/models/CourseDocument';
+import { assessorMatch } from '@/lib/enrolment-access';
 
 export async function GET(
   request: Request,
@@ -27,14 +28,16 @@ export async function GET(
       );
     }
 
-    // Verify access based on role
+    // Verify access based on role. Admin can access any course doc; assessor
+    // must be an assessor (lead or co) on the course; student must be enrolled.
     const Enrolment = (await import('@/models/Enrolment')).default;
     const user = session!.user;
-    const enrollmentFilter =
-      user.role === 'student'
-        ? { qualificationId: doc.qualificationId, userId: user.id }
-        : { qualificationId: doc.qualificationId, assessorId: user.id };
-    const hasAccess = await Enrolment.exists(enrollmentFilter);
+    let hasAccess = user.role === 'admin';
+    if (user.role === 'student') {
+      hasAccess = !!(await Enrolment.exists({ qualificationId: doc.qualificationId, userId: user.id }));
+    } else if (user.role === 'assessor') {
+      hasAccess = !!(await Enrolment.exists({ qualificationId: doc.qualificationId, ...assessorMatch(user.id) }));
+    }
     if (!hasAccess) {
       return NextResponse.json(
         { success: false, error: 'Forbidden' },
@@ -88,10 +91,12 @@ export async function PUT(
     }
 
     const Enrolment = (await import('@/models/Enrolment')).default;
-    const hasAccess = await Enrolment.exists({
-      qualificationId: existing.qualificationId,
-      assessorId: session!.user.id,
-    });
+    const hasAccess =
+      session!.user.role === 'admin' ||
+      !!(await Enrolment.exists({
+        qualificationId: existing.qualificationId,
+        ...assessorMatch(session!.user.id),
+      }));
     if (!hasAccess) {
       return NextResponse.json(
         { success: false, error: 'Forbidden' },
@@ -161,10 +166,12 @@ export async function DELETE(
     }
 
     const Enrolment = (await import('@/models/Enrolment')).default;
-    const hasAccess = await Enrolment.exists({
-      qualificationId: doc.qualificationId,
-      assessorId: session!.user.id,
-    });
+    const hasAccess =
+      session!.user.role === 'admin' ||
+      !!(await Enrolment.exists({
+        qualificationId: doc.qualificationId,
+        ...assessorMatch(session!.user.id),
+      }));
     if (!hasAccess) {
       return NextResponse.json(
         { success: false, error: 'Forbidden' },

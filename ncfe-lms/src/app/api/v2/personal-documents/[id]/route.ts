@@ -4,6 +4,7 @@ import { withAuth } from '@/lib/route-guard';
 import { deleteFile } from '@/lib/upload';
 import PersonalDocument from '@/models/PersonalDocument';
 import Enrolment from '@/models/Enrolment';
+import { assessorMatch } from '@/lib/enrolment-access';
 
 export async function DELETE(
   request: Request,
@@ -37,7 +38,7 @@ export async function DELETE(
     } else {
       const hasAccess = await Enrolment.exists({
         userId: ownerId,
-        assessorId: user.id,
+        ...assessorMatch(user.id),
       });
       if (!hasAccess) {
         return NextResponse.json(

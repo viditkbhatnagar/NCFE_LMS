@@ -44,6 +44,7 @@ export async function POST(req: NextRequest) {
     .populate<{ userId: PopulatedRef }>('userId', 'name email')
     .populate<{ qualificationId: PopulatedRef }>('qualificationId', 'title')
     .populate<{ assessorId: PopulatedRef }>('assessorId', 'name')
+    .populate<{ assessorIds: PopulatedRef[] }>('assessorIds', 'name')
     .lean();
 
   const headers = [
@@ -55,15 +56,22 @@ export async function POST(req: NextRequest) {
     'status',
     'enrolledAt',
   ];
-  const rows = enrolments.map((e) => [
-    e.userId?.name ?? '',
-    e.userId?.email ?? '',
-    e.qualificationId?.title ?? '',
-    e.assessorId?.name ?? '',
-    e.cohortId ?? '',
-    e.status,
-    e.enrolledAt instanceof Date ? e.enrolledAt.toISOString() : String(e.enrolledAt ?? ''),
-  ]);
+  const rows = enrolments.map((e) => {
+    // All assigned assessors (comma-joined), falling back to the lead.
+    const names =
+      Array.isArray(e.assessorIds) && e.assessorIds.length > 0
+        ? e.assessorIds.map((a) => a?.name).filter(Boolean).join(', ')
+        : e.assessorId?.name ?? '';
+    return [
+      e.userId?.name ?? '',
+      e.userId?.email ?? '',
+      e.qualificationId?.title ?? '',
+      names,
+      e.cohortId ?? '',
+      e.status,
+      e.enrolledAt instanceof Date ? e.enrolledAt.toISOString() : String(e.enrolledAt ?? ''),
+    ];
+  });
 
   await createAuditLog({
     userId: session!.user.id,

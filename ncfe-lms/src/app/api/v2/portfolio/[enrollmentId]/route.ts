@@ -4,6 +4,7 @@ import { withAuth } from '@/lib/route-guard';
 import Evidence from '@/models/Evidence';
 import Enrolment from '@/models/Enrolment';
 import Unit from '@/models/Unit';
+import { isEnrolmentAssessor } from '@/lib/enrolment-access';
 
 export async function GET(
   request: Request,
@@ -40,7 +41,7 @@ export async function GET(
         : String(rawUserId ?? '');
     const isOwner =
       user.role === 'assessor'
-        ? enrollment.assessorId?.toString() === user.id
+        ? isEnrolmentAssessor(enrollment, user.id)
         : enrollmentUserId === user.id;
     if (!isOwner) {
       return NextResponse.json(

@@ -4,6 +4,7 @@ import { withAuth } from '@/lib/route-guard';
 import { getFileDownloadUrl } from '@/lib/upload';
 import Evidence from '@/models/Evidence';
 import Enrolment from '@/models/Enrolment';
+import { isEnrolmentAssessor } from '@/lib/enrolment-access';
 
 export async function GET(
   request: Request,
@@ -36,7 +37,7 @@ export async function GET(
 
       const canAccess =
         user.role === 'assessor'
-          ? enrollment.assessorId?.toString() === user.id
+          ? isEnrolmentAssessor(enrollment, user.id)
           : enrollment.userId?.toString() === user.id;
 
       if (!canAccess) {

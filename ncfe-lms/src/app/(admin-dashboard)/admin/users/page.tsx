@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useCallback, useMemo } from 'react';
 import ConfirmDialog from '@/components/admin/ConfirmDialog';
+import AssessorMultiSelect from '@/components/admin/AssessorMultiSelect';
 import { generatePassword } from '@/lib/password-generator';
 import ListStateBoundary, {
   DefaultListSkeleton,
@@ -105,18 +106,18 @@ export default function AdminUsersPage() {
   const [lastCreated, setLastCreated] = useState<CreatedCredentials | null>(null);
   const [lastReset, setLastReset] = useState<ResetCredentials | null>(null);
 
-  // G1 — combined create+enrol state
+  // G1 — combined create+enrol state (multi-assessor)
   const [enrolForm, setEnrolForm] = useState({
     qualificationId: '',
-    assessorId: '',
+    assessorIds: [] as string[],
     cohortId: defaultCohort(),
   });
   const [qualOptions, setQualOptions] = useState<QualificationOption[]>([]);
   const [assessorOptions, setAssessorOptions] = useState<AssessorOption[]>([]);
 
-  // G2 — inline enrol modal state
+  // G2 — inline enrol modal state (multi-assessor)
   const [enrolForUser, setEnrolForUser] = useState<User | null>(null);
-  const [enrolModalForm, setEnrolModalForm] = useState({ qualificationId: '', assessorId: '', cohortId: defaultCohort() });
+  const [enrolModalForm, setEnrolModalForm] = useState({ qualificationId: '', assessorIds: [] as string[], cohortId: defaultCohort() });
   const [enrolModalSaving, setEnrolModalSaving] = useState(false);
   const [enrolModalError, setEnrolModalError] = useState<string | null>(null);
 
@@ -281,7 +282,7 @@ export default function AdminUsersPage() {
     setForm({ name: '', email: '', password: generatePassword(), role: 'student', phone: '', status: 'active' });
     // Leave all 3 enrolment fields blank — admin opts in by selecting a qualification.
     // Once the admin picks a qualification, the cohort will auto-default below.
-    setEnrolForm({ qualificationId: '', assessorId: '', cohortId: '' });
+    setEnrolForm({ qualificationId: '', assessorIds: [], cohortId: '' });
     setEditingId(null);
     setErrors({});
     setPasswordVisible(true);
@@ -341,8 +342,8 @@ export default function AdminUsersPage() {
 
   const submitEnrolModal = async () => {
     if (!enrolForUser) return;
-    if (!enrolModalForm.qualificationId || !enrolModalForm.assessorId || !enrolModalForm.cohortId) {
-      setEnrolModalError('Pick a qualification + assessor + cohort.');
+    if (!enrolModalForm.qualificationId || enrolModalForm.assessorIds.length === 0 || !enrolModalForm.cohortId) {
+      setEnrolModalError('Pick a qualification + at least one assessor + cohort.');
       return;
     }
     setEnrolModalSaving(true);
@@ -354,7 +355,7 @@ export default function AdminUsersPage() {
         body: JSON.stringify({
           userId: enrolForUser._id,
           qualificationId: enrolModalForm.qualificationId,
-          assessorId: enrolModalForm.assessorId,
+          assessorIds: enrolModalForm.assessorIds,
           cohortId: enrolModalForm.cohortId,
           status: 'in_progress',
         }),
@@ -415,11 +416,15 @@ export default function AdminUsersPage() {
 
     // G1 — validate combined create+enrol fields up front. All-or-nothing.
     const isStudent = !editingId && form.role === 'student';
-    const enrolFilled = [enrolForm.qualificationId, enrolForm.assessorId, enrolForm.cohortId].filter(Boolean).length;
+    const enrolFilled = [
+      enrolForm.qualificationId,
+      enrolForm.assessorIds.length > 0 ? 'x' : '',
+      enrolForm.cohortId,
+    ].filter(Boolean).length;
     if (isStudent && enrolFilled > 0 && enrolFilled < 3) {
       setErrors({
         _form: [
-          'To enrol the new student, fill all three of Qualification, Assessor, and Cohort — or leave all blank to create the user only.',
+          'To enrol the new student, fill all three of Qualification, Assessor(s), and Cohort — or leave all blank to create the user only.',
         ],
       });
       setSaving(false);
@@ -451,7 +456,7 @@ export default function AdminUsersPage() {
                 body: JSON.stringify({
                   userId: data.data._id,
                   qualificationId: enrolForm.qualificationId,
-                  assessorId: enrolForm.assessorId,
+                  assessorIds: enrolForm.assessorIds,
                   cohortId: enrolForm.cohortId,
                   status: 'in_progress',
                 }),
@@ -459,8 +464,11 @@ export default function AdminUsersPage() {
               const enrolData = await enrolRes.json();
               if (enrolRes.ok && enrolData.success) {
                 const qual = qualOptions.find((q) => q._id === enrolForm.qualificationId);
-                const assessor = assessorOptions.find((a) => a._id === enrolForm.assessorId);
-                enrolmentSummary = `Enrolled in ${qual?.title ?? 'course'} under ${assessor?.name ?? 'assessor'}, cohort ${enrolForm.cohortId}.`;
+                const names = assessorOptions
+                  .filter((a) => enrolForm.assessorIds.includes(a._id))
+                  .map((a) => a.name)
+                  .join(', ');
+                enrolmentSummary = `Enrolled in ${qual?.title ?? 'course'} under ${names || 'assessor'}, cohort ${enrolForm.cohortId}.`;
               } else {
                 enrolmentError =
                   enrolData.error ||
@@ -841,21 +849,14 @@ export default function AdminUsersPage() {
                       ))}
                     </select>
                   </div>
-                  <div>
-                    <label className="block text-xs text-gray-600 mb-1">Assessor</label>
-                    <select
-                      value={enrolForm.assessorId}
-                      onChange={(e) => setEnrolForm((s) => ({ ...s, assessorId: e.target.value }))}
-                      className="w-full px-3 py-2 text-sm border border-gray-300 rounded-[6px] focus:outline-none focus:ring-2 focus:ring-primary/50"
-                      aria-label="Assessor"
-                    >
-                      <option value="">— Select assessor —</option>
-                      {assessorOptions.map((a) => (
-                        <option key={a._id} value={a._id}>
-                          {a.name} ({a.email})
-                        </option>
-                      ))}
-                    </select>
+                  <div className="sm:col-span-2 lg:col-span-3">
+                    <AssessorMultiSelect
+                      options={assessorOptions}
+                      selected={enrolForm.assessorIds}
+                      onChange={(next) => setEnrolForm((s) => ({ ...s, assessorIds: next }))}
+                      label="Assessor(s)"
+                      maxHeightClass="max-h-36"
+                    />
                   </div>
                   <div>
                     <label className="block text-xs text-gray-600 mb-1">Cohort</label>
@@ -978,7 +979,7 @@ export default function AdminUsersPage() {
                         <button
                           onClick={() => {
                             setEnrolForUser(u);
-                            setEnrolModalForm({ qualificationId: '', assessorId: '', cohortId: defaultCohort() });
+                            setEnrolModalForm({ qualificationId: '', assessorIds: [], cohortId: defaultCohort() });
                             setEnrolModalError(null);
                           }}
                           className="text-emerald-700 hover:underline text-xs"
@@ -1263,20 +1264,13 @@ export default function AdminUsersPage() {
                   ))}
                 </select>
               </div>
-              <div>
-                <label className="block text-xs text-gray-600 mb-1">Assessor</label>
-                <select
-                  value={enrolModalForm.assessorId}
-                  onChange={(e) => setEnrolModalForm((s) => ({ ...s, assessorId: e.target.value }))}
-                  className="w-full px-3 py-2 text-sm border border-gray-300 rounded-[6px] focus:outline-none focus:ring-2 focus:ring-primary/50"
-                  aria-label="Assessor"
-                >
-                  <option value="">— Select assessor —</option>
-                  {assessorOptions.map((a) => (
-                    <option key={a._id} value={a._id}>{a.name} ({a.email})</option>
-                  ))}
-                </select>
-              </div>
+              <AssessorMultiSelect
+                options={assessorOptions}
+                selected={enrolModalForm.assessorIds}
+                onChange={(next) => setEnrolModalForm((s) => ({ ...s, assessorIds: next }))}
+                label="Assessor(s)"
+                maxHeightClass="max-h-36"
+              />
               <div>
                 <label className="block text-xs text-gray-600 mb-1">Cohort</label>
                 <input

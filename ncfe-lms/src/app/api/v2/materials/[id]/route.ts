@@ -4,6 +4,7 @@ import { withAuth } from '@/lib/route-guard';
 import { deleteFile } from '@/lib/upload';
 import { fileRenameSchema } from '@/lib/validators';
 import LearningMaterial from '@/models/LearningMaterial';
+import { assessorMatch } from '@/lib/enrolment-access';
 
 export async function PUT(
   request: Request,
@@ -34,10 +35,12 @@ export async function PUT(
     }
 
     const Enrolment = (await import('@/models/Enrolment')).default;
-    const hasAccess = await Enrolment.exists({
-      qualificationId: existing.qualificationId,
-      assessorId: session!.user.id,
-    });
+    const hasAccess =
+      session!.user.role === 'admin' ||
+      !!(await Enrolment.exists({
+        qualificationId: existing.qualificationId,
+        ...assessorMatch(session!.user.id),
+      }));
     if (!hasAccess) {
       return NextResponse.json(
         { success: false, error: 'Forbidden' },
@@ -115,10 +118,12 @@ export async function DELETE(
     }
 
     const Enrolment = (await import('@/models/Enrolment')).default;
-    const hasAccess = await Enrolment.exists({
-      qualificationId: material.qualificationId,
-      assessorId: session!.user.id,
-    });
+    const hasAccess =
+      session!.user.role === 'admin' ||
+      !!(await Enrolment.exists({
+        qualificationId: material.qualificationId,
+        ...assessorMatch(session!.user.id),
+      }));
     if (!hasAccess) {
       return NextResponse.json(
         { success: false, error: 'Forbidden' },

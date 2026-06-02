@@ -7,6 +7,7 @@ import AssessmentCriteria from '@/models/AssessmentCriteria';
 import AssessmentDecision from '@/models/AssessmentDecision';
 import Evidence from '@/models/Evidence';
 import User from '@/models/User';
+import { assessorMatch } from '@/lib/enrolment-access';
 
 export async function GET(
   request: Request,
@@ -46,7 +47,7 @@ export async function GET(
     if (user.role === 'assessor') {
       const assignedEnrolment = await Enrolment.findOne({
         userId: learnerId,
-        assessorId: user.id,
+        ...assessorMatch(user.id),
       });
 
       if (!assignedEnrolment) {

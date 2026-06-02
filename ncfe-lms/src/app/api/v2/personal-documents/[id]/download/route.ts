@@ -4,6 +4,7 @@ import { withAuth } from '@/lib/route-guard';
 import { getFileDownloadUrl } from '@/lib/upload';
 import PersonalDocument from '@/models/PersonalDocument';
 import Enrolment from '@/models/Enrolment';
+import { assessorMatch } from '@/lib/enrolment-access';
 
 export async function GET(
   request: Request,
@@ -32,7 +33,7 @@ export async function GET(
     } else {
       const enrollment = await Enrolment.findOne({
         userId: doc.userId,
-        assessorId: user.id,
+        ...assessorMatch(user.id),
       }).lean();
       canAccess = !!enrollment;
     }

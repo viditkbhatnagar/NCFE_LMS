@@ -4,6 +4,7 @@ import { withAuth } from '@/lib/route-guard';
 import { workHoursCreateSchema } from '@/lib/validators';
 import WorkHoursLog from '@/models/WorkHoursLog';
 import Enrolment from '@/models/Enrolment';
+import { isEnrolmentAssessor, assessorMatch } from '@/lib/enrolment-access';
 
 export async function GET(request: Request) {
   try {
@@ -32,7 +33,7 @@ export async function GET(request: Request) {
       const isOwner =
         user.role === 'student'
           ? enrollment?.userId?.toString() === user.id
-          : enrollment?.assessorId?.toString() === user.id;
+          : isEnrolmentAssessor(enrollment, user.id);
       if (!enrollment || !isOwner) {
         return NextResponse.json(
           { success: false, error: 'Forbidden' },
@@ -50,7 +51,7 @@ export async function GET(request: Request) {
       const enrollmentFilter =
         user.role === 'student'
           ? { userId: learnerId }
-          : { userId: learnerId, assessorId: user.id };
+          : { userId: learnerId, ...assessorMatch(user.id) };
       const hasEnrollment = await Enrolment.exists(enrollmentFilter);
       if (!hasEnrollment) {
         return NextResponse.json(
@@ -118,7 +119,7 @@ export async function POST(request: Request) {
     const isOwner =
       user.role === 'student'
         ? enrollment.userId?.toString() === user.id
-        : enrollment.assessorId?.toString() === user.id;
+        : isEnrolmentAssessor(enrollment, user.id);
     if (!isOwner) {
       return NextResponse.json(
         { success: false, error: 'Forbidden' },

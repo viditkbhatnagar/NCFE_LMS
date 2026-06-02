@@ -5,6 +5,7 @@ import Assessment from '@/models/Assessment';
 import Evidence from '@/models/Evidence';
 import Enrolment from '@/models/Enrolment';
 import User from '@/models/User';
+import { assessorMatch, enrolmentAssessorIds } from '@/lib/enrolment-access';
 
 export async function GET(request: Request) {
   try {
@@ -35,7 +36,8 @@ export async function GET(request: Request) {
     if (user.role === 'student') {
       enrollmentFilter.userId = user.id;
     } else {
-      enrollmentFilter.assessorId = user.id;
+      // Assessor: enrolments where they are lead OR co-assessor.
+      Object.assign(enrollmentFilter, assessorMatch(user.id));
     }
     if (qualificationId) enrollmentFilter.qualificationId = qualificationId;
 
@@ -58,16 +60,16 @@ export async function GET(request: Request) {
       })
         .populate('userId', 'name email')
         .populate('assessorId', 'name email')
+        .populate('assessorIds', 'name email')
         .lean();
 
       const idSet = new Set<string>();
       for (const e of allEnrollments) {
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
         const learner = e.userId as any;
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        const assessor = e.assessorId as any;
         if (learner?._id) idSet.add(String(learner._id));
-        if (assessor?._id) idSet.add(String(assessor._id));
+        // All assessors (lead + co-assessors) on this enrolment.
+        for (const aid of enrolmentAssessorIds(e)) idSet.add(aid);
       }
       // Remove self from member search
       idSet.delete(user.id);
