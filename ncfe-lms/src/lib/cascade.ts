@@ -135,13 +135,18 @@ export async function hardDeleteUser(userId: string | ID): Promise<{
           assessorId: {
             $ifNull: [
               {
-                $first: {
-                  $filter: {
-                    input: { $ifNull: ['$assessorIds', []] },
-                    as: 'a',
-                    cond: { $ne: ['$$a', uid] },
+                // First assessor that is NOT the deleted user. $arrayElemAt
+                // (vs $first) is supported on older MongoDB / Atlas tiers.
+                $arrayElemAt: [
+                  {
+                    $filter: {
+                      input: { $ifNull: ['$assessorIds', []] },
+                      as: 'a',
+                      cond: { $ne: ['$$a', uid] },
+                    },
                   },
-                },
+                  0,
+                ],
               },
               null,
             ],
