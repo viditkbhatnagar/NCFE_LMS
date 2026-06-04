@@ -1,6 +1,7 @@
 import { writeFile, mkdir, unlink } from 'fs/promises';
 import { existsSync } from 'fs';
 import path from 'path';
+import { Readable } from 'stream';
 import { v4 as uuidv4 } from 'uuid';
 import {
   DeleteObjectCommand,
@@ -8,6 +9,7 @@ import {
   PutObjectCommand,
   S3Client,
 } from '@aws-sdk/client-s3';
+import { Upload } from '@aws-sdk/lib-storage';
 import { getSignedUrl } from '@aws-sdk/s3-request-presigner';
 
 const UPLOAD_DIR = path.join(process.cwd(), 'public', 'uploads');
@@ -199,6 +201,93 @@ export async function uploadFile(file: File, ownerId: string): Promise<UploadRes
     fileName: file.name,
     fileType: file.type || ext,
     fileSize: file.size,
+    storageProvider: 'local',
+  };
+}
+
+// Constant for the multipart streaming upload below. 8 MB parts with a queue
+// of 3 caps peak memory at ~24 MB regardless of how large the video is — the
+// whole point is to NOT hold the full file in RAM (which OOM-crashed the small
+// Render instance and produced the 502 admins saw).
+const STREAM_PART_SIZE = 8 * 1024 * 1024;
+const STREAM_QUEUE_SIZE = 3;
+
+interface StreamUploadArgs {
+  // Web ReadableStream (e.g. a Next.js request body) or a Node Readable.
+  body: ReadableStream<Uint8Array> | Readable;
+  fileName: string;
+  contentType: string;
+  ownerId: string;
+}
+
+// Streams an upload straight to S3 in bounded-memory parts WITHOUT ever holding
+// the whole file in memory. Used for large live-class recordings that arrive
+// from browsers on the custom domain (which the S3 bucket CORS does not allow
+// for direct presigned PUTs), so the bytes must transit our own origin.
+export async function streamUploadToS3(args: StreamUploadArgs): Promise<UploadResult> {
+  const { body, fileName, contentType, ownerId } = args;
+
+  const ext = path.extname(fileName).toLowerCase();
+  if (!ALLOWED_EXTENSIONS.includes(ext)) {
+    throw new Error(`File type ${ext} is not allowed. Allowed: ${ALLOWED_EXTENSIONS.join(', ')}`);
+  }
+
+  const nodeBody =
+    body instanceof Readable ? body : Readable.fromWeb(body as Parameters<typeof Readable.fromWeb>[0]);
+
+  const provider = getStorageProviderFromEnv();
+
+  if (provider === 's3') {
+    const { bucket, region } = getS3Config();
+    const key = buildS3Key(ownerId, ext);
+    const s3 = getS3Client(region);
+
+    const upload = new Upload({
+      client: s3,
+      params: {
+        Bucket: bucket,
+        Key: key,
+        Body: nodeBody,
+        ContentType: contentType || 'application/octet-stream',
+      },
+      partSize: STREAM_PART_SIZE,
+      queueSize: STREAM_QUEUE_SIZE,
+    });
+
+    await upload.done();
+
+    return {
+      filePath: `s3://${bucket}/${key}`,
+      fileName,
+      fileType: contentType || ext,
+      fileSize: 0,
+      storageProvider: 's3',
+      storageBucket: bucket,
+      storageKey: key,
+    };
+  }
+
+  // Local dev fallback: persist the stream to disk. Files in dev are small.
+  const now = new Date();
+  const monthDir = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
+  const uploadPath = path.join(UPLOAD_DIR, ownerId, monthDir);
+  if (!existsSync(uploadPath)) {
+    await mkdir(uploadPath, { recursive: true });
+  }
+  const uniqueName = `${uuidv4()}${ext}`;
+  const fullPath = path.join(uploadPath, uniqueName);
+
+  const chunks: Buffer[] = [];
+  for await (const chunk of nodeBody) {
+    chunks.push(Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk));
+  }
+  await writeFile(fullPath, Buffer.concat(chunks));
+
+  return {
+    filePath: `/uploads/${ownerId}/${monthDir}/${uniqueName}`,
+    fileName,
+    fileType: contentType || ext,
+    fileSize: 0,
     storageProvider: 'local',
   };
 }

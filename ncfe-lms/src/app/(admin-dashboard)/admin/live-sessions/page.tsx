@@ -6,6 +6,7 @@ import ListStateBoundary, {
   DefaultListSkeleton,
   EmptyState,
 } from '@/components/common/ListStateBoundary';
+import { uploadLiveSessionRecording } from '@/lib/recording-upload';
 
 interface LiveSession {
   _id: string;
@@ -69,6 +70,7 @@ export default function AdminLiveSessionsPage() {
   const [deleting, setDeleting] = useState(false);
 
   const [uploadingFor, setUploadingFor] = useState<string | null>(null);
+  const [uploadPct, setUploadPct] = useState(0);
   const fileRef = useRef<HTMLInputElement>(null);
 
   const fetchSessions = useCallback(async () => {
@@ -206,20 +208,17 @@ export default function AdminLiveSessionsPage() {
     const file = e.target.files?.[0];
     const sessionId = uploadingFor;
     if (!file || !sessionId) return;
+    setUploadPct(0);
+    setError(null);
     try {
-      const fd = new FormData();
-      fd.append('file', file);
-      const res = await fetch(`/api/v2/live-sessions/${sessionId}/recording`, {
-        method: 'POST',
-        body: fd,
-      });
-      if (res.ok) fetchSessions();
-      else {
-        const j = await res.json().catch(() => ({}));
-        setError(j.error || 'Recording upload failed.');
-      }
+      // Direct-to-S3 presigned upload — large videos never route through the
+      // server (which OOM-crashed it → the 502).
+      const result = await uploadLiveSessionRecording(sessionId, file, setUploadPct);
+      if (result.ok) fetchSessions();
+      else setError(result.error || 'Recording upload failed.');
     } finally {
       setUploadingFor(null);
+      setUploadPct(0);
       if (fileRef.current) fileRef.current.value = '';
     }
   };
@@ -278,12 +277,19 @@ export default function AdminLiveSessionsPage() {
             </a>
           )}
           {!s.recordingLink && !s.recordingUrl && (
-            <button
-              onClick={() => { setUploadingFor(s._id); fileRef.current?.click(); }}
-              className="px-2.5 py-1 text-xs font-medium text-gray-700 border border-gray-300 rounded-[6px] hover:bg-gray-50"
-            >
-              Upload
-            </button>
+            uploadingFor === s._id ? (
+              <span className="px-2.5 py-1 text-xs font-medium text-primary border border-primary/30 bg-primary/5 rounded-[6px]">
+                Uploading… {uploadPct}%
+              </span>
+            ) : (
+              <button
+                onClick={() => { setUploadingFor(s._id); fileRef.current?.click(); }}
+                disabled={uploadingFor !== null}
+                className="px-2.5 py-1 text-xs font-medium text-gray-700 border border-gray-300 rounded-[6px] hover:bg-gray-50 disabled:opacity-50"
+              >
+                Upload
+              </button>
+            )
           )}
           <button
             onClick={() => openEdit(s)}

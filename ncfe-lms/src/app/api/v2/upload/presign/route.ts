@@ -4,7 +4,7 @@ import { createPresignedUploadUrl, ALLOWED_EXTENSIONS, MAX_FILE_SIZE } from '@/l
 
 export async function POST(request: Request) {
   try {
-    const { session, error } = await withAuth(['assessor', 'student']);
+    const { session, error } = await withAuth(['assessor', 'student', 'admin']);
     if (error) return error;
 
     const { fileName, contentType, fileSize, ownerId } = await request.json();
