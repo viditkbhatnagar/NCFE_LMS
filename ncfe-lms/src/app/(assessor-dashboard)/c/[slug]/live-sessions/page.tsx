@@ -247,7 +247,13 @@ export default function LiveSessionsPage() {
               Watch recording
             </a>
           )}
-          {canManage && isPast && !s.recordingLink && !s.recordingUrl && (
+          {/* Upload is available for ANY session without a recording yet — not
+              just "past" ones. The session's scheduled time is irrelevant to
+              whether a recording can be attached (a class may run early, or the
+              clock/timezone may not yet read the slot as past), and gating on
+              isPast was hiding the button for managers — the admin Live Sessions
+              page never gated it, which is why uploads worked there but not here. */}
+          {canManage && !s.recordingLink && !s.recordingUrl && (
             uploadingFor === s._id ? (
               <span className="px-3 py-1.5 text-xs font-medium text-primary border border-primary/30 bg-primary/5 rounded-[6px]">
                 Uploading… {uploadPct}%
