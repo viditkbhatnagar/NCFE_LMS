@@ -11,7 +11,7 @@ export async function GET(
 ) {
   try {
     const { id } = await params;
-    const { error } = await withAuth(['assessor', 'student']);
+    const { error } = await withAuth(['assessor', 'student', 'admin']);
     if (error) return error;
 
     await dbConnect();
