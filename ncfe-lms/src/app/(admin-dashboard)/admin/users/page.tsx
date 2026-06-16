@@ -9,7 +9,9 @@ import ListStateBoundary, {
   EmptyState,
 } from '@/components/common/ListStateBoundary';
 
-const SIGN_IN_URL = 'https://ncfe-lms.onrender.com/sign-in';
+// The sign-in link shared in copied credential blocks uses whatever domain the
+// admin is currently on (the custom domain in production) via
+// window.location.origin — never a hardcoded host.
 
 interface CreatedCredentials {
   name: string;
@@ -314,7 +316,7 @@ export default function AdminUsersPage() {
 
   const handleCopyAllCredentials = async () => {
     if (!lastCreated) return;
-    const block = `Name: ${lastCreated.name}\nEmail: ${lastCreated.email}\nPassword: ${lastCreated.password}\nLogin: ${SIGN_IN_URL}`;
+    const block = `Name: ${lastCreated.name}\nEmail: ${lastCreated.email}\nPassword: ${lastCreated.password}\nLogin: ${window.location.origin}/sign-in`;
     try {
       await navigator.clipboard.writeText(block);
       setCredsCopied(true);
@@ -399,7 +401,7 @@ export default function AdminUsersPage() {
 
   const handleCopyResetCredentials = async () => {
     if (!lastReset) return;
-    const block = `Email: ${lastReset.email}\nPassword: ${lastReset.password}\nLogin: ${SIGN_IN_URL}`;
+    const block = `Email: ${lastReset.email}\nPassword: ${lastReset.password}\nLogin: ${window.location.origin}/sign-in`;
     try {
       await navigator.clipboard.writeText(block);
       setResetCredsCopied(true);

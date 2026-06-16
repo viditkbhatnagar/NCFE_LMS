@@ -7,6 +7,11 @@ import User from '@/models/User';
 
 export const { handlers, auth, signIn, signOut } = NextAuth({
   ...authConfig,
+  // Trust the proxy's forwarded host so auth redirects stay on whatever domain
+  // the request actually arrived on (the custom domain ncfe-lms.skillhubinstitute.com),
+  // instead of falling back to NEXTAUTH_URL (the Render domain). Required when
+  // serving the same app on multiple domains behind Render's reverse proxy.
+  trustHost: true,
   providers: [
     Credentials({
       name: 'credentials',
