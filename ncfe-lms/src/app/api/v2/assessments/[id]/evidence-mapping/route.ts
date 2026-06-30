@@ -4,6 +4,32 @@ import { withAuth } from '@/lib/route-guard';
 import { evidenceMappingUpdateSchema } from '@/lib/validators';
 import Assessment from '@/models/Assessment';
 import AssessmentEvidenceMap from '@/models/AssessmentEvidenceMap';
+import Enrolment from '@/models/Enrolment';
+import { isEnrolmentAssessor } from '@/lib/enrolment-access';
+
+// Who may view/manage the evidence mapped to an assessment:
+//  - admin: always
+//  - the learner the assessment is for (their own evidence)
+//  - the lead assessor OR any co-assessor on the learner's enrolment
+// Criteria mapping + sign-off remain assessor-only elsewhere; this is just the
+// evidence attachment, which learners are allowed to manage for their own work.
+async function canManageAssessmentEvidence(
+  assessment: { assessorId?: unknown; learnerId?: unknown; enrollmentId?: unknown },
+  session: { user: { id: string; role?: string } },
+): Promise<boolean> {
+  const uid = session.user.id;
+  const role = session.user.role;
+  if (role === 'admin') return true;
+  if (role === 'student') return String(assessment.learnerId ?? '') === uid;
+  if (role === 'assessor') {
+    if (String(assessment.assessorId ?? '') === uid) return true;
+    const enrol = await Enrolment.findById(assessment.enrollmentId)
+      .select('assessorId assessorIds')
+      .lean();
+    return enrol ? isEnrolmentAssessor(enrol, uid) : false;
+  }
+  return false;
+}
 
 export async function GET(
   request: Request,
@@ -11,7 +37,7 @@ export async function GET(
 ) {
   try {
     const { id } = await params;
-    const { session, error } = await withAuth(['assessor']);
+    const { session, error } = await withAuth(['assessor', 'student', 'admin']);
     if (error) return error;
 
     await dbConnect();
@@ -23,7 +49,7 @@ export async function GET(
         { status: 404 }
       );
     }
-    if (assessment.assessorId.toString() !== session!.user.id) {
+    if (!(await canManageAssessmentEvidence(assessment, session!))) {
       return NextResponse.json(
         { success: false, error: 'Forbidden' },
         { status: 403 }
@@ -50,7 +76,7 @@ export async function PUT(
 ) {
   try {
     const { id } = await params;
-    const { session, error } = await withAuth(['assessor']);
+    const { session, error } = await withAuth(['assessor', 'student', 'admin']);
     if (error) return error;
 
     const body = await request.json();
@@ -75,7 +101,7 @@ export async function PUT(
         { status: 404 }
       );
     }
-    if (assessment.assessorId.toString() !== session!.user.id) {
+    if (!(await canManageAssessmentEvidence(assessment, session!))) {
       return NextResponse.json(
         { success: false, error: 'Forbidden' },
         { status: 403 }

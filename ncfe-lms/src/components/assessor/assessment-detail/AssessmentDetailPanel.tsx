@@ -235,13 +235,17 @@ export default function AssessmentDetailPanel({
         {/* Divider */}
         <hr className="border-gray-100" />
 
-        {/* Section 4: Evidence Mapping */}
+        {/* Section 4: Evidence Mapping.
+            Learners may attach/detach their OWN evidence here even though the
+            rest of the panel is read-only for them — they only ever see their
+            own assessment, and the API ownership-checks every change. Criteria
+            mapping + sign-off below stay assessor-only (assessor judgement). */}
         <EvidenceMappingSection
           assessmentId={assessmentId}
           enrollmentId={enrollmentId}
           evidenceMap={evidenceMap}
           onUpdated={refreshDetail}
-          readOnly={readOnly}
+          readOnly={readOnly && userRole !== 'student'}
         />
 
         {/* Section 5: Criteria Mapping */}
