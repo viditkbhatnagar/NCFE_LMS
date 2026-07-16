@@ -189,40 +189,58 @@ export async function POST(req: NextRequest) {
     const scheduledDate = new Date(data.scheduledAt);
     const durationMinutes = data.durationMinutes ?? 60;
 
-    // In-app notification — students AND assessor(s).
-    const allRecipients = new Set([...studentIds, ...assessorIds]);
-    for (const userId of allRecipients) {
-      createNotification({
-        userId,
-        type: 'live_session_scheduled',
-        title: 'New live class scheduled',
-        message: `${data.title} — ${scheduledDate.toLocaleString()}`,
-        entityType: 'LiveSession',
-        entityId: String(created._id),
-      });
-    }
+    // Decide WHAT to announce based on the session's actual timing/state:
+    //  - upcoming class  -> "scheduled" (join link)
+    //  - a past class added with a recording (retroactive entry) -> "recording
+    //    available" — NOT "scheduled", or recipients get a "class scheduled"
+    //    email for a class that already happened (the bug Jyothi reported).
+    //  - a past class with no recording -> nothing to announce.
+    const isUpcoming =
+      created.status === 'scheduled' && scheduledDate.getTime() > Date.now();
+    const recordingLink = data.recordingLink || undefined;
+    const hasRecording = !!recordingLink;
 
-    // Email — fetch user details for everyone in one query, then send.
-    const users = await User.find({
-      _id: { $in: [...allRecipients] },
-      status: 'active',
-    })
-      .select('name email')
-      .lean();
-    for (const u of users) {
-      const kind: 'student' | 'assessor' = assessorIds.has(String(u._id))
-        ? 'assessor'
-        : 'student';
-      sendLiveSessionScheduledEmail({
-        recipientName: u.name,
-        recipientEmail: u.email,
-        recipientKind: kind,
-        sessionTitle: data.title,
-        qualificationTitle: qualTitle,
-        scheduledAt: scheduledDate,
-        durationMinutes,
-        meetingLink: data.meetingLink,
-      }).catch((err) => console.warn('live-session email failed:', err));
+    if (isUpcoming || hasRecording) {
+      const allRecipients = new Set([...studentIds, ...assessorIds]);
+
+      // In-app notification — students AND assessor(s).
+      for (const userId of allRecipients) {
+        createNotification({
+          userId,
+          type: 'live_session_scheduled',
+          title: isUpcoming ? 'New live class scheduled' : 'Live class recording available',
+          message: isUpcoming
+            ? `${data.title} — ${scheduledDate.toLocaleString()}`
+            : `${data.title} — recording now available`,
+          entityType: 'LiveSession',
+          entityId: String(created._id),
+        });
+      }
+
+      // Email — fetch user details for everyone in one query, then send.
+      const users = await User.find({
+        _id: { $in: [...allRecipients] },
+        status: 'active',
+      })
+        .select('name email')
+        .lean();
+      for (const u of users) {
+        const kind: 'student' | 'assessor' = assessorIds.has(String(u._id))
+          ? 'assessor'
+          : 'student';
+        sendLiveSessionScheduledEmail({
+          recipientName: u.name,
+          recipientEmail: u.email,
+          recipientKind: kind,
+          sessionTitle: data.title,
+          qualificationTitle: qualTitle,
+          scheduledAt: scheduledDate,
+          durationMinutes,
+          meetingLink: data.meetingLink,
+          variant: isUpcoming ? 'scheduled' : 'recording',
+          recordingUrl: recordingLink,
+        }).catch((err) => console.warn('live-session email failed:', err));
+      }
     }
   } catch (err) {
     console.warn('live-session notify failed:', err);

@@ -319,6 +319,11 @@ export async function sendLiveSessionScheduledEmail(args: {
   scheduledAt: Date;
   durationMinutes: number;
   meetingLink: string;
+  // 'scheduled' = an upcoming class (join link). 'recording' = a past class
+  // added/completed with a recording — never call this a "scheduled" class, or
+  // recipients get a "class scheduled" email for a class that already happened.
+  variant?: 'scheduled' | 'recording';
+  recordingUrl?: string;
 }): Promise<SendResult> {
   const when = args.scheduledAt.toLocaleString(undefined, {
     weekday: 'long',
@@ -328,6 +333,34 @@ export async function sendLiveSessionScheduledEmail(args: {
     hour: '2-digit',
     minute: '2-digit',
   });
+
+  if (args.variant === 'recording') {
+    const link = args.recordingUrl || args.meetingLink;
+    const intro = args.recipientKind === 'student'
+      ? `A recording is now available for a live class on <em>${escapeHtml(args.qualificationTitle)}</em>. You can watch it any time.`
+      : `A recording has been added for a live class on your course <em>${escapeHtml(args.qualificationTitle)}</em>.`;
+    const button = `
+    <p style="margin:24px 0;text-align:center;">
+      <a href="${escapeAttr(link)}" style="display:inline-block;padding:12px 24px;background:#15803d;color:#ffffff;text-decoration:none;border-radius:6px;font-weight:600;">Watch recording</a>
+    </p>`;
+    const html = wrapper(`
+    <h1 style="margin:0 0 8px;font-size:22px;color:#111827;">Live class recording available</h1>
+    <p style="margin:0 0 16px;color:#374151;">Hi ${escapeHtml(args.recipientName)},</p>
+    <p style="margin:0 0 16px;color:#374151;">${intro}</p>
+    <div style="margin:20px 0;padding:16px;background:#f9fafb;border-radius:6px;border:1px solid #e5e7eb;font-size:14px;">
+      <div style="margin-bottom:6px;"><strong>${escapeHtml(args.sessionTitle)}</strong></div>
+      <div style="color:#6b7280;">Held ${escapeHtml(when)} &middot; ${args.durationMinutes} min</div>
+    </div>
+    ${button}
+  `);
+    return send(
+      'live_session_recording',
+      { email: args.recipientEmail, name: args.recipientName },
+      `Recording available: ${args.sessionTitle}`,
+      html,
+    );
+  }
+
   const intro = args.recipientKind === 'student'
     ? `A new live class has been scheduled on <em>${escapeHtml(args.qualificationTitle)}</em>. Click below to join when it starts.`
     : `A live class has been scheduled on your course <em>${escapeHtml(args.qualificationTitle)}</em>. You can use the same link to host the class.`;
