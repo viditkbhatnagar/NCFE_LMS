@@ -12,7 +12,7 @@ export async function GET(
 ) {
   try {
     const { id } = await params;
-    const { session, error } = await withAuth(['assessor', 'student']);
+    const { session, error } = await withAuth(['assessor', 'student', 'admin']);
     if (error) return error;
 
     await dbConnect();
@@ -33,7 +33,7 @@ export async function GET(
           { status: 403 }
         );
       }
-    } else if (assessment.assessorId.toString() !== userId) {
+    } else if (userRole !== 'admin' && assessment.assessorId.toString() !== userId) {
       return NextResponse.json(
         { success: false, error: 'Forbidden' },
         { status: 403 }
@@ -61,7 +61,7 @@ export async function POST(
 ) {
   try {
     const { id } = await params;
-    const { session, error } = await withAuth(['assessor', 'student']);
+    const { session, error } = await withAuth(['assessor', 'student', 'admin']);
     if (error) return error;
 
     const body = await request.json();
@@ -95,7 +95,7 @@ export async function POST(
           { status: 403 }
         );
       }
-    } else if (assessment.assessorId.toString() !== userId) {
+    } else if (userRole !== 'admin' && assessment.assessorId.toString() !== userId) {
       return NextResponse.json(
         { success: false, error: 'Forbidden' },
         { status: 403 }

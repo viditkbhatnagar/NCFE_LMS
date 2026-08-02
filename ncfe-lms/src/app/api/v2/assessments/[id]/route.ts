@@ -83,9 +83,12 @@ export async function GET(
           { status: 403 }
         );
       }
+    } else if (userRole === 'admin') {
+      // Admin is a full superset — can view AND edit any assessment.
+      canEdit = true;
     } else if (assessment.assessorId.toString() === userId) {
       canEdit = true;
-    } else if (userRole !== 'admin') {
+    } else {
       // A non-owning assessor may VIEW read-only any assessment on a course they
       // teach on (they assess at least one enrolment in that qualification).
       const teaches = await Enrolment.exists({
@@ -149,7 +152,7 @@ export async function PUT(
 ) {
   try {
     const { id } = await params;
-    const { session, error } = await withAuth(['assessor']);
+    const { session, error } = await withAuth(['assessor', 'admin']);
     if (error) return error;
 
     const body = await request.json();
@@ -175,7 +178,7 @@ export async function PUT(
       );
     }
 
-    if (assessment.assessorId.toString() !== session!.user.id) {
+    if (session!.user.role !== 'admin' && assessment.assessorId.toString() !== session!.user.id) {
       return NextResponse.json(
         { success: false, error: 'Forbidden' },
         { status: 403 }
@@ -250,7 +253,7 @@ export async function DELETE(
 ) {
   try {
     const { id } = await params;
-    const { session, error } = await withAuth(['assessor']);
+    const { session, error } = await withAuth(['assessor', 'admin']);
     if (error) return error;
 
     await dbConnect();
@@ -263,14 +266,14 @@ export async function DELETE(
       );
     }
 
-    if (assessment.assessorId.toString() !== session!.user.id) {
+    if (session!.user.role !== 'admin' && assessment.assessorId.toString() !== session!.user.id) {
       return NextResponse.json(
         { success: false, error: 'Forbidden' },
         { status: 403 }
       );
     }
 
-    if (assessment.status !== 'draft') {
+    if (session!.user.role !== 'admin' && assessment.status !== 'draft') {
       return NextResponse.json(
         { success: false, error: 'Only draft assessments can be deleted' },
         { status: 400 }

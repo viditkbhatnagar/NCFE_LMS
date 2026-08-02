@@ -23,7 +23,7 @@ export async function POST(
 ) {
   try {
     const { id } = await params;
-    const { session, error } = await withAuth(['assessor']);
+    const { session, error } = await withAuth(['assessor', 'admin']);
     if (error) return error;
 
     const body = await request.json();
@@ -43,23 +43,25 @@ export async function POST(
     }
 
     const userId = session!.user.id;
+    const isAdmin = session!.user.role === 'admin';
 
-    // Caller must be allowed to SEE the source: the owning assessor, or an
-    // assessor who teaches the source's course.
+    // Caller must be allowed to SEE the source: the owning assessor, an assessor
+    // who teaches the source's course, or an admin (superset).
     const isOwner = source.assessorId.toString() === userId;
     const teachesSource =
+      isAdmin ||
       isOwner ||
       !!(await Enrolment.exists({ qualificationId: source.qualificationId, ...assessorMatch(userId) }));
     if (!teachesSource) {
       return NextResponse.json({ success: false, error: 'Forbidden' }, { status: 403 });
     }
 
-    // Target enrolment must exist and be one the caller assesses.
+    // Target enrolment must exist and be one the caller assesses (admins: any).
     const target = await Enrolment.findById(validation.data.enrollmentId);
     if (!target) {
       return NextResponse.json({ success: false, error: 'Target enrolment not found' }, { status: 404 });
     }
-    if (!isEnrolmentAssessor(target, userId)) {
+    if (!isAdmin && !isEnrolmentAssessor(target, userId)) {
       return NextResponse.json(
         { success: false, error: 'Forbidden: that learner is not assigned to you' },
         { status: 403 },

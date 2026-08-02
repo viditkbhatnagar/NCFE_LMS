@@ -13,7 +13,7 @@ import type { SignOffRole } from '@/types';
 
 export async function GET(request: Request) {
   try {
-    const { session, error } = await withAuth(['assessor', 'iqa']);
+    const { session, error } = await withAuth(['assessor', 'iqa', 'admin']);
     if (error) return error;
 
     const { searchParams } = new URL(request.url);
@@ -33,8 +33,14 @@ export async function GET(request: Request) {
     // Multi-assessor: an assessor sees ALL assessments on the learners they
     // assess (lead or co-assessor) for this qualification — not only the ones
     // they personally created. Scope by the enrolments they assess.
+    // Admin sees every enrolment (full oversight); iqa → assigned learners;
+    // assessor → learners they assess.
     const scopeMatch =
-      session!.user.role === 'iqa' ? iqaMatch(session!.user.id) : assessorMatch(session!.user.id);
+      session!.user.role === 'admin'
+        ? {}
+        : session!.user.role === 'iqa'
+          ? iqaMatch(session!.user.id)
+          : assessorMatch(session!.user.id);
     const myEnrolments = await Enrolment.find({
       qualificationId,
       ...scopeMatch,
@@ -98,7 +104,7 @@ export async function GET(request: Request) {
 
 export async function POST(request: Request) {
   try {
-    const { session, error } = await withAuth(['assessor']);
+    const { session, error } = await withAuth(['assessor', 'admin']);
     if (error) return error;
 
     const body = await request.json();
@@ -124,8 +130,9 @@ export async function POST(request: Request) {
         { status: 404 }
       );
     }
-    // Any assigned assessor (lead or co-assessor) can create assessments.
-    if (!isEnrolmentAssessor(enrollment, session!.user.id)) {
+    // Any assigned assessor (lead or co-assessor) can create assessments; an
+    // admin (superset) can create for any enrolment.
+    if (session!.user.role !== 'admin' && !isEnrolmentAssessor(enrollment, session!.user.id)) {
       return NextResponse.json(
         { success: false, error: 'Forbidden: learner not assigned to you' },
         { status: 403 }

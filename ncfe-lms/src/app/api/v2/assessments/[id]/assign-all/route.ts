@@ -26,7 +26,7 @@ export async function POST(
 ) {
   try {
     const { id } = await params;
-    const { session, error } = await withAuth(['assessor']);
+    const { session, error } = await withAuth(['assessor', 'admin']);
     if (error) return error;
 
     const body = await request.json().catch(() => ({}));
@@ -40,8 +40,9 @@ export async function POST(
     }
 
     const userId = session!.user.id;
-    // Caller must teach the source's course.
+    // Caller must teach the source's course (admins: superset — allowed).
     const teaches =
+      session!.user.role === 'admin' ||
       source.assessorId.toString() === userId ||
       !!(await Enrolment.exists({ qualificationId: source.qualificationId, ...assessorMatch(userId) }));
     if (!teaches) {
