@@ -10,6 +10,8 @@ import EvidenceMappingSection from './EvidenceMappingSection';
 import CriteriaMappingSection from './CriteriaMappingSection';
 import SignOffStatusSection from './SignOffStatusSection';
 import RemarksSection from './RemarksSection';
+import LearnerSelectionModal from '@/components/assessor/LearnerSelectionModal';
+import { useAssessorCourse } from '@/contexts/AssessorCourseContext';
 import type {
   AssessmentKind,
   AssessmentStatus,
@@ -71,6 +73,9 @@ export default function AssessmentDetailPanel({
   // prop, it gates every write affordance in the panel.
   const [canEdit, setCanEdit] = useState(true);
   const effectiveReadOnly = readOnly || !canEdit;
+  const { enrollments } = useAssessorCourse();
+  const [showDuplicate, setShowDuplicate] = useState(false);
+  const [duplicating, setDuplicating] = useState(false);
 
   // Auto-save hook
   const { saveStatus, scheduleUpdate, setSaveStatus } = useAutoSave<EditState>({
@@ -188,6 +193,31 @@ export default function AssessmentDetailPanel({
   // Re-fetch callbacks for sub-sections
   const refreshDetail = () => fetchDetail();
 
+  // Duplicate this assessment's plan onto another learner (creates a fresh draft
+  // owned by the current assessor). Allowed even when viewing read-only.
+  const handleDuplicate = async (target: { _id: string; userId?: { _id: string } }) => {
+    if (duplicating) return;
+    setDuplicating(true);
+    try {
+      const res = await fetch(`/api/v2/assessments/${assessmentId}/duplicate`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ enrollmentId: target._id, learnerId: target.userId?._id }),
+      });
+      const json = await res.json();
+      if (json.success) {
+        setShowDuplicate(false);
+        onUpdated();
+      } else {
+        alert(json.error || 'Failed to duplicate assessment');
+      }
+    } catch {
+      alert('Failed to duplicate assessment');
+    } finally {
+      setDuplicating(false);
+    }
+  };
+
   if (loading) {
     return (
       <div className="flex items-center justify-center h-full">
@@ -211,6 +241,7 @@ export default function AssessmentDetailPanel({
         onPublish={handlePublish}
         onDelete={handleDelete}
         onClose={onClose}
+        onDuplicate={() => setShowDuplicate(true)}
       />
 
       {/* Scrollable sections */}
@@ -295,6 +326,13 @@ export default function AssessmentDetailPanel({
         loading={deleting}
         onConfirm={performDelete}
         onCancel={() => setConfirmDelete(false)}
+      />
+
+      <LearnerSelectionModal
+        isOpen={showDuplicate}
+        onClose={() => setShowDuplicate(false)}
+        enrollments={enrollments}
+        onSelect={(enr) => handleDuplicate(enr)}
       />
     </div>
   );

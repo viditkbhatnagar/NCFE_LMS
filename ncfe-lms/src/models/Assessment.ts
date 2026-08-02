@@ -13,6 +13,7 @@ export interface IAssessment extends Document {
   assessorId: mongoose.Types.ObjectId;
   enrollmentId: mongoose.Types.ObjectId;
   qualificationId: mongoose.Types.ObjectId;
+  sourceAssessmentId?: mongoose.Types.ObjectId;
   createdAt: Date;
   updatedAt: Date;
 }
@@ -78,6 +79,12 @@ const AssessmentSchema = new Schema<IAssessment>(
       type: Schema.Types.ObjectId,
       ref: 'Qualification',
       required: [true, 'Qualification ID is required'],
+    },
+    // Set when this assessment was created by duplicating another one — for
+    // lineage/traceability. Optional; absent on originals.
+    sourceAssessmentId: {
+      type: Schema.Types.ObjectId,
+      ref: 'Assessment',
     },
   },
   {

@@ -115,6 +115,13 @@ export const assessmentCreateSchema = z.object({
   enrollmentId: z.string().min(1, 'Enrollment ID is required'),
 });
 
+// Duplicating an assessment to another learner. learnerId is optional — the API
+// derives it from the target enrolment when omitted.
+export const assessmentDuplicateSchema = z.object({
+  enrollmentId: z.string().min(1, 'Target enrolment is required'),
+  learnerId: z.string().optional(),
+});
+
 export const signOffSchema = z.object({
   assessmentId: z.string().min(1),
   role: z.enum(['assessor', 'iqa', 'eqa', 'learner']),

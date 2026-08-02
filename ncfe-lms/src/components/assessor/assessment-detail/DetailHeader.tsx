@@ -15,6 +15,7 @@ interface DetailHeaderProps {
   onPublish: () => void;
   onDelete: () => void;
   onClose: () => void;
+  onDuplicate?: () => void;
 }
 
 const ROLE_ICONS: Record<string, { label: string; icon: React.ReactNode }> = {
@@ -66,6 +67,7 @@ export default function DetailHeader({
   onPublish,
   onDelete,
   onClose,
+  onDuplicate,
 }: DetailHeaderProps) {
   const d = date ? new Date(date) : null;
   const dateValue = d && !isNaN(d.getTime()) ? d.toISOString().split('T')[0] : '';
@@ -184,6 +186,18 @@ export default function DetailHeader({
           >
             PDF
           </a>
+        )}
+
+        {/* Duplicate to another learner — available even when viewing read-only
+            (the copy is created fresh under the current assessor). */}
+        {onDuplicate && (
+          <button
+            onClick={onDuplicate}
+            className="px-3 py-1 text-xs font-medium text-gray-700 border border-gray-300 rounded-[6px] hover:bg-gray-50"
+            title="Duplicate this assessment to another learner"
+          >
+            Duplicate
+          </button>
         )}
 
         {/* Delete — hidden for read-only */}
