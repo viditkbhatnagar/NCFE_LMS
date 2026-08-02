@@ -44,6 +44,8 @@ export interface AssessmentListItem {
   criteriaCount: number;
   publishCount: number;
   signOffs: Array<{ role: SignOffRole; status: SignOffStatus }>;
+  audience?: 'single' | 'all';
+  assignmentGroupId?: string;
   createdAt: string;
   updatedAt: string;
 }

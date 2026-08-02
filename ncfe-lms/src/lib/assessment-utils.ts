@@ -22,6 +22,39 @@ export function formatAssessmentDate(dateStr: string): string {
   });
 }
 
+export interface AssessmentFolder {
+  key: string;
+  label: string;
+  items: AssessmentListItem[];
+}
+
+// Groups assessments into folders for the folder-wise view: one folder per
+// learner (for individually-assigned assessments), plus a single "All learners"
+// folder holding every copy that was assigned to the whole cohort (audience='all').
+export function groupIntoFolders(assessments: AssessmentListItem[]): AssessmentFolder[] {
+  const allLearners = assessments.filter((a) => a.audience === 'all');
+  const single = assessments.filter((a) => a.audience !== 'all');
+
+  const byLearner = new Map<string, { name: string; items: AssessmentListItem[] }>();
+  for (const a of single) {
+    const lid = a.learnerId?._id || 'unknown';
+    const name = a.learnerId?.name || 'Unknown learner';
+    if (!byLearner.has(lid)) byLearner.set(lid, { name, items: [] });
+    byLearner.get(lid)!.items.push(a);
+  }
+
+  const learnerFolders: AssessmentFolder[] = [...byLearner.entries()]
+    .map(([lid, v]) => ({ key: `learner:${lid}`, label: v.name, items: v.items }))
+    .sort((a, b) => a.label.localeCompare(b.label));
+
+  const folders: AssessmentFolder[] = [];
+  if (allLearners.length > 0) {
+    folders.push({ key: 'all', label: 'All learners', items: allLearners });
+  }
+  folders.push(...learnerFolders);
+  return folders;
+}
+
 export function groupByTimePeriod(
   assessments: AssessmentListItem[]
 ): { label: string; items: AssessmentListItem[] }[] {

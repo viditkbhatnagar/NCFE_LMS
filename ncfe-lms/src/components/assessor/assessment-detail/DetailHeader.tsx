@@ -16,6 +16,7 @@ interface DetailHeaderProps {
   onDelete: () => void;
   onClose: () => void;
   onDuplicate?: () => void;
+  onAssignAll?: () => void;
 }
 
 const ROLE_ICONS: Record<string, { label: string; icon: React.ReactNode }> = {
@@ -68,6 +69,7 @@ export default function DetailHeader({
   onDelete,
   onClose,
   onDuplicate,
+  onAssignAll,
 }: DetailHeaderProps) {
   const d = date ? new Date(date) : null;
   const dateValue = d && !isNaN(d.getTime()) ? d.toISOString().split('T')[0] : '';
@@ -197,6 +199,17 @@ export default function DetailHeader({
             title="Duplicate this assessment to another learner"
           >
             Duplicate
+          </button>
+        )}
+
+        {/* Assign to every learner on the course (owner action). */}
+        {!readOnly && onAssignAll && (
+          <button
+            onClick={onAssignAll}
+            className="px-3 py-1 text-xs font-medium text-gray-700 border border-gray-300 rounded-[6px] hover:bg-gray-50"
+            title="Assign this assessment to all learners on the course"
+          >
+            Assign to all
           </button>
         )}
 

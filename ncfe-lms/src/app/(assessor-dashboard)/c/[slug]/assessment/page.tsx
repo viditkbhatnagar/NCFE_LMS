@@ -5,7 +5,7 @@ import { useAssessorCourse } from '@/contexts/AssessorCourseContext';
 import AssessmentCard from '@/components/assessor/AssessmentCard';
 import LearnerSelectionModal from '@/components/assessor/LearnerSelectionModal';
 import AssessmentDetailPanel from '@/components/assessor/assessment-detail/AssessmentDetailPanel';
-import { groupByTimePeriod } from '@/lib/assessment-utils';
+import { groupIntoFolders } from '@/lib/assessment-utils';
 import type { AssessmentListItem } from '@/types';
 import ListStateBoundary, {
   DefaultListSkeleton,
@@ -28,6 +28,7 @@ export default function AssessmentsPage() {
   const [selectedAssessmentId, setSelectedAssessmentId] = useState<string | null>(null);
   const [showLearnerModal, setShowLearnerModal] = useState(false);
   const [creating, setCreating] = useState(false);
+  const [collapsedFolders, setCollapsedFolders] = useState<Set<string>>(new Set());
   const [panelW, setPanelW] = useState<number | null>(null);
   const [isDesktop, setIsDesktop] = useState(false);
 
@@ -139,7 +140,14 @@ export default function AssessmentsPage() {
     setSelectedAssessmentId(null);
   };
 
-  const groups = groupByTimePeriod(assessments);
+  const folders = groupIntoFolders(assessments);
+  const toggleFolder = (key: string) =>
+    setCollapsedFolders((prev) => {
+      const next = new Set(prev);
+      if (next.has(key)) next.delete(key);
+      else next.add(key);
+      return next;
+    });
 
   // Find the selected assessment to get its enrollmentId
   const selectedAssessment = assessments.find((a) => a._id === selectedAssessmentId);
@@ -198,24 +206,43 @@ export default function AssessmentsPage() {
             />
           }
         >
-          {/* Card grid grouped by time */}
-          {groups.map((group) => (
-            <div key={group.label} className="mb-6">
-              <h2 className="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-3">
-                {group.label}
-              </h2>
-              <div className="grid grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3">
-                {group.items.map((assessment) => (
-                  <AssessmentCard
-                    key={assessment._id}
-                    assessment={assessment}
-                    isSelected={selectedAssessmentId === assessment._id}
-                    onClick={() => setSelectedAssessmentId(assessment._id)}
-                  />
-                ))}
+          {/* Folder-wise: one folder per learner + an "All learners" folder */}
+          {folders.map((folder) => {
+            const collapsed = collapsedFolders.has(folder.key);
+            const isAll = folder.key === 'all';
+            return (
+              <div key={folder.key} className="mb-4">
+                <button
+                  onClick={() => toggleFolder(folder.key)}
+                  className="w-full flex items-center gap-2 py-2 text-left group"
+                >
+                  <svg
+                    className={`w-4 h-4 text-gray-400 transition-transform ${collapsed ? '' : 'rotate-90'}`}
+                    fill="none" viewBox="0 0 24 24" stroke="currentColor"
+                  >
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+                  </svg>
+                  <svg className={`w-4 h-4 ${isAll ? 'text-primary' : 'text-amber-500'}`} fill="currentColor" viewBox="0 0 20 20">
+                    <path d="M2 6a2 2 0 012-2h4l2 2h6a2 2 0 012 2v6a2 2 0 01-2 2H4a2 2 0 01-2-2V6z" />
+                  </svg>
+                  <span className="text-sm font-semibold text-gray-800">{folder.label}</span>
+                  <span className="text-xs text-gray-400">({folder.items.length})</span>
+                </button>
+                {!collapsed && (
+                  <div className="grid grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3 pl-6 pt-1">
+                    {folder.items.map((assessment) => (
+                      <AssessmentCard
+                        key={assessment._id}
+                        assessment={assessment}
+                        isSelected={selectedAssessmentId === assessment._id}
+                        onClick={() => setSelectedAssessmentId(assessment._id)}
+                      />
+                    ))}
+                  </div>
+                )}
               </div>
-            </div>
-          ))}
+            );
+          })}
         </ListStateBoundary>
       </div>
 

@@ -76,6 +76,8 @@ export default function AssessmentDetailPanel({
   const { enrollments } = useAssessorCourse();
   const [showDuplicate, setShowDuplicate] = useState(false);
   const [duplicating, setDuplicating] = useState(false);
+  const [confirmAssignAll, setConfirmAssignAll] = useState(false);
+  const [assigningAll, setAssigningAll] = useState(false);
 
   // Auto-save hook
   const { saveStatus, scheduleUpdate, setSaveStatus } = useAutoSave<EditState>({
@@ -218,6 +220,27 @@ export default function AssessmentDetailPanel({
     }
   };
 
+  // Assign this assessment's plan to every learner on the course (fan-out).
+  const handleAssignAll = async () => {
+    if (assigningAll) return;
+    setAssigningAll(true);
+    try {
+      const res = await fetch(`/api/v2/assessments/${assessmentId}/assign-all`, { method: 'POST' });
+      const json = await res.json();
+      if (json.success) {
+        setConfirmAssignAll(false);
+        alert(`Assigned to ${json.data?.count ?? 0} learner(s).`);
+        onUpdated();
+      } else {
+        alert(json.error || 'Failed to assign to all learners');
+      }
+    } catch {
+      alert('Failed to assign to all learners');
+    } finally {
+      setAssigningAll(false);
+    }
+  };
+
   if (loading) {
     return (
       <div className="flex items-center justify-center h-full">
@@ -242,6 +265,7 @@ export default function AssessmentDetailPanel({
         onDelete={handleDelete}
         onClose={onClose}
         onDuplicate={() => setShowDuplicate(true)}
+        onAssignAll={() => setConfirmAssignAll(true)}
       />
 
       {/* Scrollable sections */}
@@ -333,6 +357,16 @@ export default function AssessmentDetailPanel({
         onClose={() => setShowDuplicate(false)}
         enrollments={enrollments}
         onSelect={(enr) => handleDuplicate(enr)}
+      />
+
+      <ConfirmDialog
+        open={confirmAssignAll}
+        title="Assign to all learners?"
+        message="This creates a copy of this assessment for every active learner on the course, each under their own assessor. Existing copies are not affected."
+        confirmLabel="Assign to all"
+        loading={assigningAll}
+        onConfirm={handleAssignAll}
+        onCancel={() => setConfirmAssignAll(false)}
       />
     </div>
   );

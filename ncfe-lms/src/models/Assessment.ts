@@ -14,6 +14,11 @@ export interface IAssessment extends Document {
   enrollmentId: mongoose.Types.ObjectId;
   qualificationId: mongoose.Types.ObjectId;
   sourceAssessmentId?: mongoose.Types.ObjectId;
+  // 'all' = one of the per-learner copies created by an "assign to all learners"
+  // action; those copies share an assignmentGroupId so the UI can show them as
+  // a single batch in the "All learners" folder. Default 'single'.
+  audience: 'single' | 'all';
+  assignmentGroupId?: mongoose.Types.ObjectId;
   createdAt: Date;
   updatedAt: Date;
 }
@@ -85,6 +90,14 @@ const AssessmentSchema = new Schema<IAssessment>(
     sourceAssessmentId: {
       type: Schema.Types.ObjectId,
       ref: 'Assessment',
+    },
+    audience: {
+      type: String,
+      enum: ['single', 'all'],
+      default: 'single',
+    },
+    assignmentGroupId: {
+      type: Schema.Types.ObjectId,
     },
   },
   {
