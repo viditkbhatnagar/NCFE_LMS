@@ -12,6 +12,9 @@ export interface IEnrolment extends Document {
   // Full set of assessors assigned to this enrolment (includes the lead).
   // A student is visible to, and accessible by, EVERY assessor listed here.
   assessorIds: mongoose.Types.ObjectId[];
+  // Internal Quality Assurer(s) assigned to this enrolment. An IQA sees (read
+  // only) the learners they are assigned to here.
+  iqaIds: mongoose.Types.ObjectId[];
   status: EnrolmentStatus;
   enrolledAt: Date;
   createdAt: Date;
@@ -44,6 +47,12 @@ const EnrolmentSchema = new Schema<IEnrolment>(
         ref: 'User',
       },
     ],
+    iqaIds: [
+      {
+        type: Schema.Types.ObjectId,
+        ref: 'User',
+      },
+    ],
     status: {
       type: String,
       enum: ['enrolled', 'in_progress', 'completed', 'withdrawn'],
@@ -63,6 +72,7 @@ EnrolmentSchema.index({ userId: 1 });
 EnrolmentSchema.index({ qualificationId: 1 });
 EnrolmentSchema.index({ assessorId: 1 });
 EnrolmentSchema.index({ assessorIds: 1 });
+EnrolmentSchema.index({ iqaIds: 1 });
 EnrolmentSchema.index({ userId: 1, qualificationId: 1 });
 EnrolmentSchema.index({ status: 1 });
 

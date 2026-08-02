@@ -118,8 +118,14 @@ export default function AssessorIconSidebar({ isOpen, onClose, userRole }: Props
     prevPathnameRef.current = pathname;
   }, [pathname, onClose]);
 
-  // When no slug (course selector), only show Home icon
-  const visibleIcons = slug ? navIcons : navIcons.filter((item) => item.path === '');
+  // When no slug (course selector), only show Home icon.
+  let visibleIcons = slug ? navIcons : navIcons.filter((item) => item.path === '');
+  // IQA is a read-only quality-assurance role: it must not see live classes or
+  // course documents.
+  if (userRole === 'iqa') {
+    const hiddenForIqa = new Set(['/course-documents', '/live-sessions']);
+    visibleIcons = visibleIcons.filter((item) => !hiddenForIqa.has(item.path));
+  }
 
   const sidebarContent = (
     <aside className="w-[65px] bg-secondary flex flex-col items-center py-3 gap-1 shrink-0 h-full">

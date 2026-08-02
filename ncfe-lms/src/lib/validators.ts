@@ -311,6 +311,7 @@ export const adminEnrolmentCreateSchema = z.object({
   // through assessorIds. The API merges + derives the lead.
   assessorId: z.string().optional(),
   assessorIds: z.array(z.string()).optional(),
+  iqaIds: z.array(z.string()).optional(),
   cohortId: z.string().optional(),
   status: z.enum(['enrolled', 'in_progress', 'completed', 'withdrawn']).optional().default('enrolled'),
 });
@@ -318,6 +319,7 @@ export const adminEnrolmentCreateSchema = z.object({
 export const adminEnrolmentUpdateSchema = z.object({
   assessorId: z.string().optional(),
   assessorIds: z.array(z.string()).optional(),
+  iqaIds: z.array(z.string()).optional(),
   cohortId: z.string().optional(),
   status: z.enum(['enrolled', 'in_progress', 'completed', 'withdrawn']).optional(),
 });

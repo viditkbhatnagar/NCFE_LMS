@@ -208,7 +208,7 @@ export default function PortfolioPage() {
           onSortChange={setSort}
           viewMode={viewMode}
           onViewModeChange={setViewMode}
-          onUploadClick={() => setShowUploadModal(true)}
+          onUploadClick={userRole === 'iqa' ? undefined : () => setShowUploadModal(true)}
         />
       </div>
 

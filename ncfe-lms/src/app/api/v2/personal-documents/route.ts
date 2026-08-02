@@ -4,11 +4,11 @@ import { withAuth } from '@/lib/route-guard';
 import { uploadFile } from '@/lib/upload';
 import PersonalDocument from '@/models/PersonalDocument';
 import Enrolment from '@/models/Enrolment';
-import { assessorMatch } from '@/lib/enrolment-access';
+import { assessorMatch, iqaMatch } from '@/lib/enrolment-access';
 
 export async function GET(request: Request) {
   try {
-    const { session, error } = await withAuth(['assessor', 'student']);
+    const { session, error } = await withAuth(['assessor', 'student', 'iqa']);
     if (error) return error;
 
     const { searchParams } = new URL(request.url);
@@ -33,10 +33,11 @@ export async function GET(request: Request) {
         );
       }
 
-      // Verify this learner belongs to the assessor's enrollments (lead or co-assessor)
+      // Verify this learner is assigned to the requester — an assessor (lead or
+      // co-assessor) or an IQA.
       const enrollment = await Enrolment.findOne({
         userId,
-        ...assessorMatch(user.id),
+        ...(user.role === 'iqa' ? iqaMatch(user.id) : assessorMatch(user.id)),
       }).lean();
 
       if (!enrollment) {

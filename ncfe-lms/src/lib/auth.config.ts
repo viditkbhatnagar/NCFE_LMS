@@ -45,7 +45,7 @@ export const authConfig: NextAuthConfig = {
           nextUrl.pathname.startsWith('/submissions') ||
           nextUrl.pathname.startsWith('/progress');
 
-        if (isOldDashboard && (role === 'assessor' || role === 'student')) {
+        if (isOldDashboard && (role === 'assessor' || role === 'student' || role === 'iqa')) {
           return Response.redirect(new URL('/c', nextUrl));
         }
 
@@ -67,7 +67,7 @@ export const authConfig: NextAuthConfig = {
         if (role === 'admin') {
           return Response.redirect(new URL('/admin/dashboard', nextUrl));
         }
-        if (role === 'assessor' || role === 'student') {
+        if (role === 'assessor' || role === 'student' || role === 'iqa') {
           return Response.redirect(new URL('/c', nextUrl));
         }
         return Response.redirect(new URL('/dashboard', nextUrl));

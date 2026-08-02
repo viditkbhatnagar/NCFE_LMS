@@ -4,7 +4,7 @@ import { withAuth } from '@/lib/route-guard';
 import { getFileDownloadUrl } from '@/lib/upload';
 import PersonalDocument from '@/models/PersonalDocument';
 import Enrolment from '@/models/Enrolment';
-import { assessorMatch } from '@/lib/enrolment-access';
+import { assessorMatch, iqaMatch } from '@/lib/enrolment-access';
 
 export async function GET(
   request: Request,
@@ -12,7 +12,7 @@ export async function GET(
 ) {
   try {
     const { id } = await params;
-    const { session, error } = await withAuth(['assessor', 'student']);
+    const { session, error } = await withAuth(['assessor', 'student', 'iqa']);
     if (error) return error;
 
     await dbConnect();
@@ -33,7 +33,7 @@ export async function GET(
     } else {
       const enrollment = await Enrolment.findOne({
         userId: doc.userId,
-        ...assessorMatch(user.id),
+        ...(user.role === 'iqa' ? iqaMatch(user.id) : assessorMatch(user.id)),
       }).lean();
       canAccess = !!enrollment;
     }

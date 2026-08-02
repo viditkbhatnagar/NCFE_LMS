@@ -8,12 +8,12 @@ import SignOff from '@/models/SignOff';
 import Enrolment from '@/models/Enrolment';
 import { createNotification } from '@/lib/notifications';
 import User from '@/models/User';
-import { isEnrolmentAssessor, assessorMatch } from '@/lib/enrolment-access';
+import { isEnrolmentAssessor, assessorMatch, iqaMatch } from '@/lib/enrolment-access';
 import type { SignOffRole } from '@/types';
 
 export async function GET(request: Request) {
   try {
-    const { session, error } = await withAuth(['assessor']);
+    const { session, error } = await withAuth(['assessor', 'iqa']);
     if (error) return error;
 
     const { searchParams } = new URL(request.url);
@@ -33,9 +33,11 @@ export async function GET(request: Request) {
     // Multi-assessor: an assessor sees ALL assessments on the learners they
     // assess (lead or co-assessor) for this qualification — not only the ones
     // they personally created. Scope by the enrolments they assess.
+    const scopeMatch =
+      session!.user.role === 'iqa' ? iqaMatch(session!.user.id) : assessorMatch(session!.user.id);
     const myEnrolments = await Enrolment.find({
       qualificationId,
-      ...assessorMatch(session!.user.id),
+      ...scopeMatch,
     })
       .select('_id')
       .lean();

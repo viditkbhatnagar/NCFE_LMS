@@ -25,6 +25,7 @@ function idStr(v: IdLike): string | null {
 interface EnrolmentLike {
   assessorId?: IdLike;
   assessorIds?: IdLike[];
+  iqaIds?: IdLike[];
 }
 
 /**
@@ -90,4 +91,33 @@ export function buildAssessorFields(input: {
   push(input.assessorId);
   for (const a of input.assessorIds ?? []) push(a);
   return { assessorIds: ids, assessorId: ids[0] };
+}
+
+// ---- IQA (Internal Quality Assurer) assignment ----------------------------
+// An IQA is assigned to specific enrolments via `iqaIds`, mirroring assessors.
+// An IQA gets read-only visibility of exactly the learners they are assigned to.
+
+/** De-duplicated set of IQA id strings assigned to an enrolment. */
+export function enrolmentIqaIds(enrolment: EnrolmentLike | null | undefined): string[] {
+  const ids = new Set<string>();
+  if (enrolment && Array.isArray(enrolment.iqaIds)) {
+    for (const a of enrolment.iqaIds) {
+      const s = idStr(a);
+      if (s) ids.add(s);
+    }
+  }
+  return [...ids];
+}
+
+/** True if `userId` is an assigned IQA on the enrolment. */
+export function isEnrolmentIqa(
+  enrolment: EnrolmentLike | null | undefined,
+  userId: string | mongoose.Types.ObjectId,
+): boolean {
+  return enrolmentIqaIds(enrolment).includes(String(userId));
+}
+
+/** Mongo filter fragment matching enrolments an IQA is assigned to. */
+export function iqaMatch(userId: string | mongoose.Types.ObjectId): { iqaIds: mongoose.Types.ObjectId } {
+  return { iqaIds: new mongoose.Types.ObjectId(String(userId)) };
 }

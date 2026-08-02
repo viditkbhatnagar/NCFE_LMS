@@ -14,6 +14,10 @@ interface AssessorMultiSelectProps {
   hint?: string;
   /** Compact height for use inside a modal. */
   maxHeightClass?: string;
+  /** Show the "Lead" badge on the first selection (assessors). Off for IQAs. */
+  showLead?: boolean;
+  /** Noun for the count line, e.g. "assessor" or "IQA". */
+  noun?: string;
 }
 
 /**
@@ -28,6 +32,8 @@ export default function AssessorMultiSelect({
   label = 'Assessors',
   hint = 'Tick one or more assessors. The first selected is the lead. All assigned assessors can see and work with this learner.',
   maxHeightClass = 'max-h-44',
+  showLead = true,
+  noun = 'assessor',
 }: AssessorMultiSelectProps) {
   const toggle = (id: string) => {
     if (selected.includes(id)) {
@@ -62,7 +68,7 @@ export default function AssessorMultiSelect({
                 />
                 <span className="text-gray-900">{a.name}</span>
                 {a.email && <span className="text-gray-400 text-xs">{a.email}</span>}
-                {checked && a._id === leadId && (
+                {showLead && checked && a._id === leadId && (
                   <span className="ml-auto inline-flex items-center px-1.5 py-0.5 text-[10px] font-medium rounded bg-primary/10 text-primary">
                     Lead
                   </span>
@@ -74,7 +80,7 @@ export default function AssessorMultiSelect({
       )}
       {selected.length > 0 && (
         <p className="text-xs text-gray-400 mt-1">
-          {selected.length} assessor{selected.length === 1 ? '' : 's'} selected
+          {selected.length} {noun}{selected.length === 1 ? '' : 's'} selected
         </p>
       )}
     </div>

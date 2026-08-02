@@ -7,7 +7,7 @@ import Evidence from '@/models/Evidence';
 import LearningMaterial from '@/models/LearningMaterial';
 import Enrolment from '@/models/Enrolment';
 import User from '@/models/User';
-import { assessorMatch, enrolmentAssessorIds } from '@/lib/enrolment-access';
+import { assessorMatch, enrolmentAssessorIds, iqaMatch } from '@/lib/enrolment-access';
 
 export async function GET(
   request: Request,
@@ -15,7 +15,7 @@ export async function GET(
 ) {
   try {
     const { qualificationId } = await params;
-    const { session, error } = await withAuth(['assessor']);
+    const { session, error } = await withAuth(['assessor', 'iqa']);
     if (error) return error;
 
     await dbConnect();
@@ -23,10 +23,13 @@ export async function GET(
     const url = new URL(request.url);
     const filterEnrollmentId = url.searchParams.get('enrollmentId');
 
-    // All enrollments where this user is an assessor (lead or co-assessor).
+    // Enrolments in scope: for an assessor, the learners they assess; for an IQA,
+    // the learners they are assigned to quality-assure.
+    const scopeMatch =
+      session!.user.role === 'iqa' ? iqaMatch(session!.user.id) : assessorMatch(session!.user.id);
     const enrollments = await Enrolment.find({
       qualificationId,
-      ...assessorMatch(session!.user.id),
+      ...scopeMatch,
     })
       .populate('userId', 'name email')
       .lean();

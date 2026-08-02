@@ -16,7 +16,7 @@ export default function AssessmentsPage() {
   const { qualification, enrollments, currentEnrollmentId, selectedLearner, userRole } =
     useAssessorCourse();
 
-  const readOnly = userRole === 'student';
+  const readOnly = userRole === 'student' || userRole === 'iqa';
 
   const SIDEBAR_W = 65;
   const TOP_NAV_H = 56;

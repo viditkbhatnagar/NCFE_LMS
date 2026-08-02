@@ -39,7 +39,7 @@ function materialToFileItem(m: MaterialItem): FileItem {
 
 export default function MaterialsPage() {
   const { qualification, userRole } = useAssessorCourse();
-  const readOnly = userRole === 'student';
+  const readOnly = userRole === 'student' || userRole === 'iqa';
 
   const [items, setItems] = useState<FileItem[]>([]);
   const [loading, setLoading] = useState(true);

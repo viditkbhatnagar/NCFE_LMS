@@ -96,6 +96,7 @@ export default function SignOffStatusSection({
   };
 
   const [signOffError, setSignOffError] = useState<string | null>(null);
+  const [comment, setComment] = useState('');
 
   const handleSignOff = async () => {
     setSigningOff(true);
@@ -104,7 +105,11 @@ export default function SignOffStatusSection({
       const res = await fetch(`/api/v2/assessments/${assessmentId}/sign-off`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ role: mySignOffRole, status: 'signed_off' }),
+        body: JSON.stringify({
+          role: mySignOffRole,
+          status: 'signed_off',
+          comments: comment.trim() || undefined,
+        }),
       });
       if (res.ok) {
         onSignOff();
@@ -161,7 +166,8 @@ export default function SignOffStatusSection({
             const canSign = mySignOffRole === role && isReady;
 
             return (
-              <div key={role} className="relative flex items-start gap-3">
+              <div key={role}>
+                <div className="relative flex items-start gap-3">
                 {/* Number circle */}
                 <div
                   className={`relative z-10 w-7 h-7 rounded-full flex items-center justify-center text-xs font-bold shrink-0 ${
@@ -200,6 +206,9 @@ export default function SignOffStatusSection({
                       ? 'Awaiting sign off'
                       : 'Pending'}
                   </p>
+                  {isSigned && so?.comments && (
+                    <p className="text-xs text-gray-600 mt-1 italic">&ldquo;{so.comments}&rdquo;</p>
+                  )}
                 </div>
 
                 {/* Action */}
@@ -219,6 +228,16 @@ export default function SignOffStatusSection({
                     </svg>
                     Pending
                   </span>
+                )}
+                </div>
+                {canSign && !isSigned && (
+                  <textarea
+                    value={comment}
+                    onChange={(e) => setComment(e.target.value)}
+                    placeholder="Add a remark (optional), then Sign Off…"
+                    rows={2}
+                    className="w-full mt-2 ml-9 border border-gray-200 rounded-[6px] px-2 py-1.5 text-xs text-gray-900 placeholder:text-gray-400 focus:outline-none focus:ring-1 focus:ring-primary resize-y"
+                  />
                 )}
               </div>
             );

@@ -24,6 +24,7 @@ export async function GET(
     .populate('qualificationId', 'title code')
     .populate('assessorId', 'name email')
     .populate('assessorIds', 'name email')
+    .populate('iqaIds', 'name email')
     .lean();
 
   if (!enrolment) {
@@ -74,6 +75,7 @@ export async function PUT(
     .populate('qualificationId', 'title code')
     .populate('assessorId', 'name email')
     .populate('assessorIds', 'name email')
+    .populate('iqaIds', 'name email')
     .lean();
 
   await createAuditLog({

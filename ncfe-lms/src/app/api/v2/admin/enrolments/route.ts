@@ -36,6 +36,7 @@ export async function GET(req: NextRequest) {
       .populate('qualificationId', 'title code')
       .populate('assessorId', 'name email')
       .populate('assessorIds', 'name email')
+      .populate('iqaIds', 'name email')
       .sort({ enrolledAt: -1 })
       .skip((page - 1) * limit)
       .limit(limit)

@@ -11,7 +11,7 @@ import CriterionComment from '@/models/CriterionComment';
 import Notification from '@/models/Notification';
 import User from '@/models/User';
 import Enrolment from '@/models/Enrolment';
-import { assessorMatch } from '@/lib/enrolment-access';
+import { assessorMatch, isEnrolmentIqa } from '@/lib/enrolment-access';
 import { createNotification } from '@/lib/notifications';
 import { sendSignOffEmail } from '@/lib/email';
 import { createAuditLog } from '@/lib/audit';
@@ -25,7 +25,7 @@ export async function GET(
 ) {
   try {
     const { id } = await params;
-    const { session, error } = await withAuth(['assessor', 'student', 'admin']);
+    const { session, error } = await withAuth(['assessor', 'student', 'admin', 'iqa']);
     if (error) return error;
 
     await dbConnect();
@@ -72,6 +72,15 @@ export async function GET(
         return NextResponse.json(
           { success: false, error: 'Assessment not found' },
           { status: 404 }
+        );
+      }
+    } else if (userRole === 'iqa') {
+      // An IQA may VIEW (read-only) assessments for the learners assigned to them.
+      const enrol = await Enrolment.findById(assessment.enrollmentId).select('iqaIds').lean();
+      if (!enrol || !isEnrolmentIqa(enrol, userId)) {
+        return NextResponse.json(
+          { success: false, error: 'Forbidden' },
+          { status: 403 }
         );
       }
     } else if (assessment.assessorId.toString() === userId) {

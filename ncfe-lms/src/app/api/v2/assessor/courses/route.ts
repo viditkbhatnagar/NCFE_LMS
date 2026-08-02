@@ -7,10 +7,37 @@ import Qualification from '@/models/Qualification';
 
 export async function GET() {
   try {
-    const { session, error } = await withAuth(['assessor', 'admin']);
+    const { session, error } = await withAuth(['assessor', 'admin', 'iqa']);
     if (error) return error;
 
     await dbConnect();
+
+    // IQA sees only the courses on which they are assigned to learners.
+    if (session!.user.role === 'iqa') {
+      const me = new mongoose.Types.ObjectId(session!.user.id);
+      const agg = await Enrolment.aggregate([
+        { $match: { iqaIds: me } },
+        { $group: { _id: '$qualificationId', learnerCount: { $sum: 1 } } },
+      ]);
+      const qids = agg.map((e: { _id: mongoose.Types.ObjectId }) => e._id);
+      const cmap: Record<string, number> = {};
+      for (const e of agg) cmap[String(e._id)] = e.learnerCount;
+      const quals = await Qualification.find({ _id: { $in: qids } })
+        .select('title slug code level')
+        .sort({ title: 1 })
+        .lean();
+      return NextResponse.json({
+        success: true,
+        data: quals.map((q) => ({
+          _id: String(q._id),
+          title: q.title,
+          slug: q.slug,
+          code: q.code,
+          level: q.level,
+          learnerCount: cmap[String(q._id)] || 0,
+        })),
+      });
+    }
 
     // Admin sees every active course (they manage content across all of them).
     if (session!.user.role === 'admin') {

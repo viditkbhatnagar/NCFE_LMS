@@ -18,7 +18,12 @@ export default async function AssessorDashboardLayout({
 
   // Admin is allowed in for content tasks (materials, live sessions). IQA is
   // the only role with no business here.
-  if (user.role !== 'assessor' && user.role !== 'student' && user.role !== 'admin') {
+  if (
+    user.role !== 'assessor' &&
+    user.role !== 'student' &&
+    user.role !== 'admin' &&
+    user.role !== 'iqa'
+  ) {
     redirect('/dashboard');
   }
 

@@ -14,7 +14,8 @@ interface PortfolioToolbarProps {
   onSortChange: (v: SortOrder) => void;
   viewMode: ViewMode;
   onViewModeChange: (v: ViewMode) => void;
-  onUploadClick: () => void;
+  /** Omit to hide the Upload button (e.g. read-only IQA view). */
+  onUploadClick?: () => void;
 }
 
 export default function PortfolioToolbar({
@@ -30,7 +31,8 @@ export default function PortfolioToolbar({
 }: PortfolioToolbarProps) {
   return (
     <div className="flex items-center gap-3 flex-wrap">
-      {/* Upload button */}
+      {/* Upload button — hidden when no handler (read-only IQA view) */}
+      {onUploadClick && (
       <button
         onClick={onUploadClick}
         className="flex items-center gap-1.5 px-4 py-2 bg-brand-600 text-white rounded-md text-sm font-medium hover:bg-brand-700 transition-colors"
@@ -50,6 +52,7 @@ export default function PortfolioToolbar({
         </svg>
         Upload Evidence
       </button>
+      )}
 
       <div className="flex-1" />
 

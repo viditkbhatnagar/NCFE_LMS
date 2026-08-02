@@ -4,7 +4,7 @@ import { withAuth } from '@/lib/route-guard';
 import Evidence from '@/models/Evidence';
 import Enrolment from '@/models/Enrolment';
 import Unit from '@/models/Unit';
-import { isEnrolmentAssessor } from '@/lib/enrolment-access';
+import { isEnrolmentAssessor, isEnrolmentIqa } from '@/lib/enrolment-access';
 
 export async function GET(
   request: Request,
@@ -12,7 +12,7 @@ export async function GET(
 ) {
   try {
     const { enrollmentId } = await params;
-    const { session, error } = await withAuth(['assessor', 'student']);
+    const { session, error } = await withAuth(['assessor', 'student', 'iqa']);
     if (error) return error;
 
     const { searchParams } = new URL(request.url);
@@ -42,7 +42,9 @@ export async function GET(
     const isOwner =
       user.role === 'assessor'
         ? isEnrolmentAssessor(enrollment, user.id)
-        : enrollmentUserId === user.id;
+        : user.role === 'iqa'
+          ? isEnrolmentIqa(enrollment, user.id)
+          : enrollmentUserId === user.id;
     if (!isOwner) {
       return NextResponse.json(
         { success: false, error: 'Forbidden' },

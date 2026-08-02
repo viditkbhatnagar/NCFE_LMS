@@ -22,6 +22,7 @@ interface Enrolment {
   qualificationId: { _id: string; title: string; code: string } | null;
   assessorId: AssessorRef | null;
   assessorIds?: AssessorRef[];
+  iqaIds?: AssessorRef[];
   cohortId: string;
   status: string;
   enrolledAt: string;
@@ -61,12 +62,14 @@ export default function AdminEnrolmentsPage() {
   const [editingId, setEditingId] = useState<string | null>(null);
   const [form, setForm] = useState({ userId: '', qualificationId: '', cohortId: '', status: 'enrolled' });
   const [formAssessorIds, setFormAssessorIds] = useState<string[]>([]);
+  const [formIqaIds, setFormIqaIds] = useState<string[]>([]);
   const [saving, setSaving] = useState(false);
   const [errors, setErrors] = useState<Record<string, string[]>>({});
 
   // Select options
   const [students, setStudents] = useState<SelectOption[]>([]);
   const [assessors, setAssessors] = useState<SelectOption[]>([]);
+  const [iqas, setIqas] = useState<SelectOption[]>([]);
   const [qualifications, setQualifications] = useState<SelectOption[]>([]);
 
   // Withdraw (soft) + permanent delete (hard, with cascade)
@@ -183,14 +186,16 @@ export default function AdminEnrolmentsPage() {
   };
 
   const fetchOptions = useCallback(async () => {
-    const [studRes, assRes, qualRes] = await Promise.all([
+    const [studRes, assRes, iqaRes, qualRes] = await Promise.all([
       fetch('/api/v2/admin/users?role=student&limit=100'),
       fetch('/api/v2/admin/users?role=assessor&limit=100'),
+      fetch('/api/v2/admin/users?role=iqa&limit=100'),
       fetch('/api/v2/admin/qualifications?limit=100'),
     ]);
-    const [studData, assData, qualData] = await Promise.all([studRes.json(), assRes.json(), qualRes.json()]);
+    const [studData, assData, iqaData, qualData] = await Promise.all([studRes.json(), assRes.json(), iqaRes.json(), qualRes.json()]);
     if (studData.success) setStudents(studData.data);
     if (assData.success) setAssessors(assData.data);
+    if (iqaData.success) setIqas(iqaData.data);
     if (qualData.success) setQualifications(qualData.data);
   }, []);
 
@@ -205,6 +210,7 @@ export default function AdminEnrolmentsPage() {
   const resetForm = () => {
     setForm({ userId: '', qualificationId: '', cohortId: '', status: 'enrolled' });
     setFormAssessorIds([]);
+    setFormIqaIds([]);
     setEditingId(null);
     setShowForm(false);
     setErrors({});
@@ -225,6 +231,7 @@ export default function AdminEnrolmentsPage() {
           ? [e.assessorId._id]
           : [];
     setFormAssessorIds(ids);
+    setFormIqaIds(Array.isArray(e.iqaIds) ? e.iqaIds.map((a) => a._id) : []);
     setEditingId(e._id);
     setShowForm(true);
   };
@@ -237,8 +244,8 @@ export default function AdminEnrolmentsPage() {
     const url = editingId ? `/api/v2/admin/enrolments/${editingId}` : '/api/v2/admin/enrolments';
     const method = editingId ? 'PUT' : 'POST';
     const body = editingId
-      ? { assessorIds: formAssessorIds, cohortId: form.cohortId || undefined, status: form.status }
-      : { ...form, assessorIds: formAssessorIds };
+      ? { assessorIds: formAssessorIds, iqaIds: formIqaIds, cohortId: form.cohortId || undefined, status: form.status }
+      : { ...form, assessorIds: formAssessorIds, iqaIds: formIqaIds };
 
     try {
       const res = await fetch(url, {
@@ -424,6 +431,17 @@ export default function AdminEnrolmentsPage() {
                   options={assessors}
                   selected={formAssessorIds}
                   onChange={setFormAssessorIds}
+                />
+              </div>
+              <div className="md:col-span-2">
+                <AssessorMultiSelect
+                  options={iqas}
+                  selected={formIqaIds}
+                  onChange={setFormIqaIds}
+                  label="IQA(s)"
+                  hint="Tick the Internal Quality Assurer(s) for this learner. They get read-only visibility of exactly the learners assigned to them."
+                  showLead={false}
+                  noun="IQA"
                 />
               </div>
               <div>

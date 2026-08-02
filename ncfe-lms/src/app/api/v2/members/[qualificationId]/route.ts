@@ -7,6 +7,7 @@ import {
   assessorMatch,
   enrolmentAssessorIds,
   isEnrolmentAssessor,
+  iqaMatch,
 } from '@/lib/enrolment-access';
 
 export async function GET(
@@ -15,17 +16,21 @@ export async function GET(
 ) {
   try {
     const { qualificationId } = await params;
-    const { session, error } = await withAuth(['assessor']);
+    const { session, error } = await withAuth(['assessor', 'iqa', 'admin']);
     if (error) return error;
 
     await dbConnect();
 
-    // Verify the requesting assessor has at least one enrollment for this
-    // qualification — as lead OR co-assessor.
-    const hasAccess = await Enrolment.exists({
-      qualificationId,
-      ...assessorMatch(session!.user.id),
-    });
+    const role = session!.user.role;
+    // Access + learner scope by role: assessor/admin see all course members; an
+    // IQA sees only the learners they are assigned to.
+    const scopedQuery =
+      role === 'iqa'
+        ? { qualificationId, ...iqaMatch(session!.user.id) }
+        : role === 'admin'
+          ? { qualificationId }
+          : { qualificationId, ...assessorMatch(session!.user.id) };
+    const hasAccess = await Enrolment.exists(scopedQuery);
     if (!hasAccess) {
       return NextResponse.json(
         { success: false, error: 'Forbidden' },
@@ -33,8 +38,9 @@ export async function GET(
       );
     }
 
-    // All enrollments for this qualification
-    const allEnrollments = await Enrolment.find({ qualificationId })
+    // Enrollments in scope (all for assessor/admin; assigned-only for iqa).
+    const listQuery = role === 'iqa' ? scopedQuery : { qualificationId };
+    const allEnrollments = await Enrolment.find(listQuery)
       .populate('userId', 'name email')
       .lean();
 

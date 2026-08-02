@@ -7,7 +7,7 @@ import AssessmentCriteria from '@/models/AssessmentCriteria';
 import Assessment from '@/models/Assessment';
 import AssessmentCriteriaMap from '@/models/AssessmentCriteriaMap';
 import Enrolment from '@/models/Enrolment';
-import { isEnrolmentAssessor } from '@/lib/enrolment-access';
+import { isEnrolmentAssessor, isEnrolmentIqa } from '@/lib/enrolment-access';
 
 export async function GET(
   request: Request,
@@ -15,7 +15,7 @@ export async function GET(
 ) {
   try {
     const { enrollmentId } = await params;
-    const { session, error } = await withAuth(['assessor', 'student']);
+    const { session, error } = await withAuth(['assessor', 'student', 'iqa']);
     if (error) return error;
 
     await dbConnect();
@@ -32,7 +32,9 @@ export async function GET(
     const isOwner =
       session!.user.role === 'student'
         ? enrollment.userId?.toString() === session!.user.id
-        : isEnrolmentAssessor(enrollment, session!.user.id);
+        : session!.user.role === 'iqa'
+          ? isEnrolmentIqa(enrollment, session!.user.id)
+          : isEnrolmentAssessor(enrollment, session!.user.id);
 
     if (!isOwner) {
       return NextResponse.json(

@@ -5,10 +5,11 @@ import { uploadFile } from '@/lib/upload';
 import { materialFolderCreateSchema } from '@/lib/validators';
 import LearningMaterial from '@/models/LearningMaterial';
 import Enrolment from '@/models/Enrolment';
+import { iqaMatch } from '@/lib/enrolment-access';
 
 export async function GET(request: Request) {
   try {
-    const { session, error } = await withAuth(['assessor', 'student', 'admin']);
+    const { session, error } = await withAuth(['assessor', 'student', 'admin', 'iqa']);
     if (error) return error;
 
     const { searchParams } = new URL(request.url);
@@ -34,6 +35,15 @@ export async function GET(request: Request) {
         qualificationId,
       });
       if (!hasEnrollment) {
+        return NextResponse.json(
+          { success: false, error: 'Forbidden' },
+          { status: 403 }
+        );
+      }
+    } else if (user.role === 'iqa') {
+      // An IQA sees materials on courses where they are assigned to learners.
+      const assigned = await Enrolment.exists({ qualificationId, ...iqaMatch(user.id) });
+      if (!assigned) {
         return NextResponse.json(
           { success: false, error: 'Forbidden' },
           { status: 403 }

@@ -5,7 +5,7 @@ import Qualification from '@/models/Qualification';
 import Enrolment from '@/models/Enrolment';
 import { AssessorCourseProvider } from '@/contexts/AssessorCourseContext';
 import AssessorSubHeader from '@/components/assessor/AssessorSubHeader';
-import { assessorMatch } from '@/lib/enrolment-access';
+import { assessorMatch, iqaMatch } from '@/lib/enrolment-access';
 import type { UserRole } from '@/types';
 
 interface Props {
@@ -23,7 +23,12 @@ export default async function CourseLayout({ children, params }: Props) {
 
   const user = session.user as { id?: string; role?: UserRole; name?: string | null };
 
-  if (user.role !== 'assessor' && user.role !== 'student' && user.role !== 'admin') {
+  if (
+    user.role !== 'assessor' &&
+    user.role !== 'student' &&
+    user.role !== 'admin' &&
+    user.role !== 'iqa'
+  ) {
     redirect('/dashboard');
   }
 
@@ -43,16 +48,19 @@ export default async function CourseLayout({ children, params }: Props) {
   }
 
   // Student → their own enrolment; assessor → enrolments they assess (lead OR
-  // co-assessor); admin → every enrolment on the course.
+  // co-assessor); iqa → enrolments they are assigned to quality-assure; admin →
+  // every enrolment on the course.
   const enrolmentFilter =
     user.role === 'student'
       ? { userId: user.id, qualificationId: qualification._id }
       : user.role === 'admin'
         ? { qualificationId: qualification._id }
-        : {
-            qualificationId: qualification._id,
-            ...assessorMatch(user.id!),
-          };
+        : user.role === 'iqa'
+          ? { qualificationId: qualification._id, ...iqaMatch(user.id!) }
+          : {
+              qualificationId: qualification._id,
+              ...assessorMatch(user.id!),
+            };
 
   const enrollments = await Enrolment.find(enrolmentFilter)
     .populate('userId', 'name email')

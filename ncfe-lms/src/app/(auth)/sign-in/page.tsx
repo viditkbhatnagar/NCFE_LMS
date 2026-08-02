@@ -41,7 +41,7 @@ export default function SignInPage() {
           const role = session?.user?.role;
           if (role === 'admin') {
             router.push('/admin/dashboard');
-          } else if (role === 'assessor' || role === 'student') {
+          } else if (role === 'assessor' || role === 'student' || role === 'iqa') {
             router.push('/c');
           } else {
             router.push('/dashboard');
