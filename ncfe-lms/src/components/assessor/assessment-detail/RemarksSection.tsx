@@ -7,9 +7,10 @@ interface RemarksSectionProps {
   remarks: RemarkEntry[];
   assessmentId: string;
   onAdded: () => void;
+  readOnly?: boolean;
 }
 
-export default function RemarksSection({ remarks, assessmentId, onAdded }: RemarksSectionProps) {
+export default function RemarksSection({ remarks, assessmentId, onAdded, readOnly = false }: RemarksSectionProps) {
   const [newRemark, setNewRemark] = useState('');
   const [submitting, setSubmitting] = useState(false);
 
@@ -83,32 +84,35 @@ export default function RemarksSection({ remarks, assessmentId, onAdded }: Remar
         </div>
       )}
 
-      {/* Add remark form */}
-      <div className="space-y-2">
-        <textarea
-          value={newRemark}
-          onChange={(e) => setNewRemark(e.target.value)}
-          placeholder="Add a remark..."
-          rows={2}
-          className="w-full border border-gray-200 rounded-[6px] px-3 py-2 text-sm text-gray-900 placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent resize-y"
-        />
-        <button
-          onClick={handleSubmit}
-          disabled={submitting || !newRemark.trim()}
-          className="flex items-center gap-1.5 px-3 py-1.5 bg-primary text-white rounded-[6px] text-xs font-medium hover:bg-primary/90 transition-colors disabled:opacity-50"
-        >
-          {submitting ? (
-            'Submitting...'
-          ) : (
-            <>
-              <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 19l9 2-9-18-9 18 9-2zm0 0v-8" />
-              </svg>
-              Submit Remark
-            </>
-          )}
-        </button>
-      </div>
+      {/* Add remark form — hidden when viewing read-only (e.g. another
+          assessor's assessment or an oversight role). */}
+      {!readOnly && (
+        <div className="space-y-2">
+          <textarea
+            value={newRemark}
+            onChange={(e) => setNewRemark(e.target.value)}
+            placeholder="Add a remark..."
+            rows={2}
+            className="w-full border border-gray-200 rounded-[6px] px-3 py-2 text-sm text-gray-900 placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent resize-y"
+          />
+          <button
+            onClick={handleSubmit}
+            disabled={submitting || !newRemark.trim()}
+            className="flex items-center gap-1.5 px-3 py-1.5 bg-primary text-white rounded-[6px] text-xs font-medium hover:bg-primary/90 transition-colors disabled:opacity-50"
+          >
+            {submitting ? (
+              'Submitting...'
+            ) : (
+              <>
+                <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 19l9 2-9-18-9 18 9-2zm0 0v-8" />
+                </svg>
+                Submit Remark
+              </>
+            )}
+          </button>
+        </div>
+      )}
     </div>
   );
 }

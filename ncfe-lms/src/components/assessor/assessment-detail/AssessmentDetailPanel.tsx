@@ -66,11 +66,16 @@ export default function AssessmentDetailPanel({
   const [remarks, setRemarks] = useState<RemarkEntry[]>([]);
   const [confirmDelete, setConfirmDelete] = useState(false);
   const [deleting, setDeleting] = useState(false);
+  // canEdit comes from the detail GET: false when viewing another assessor's
+  // assessment (or as an oversight role). Combined with the incoming readOnly
+  // prop, it gates every write affordance in the panel.
+  const [canEdit, setCanEdit] = useState(true);
+  const effectiveReadOnly = readOnly || !canEdit;
 
   // Auto-save hook
   const { saveStatus, scheduleUpdate, setSaveStatus } = useAutoSave<EditState>({
     saveFn: async (updates) => {
-      if (readOnly) return true;
+      if (effectiveReadOnly) return true;
       try {
         const res = await fetch(`/api/v2/assessments/${assessmentId}`, {
           method: 'PUT',
@@ -101,6 +106,7 @@ export default function AssessmentDetailPanel({
       const json = await res.json();
       if (json.success) {
         const { assessment, criteriaMap: cm, evidenceMap: em, signOffs: so, remarks: rm } = json.data;
+        setCanEdit(json.data.canEdit ?? true);
         setEditState({
           title: assessment.title || '',
           date: assessment.date || '',
@@ -128,14 +134,14 @@ export default function AssessmentDetailPanel({
 
   // Field update handlers — no-op when readOnly
   const updateField = <K extends keyof EditState>(key: K, value: EditState[K]) => {
-    if (readOnly) return;
+    if (effectiveReadOnly) return;
     setEditState((prev) => ({ ...prev, [key]: value }));
     scheduleUpdate({ [key]: value } as Partial<EditState>);
   };
 
   // Publish handler
   const handlePublish = async () => {
-    if (readOnly) return;
+    if (effectiveReadOnly) return;
     try {
       const res = await fetch(`/api/v2/assessments/${assessmentId}`, {
         method: 'PUT',
@@ -155,7 +161,7 @@ export default function AssessmentDetailPanel({
 
   // Delete handler — opens ConfirmDialog instead of native window.confirm
   const handleDelete = () => {
-    if (readOnly) return;
+    if (effectiveReadOnly) return;
     setConfirmDelete(true);
   };
 
@@ -199,7 +205,7 @@ export default function AssessmentDetailPanel({
         signOffs={signOffs}
         saveStatus={saveStatus}
         status={editState.status}
-        readOnly={readOnly}
+        readOnly={effectiveReadOnly}
         onDateChange={(date) => updateField('date', date)}
         onTitleChange={(title) => updateField('title', title)}
         onPublish={handlePublish}
@@ -213,7 +219,7 @@ export default function AssessmentDetailPanel({
         <AssessmentKindSelector
           value={editState.assessmentKind}
           onChange={(kind) => updateField('assessmentKind', kind)}
-          readOnly={readOnly}
+          readOnly={effectiveReadOnly}
         />
 
         {/* Section 2: Plan Intent */}
@@ -221,7 +227,7 @@ export default function AssessmentDetailPanel({
           label="Plan Intent"
           value={editState.planIntent}
           onChange={(value) => updateField('planIntent', value)}
-          readOnly={readOnly}
+          readOnly={effectiveReadOnly}
         />
 
         {/* Section 3: Plan Implementation */}
@@ -229,7 +235,7 @@ export default function AssessmentDetailPanel({
           label="Plan Implementation"
           value={editState.planImplementation}
           onChange={(value) => updateField('planImplementation', value)}
-          readOnly={readOnly}
+          readOnly={effectiveReadOnly}
         />
 
         {/* Divider */}
@@ -245,7 +251,7 @@ export default function AssessmentDetailPanel({
           enrollmentId={enrollmentId}
           evidenceMap={evidenceMap}
           onUpdated={refreshDetail}
-          readOnly={readOnly && userRole !== 'student'}
+          readOnly={effectiveReadOnly && userRole !== 'student'}
         />
 
         {/* Section 5: Criteria Mapping */}
@@ -254,7 +260,7 @@ export default function AssessmentDetailPanel({
           qualificationId={qualificationId}
           criteriaMap={criteriaMap}
           onUpdated={refreshDetail}
-          readOnly={readOnly}
+          readOnly={effectiveReadOnly}
         />
 
         {/* Divider */}
@@ -276,6 +282,7 @@ export default function AssessmentDetailPanel({
           remarks={remarks}
           assessmentId={assessmentId}
           onAdded={refreshDetail}
+          readOnly={effectiveReadOnly}
         />
       </div>
 

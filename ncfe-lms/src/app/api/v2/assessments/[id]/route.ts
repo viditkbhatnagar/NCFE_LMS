@@ -10,6 +10,8 @@ import Remark from '@/models/Remark';
 import CriterionComment from '@/models/CriterionComment';
 import Notification from '@/models/Notification';
 import User from '@/models/User';
+import Enrolment from '@/models/Enrolment';
+import { assessorMatch } from '@/lib/enrolment-access';
 import { createNotification } from '@/lib/notifications';
 import { sendSignOffEmail } from '@/lib/email';
 import { createAuditLog } from '@/lib/audit';
@@ -23,7 +25,7 @@ export async function GET(
 ) {
   try {
     const { id } = await params;
-    const { session, error } = await withAuth(['assessor', 'student']);
+    const { session, error } = await withAuth(['assessor', 'student', 'admin']);
     if (error) return error;
 
     await dbConnect();
@@ -42,6 +44,9 @@ export async function GET(
 
     const userId = session!.user.id;
     const userRole = session!.user.role;
+    // canEdit gates every write affordance in the panel. Only the owning
+    // assessor edits; other assessors on the course (and admins) view read-only.
+    let canEdit = false;
 
     if (userRole === 'student') {
       // learnerId may be a populated object or a raw ObjectId/string
@@ -69,11 +74,21 @@ export async function GET(
           { status: 404 }
         );
       }
-    } else if (assessment.assessorId.toString() !== userId) {
-      return NextResponse.json(
-        { success: false, error: 'Forbidden' },
-        { status: 403 }
-      );
+    } else if (assessment.assessorId.toString() === userId) {
+      canEdit = true;
+    } else if (userRole !== 'admin') {
+      // A non-owning assessor may VIEW read-only any assessment on a course they
+      // teach on (they assess at least one enrolment in that qualification).
+      const teaches = await Enrolment.exists({
+        qualificationId: assessment.qualificationId,
+        ...assessorMatch(userId),
+      });
+      if (!teaches) {
+        return NextResponse.json(
+          { success: false, error: 'Forbidden' },
+          { status: 403 }
+        );
+      }
     }
 
     // Fetch related data in parallel
@@ -107,6 +122,7 @@ export async function GET(
         evidenceMap,
         signOffs,
         remarks,
+        canEdit,
       },
     });
   } catch (err) {
