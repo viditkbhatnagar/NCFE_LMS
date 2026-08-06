@@ -4,11 +4,11 @@ import { withAuth } from '@/lib/route-guard';
 import { workHoursCreateSchema } from '@/lib/validators';
 import WorkHoursLog from '@/models/WorkHoursLog';
 import Enrolment from '@/models/Enrolment';
-import { isEnrolmentAssessor, assessorMatch } from '@/lib/enrolment-access';
+import { isEnrolmentAssessor, assessorMatch, isEnrolmentIqa, iqaMatch } from '@/lib/enrolment-access';
 
 export async function GET(request: Request) {
   try {
-    const { session, error } = await withAuth(['assessor', 'student']);
+    const { session, error } = await withAuth(['assessor', 'student', 'iqa']);
     if (error) return error;
 
     const { searchParams } = new URL(request.url);
@@ -33,7 +33,9 @@ export async function GET(request: Request) {
       const isOwner =
         user.role === 'student'
           ? enrollment?.userId?.toString() === user.id
-          : isEnrolmentAssessor(enrollment, user.id);
+          : user.role === 'iqa'
+            ? isEnrolmentIqa(enrollment, user.id)
+            : isEnrolmentAssessor(enrollment, user.id);
       if (!enrollment || !isOwner) {
         return NextResponse.json(
           { success: false, error: 'Forbidden' },
@@ -51,7 +53,9 @@ export async function GET(request: Request) {
       const enrollmentFilter =
         user.role === 'student'
           ? { userId: learnerId }
-          : { userId: learnerId, ...assessorMatch(user.id) };
+          : user.role === 'iqa'
+            ? { userId: learnerId, ...iqaMatch(user.id) }
+            : { userId: learnerId, ...assessorMatch(user.id) };
       const hasEnrollment = await Enrolment.exists(enrollmentFilter);
       if (!hasEnrollment) {
         return NextResponse.json(

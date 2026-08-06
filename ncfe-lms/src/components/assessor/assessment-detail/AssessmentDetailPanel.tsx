@@ -333,11 +333,13 @@ export default function AssessmentDetailPanel({
         <hr className="border-gray-100" />
 
         {/* Section 7: Remarks */}
+        {/* IQAs give feedback via remarks too, even though the rest of the
+            panel is read-only for them. */}
         <RemarksSection
           remarks={remarks}
           assessmentId={assessmentId}
           onAdded={refreshDetail}
-          readOnly={effectiveReadOnly}
+          readOnly={effectiveReadOnly && userRole !== 'iqa'}
         />
       </div>
 

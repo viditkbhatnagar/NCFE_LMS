@@ -4,6 +4,8 @@ import { withAuth } from '@/lib/route-guard';
 import { remarkActionSchema } from '@/lib/validators';
 import Assessment from '@/models/Assessment';
 import Remark from '@/models/Remark';
+import Enrolment from '@/models/Enrolment';
+import { isEnrolmentIqa } from '@/lib/enrolment-access';
 import { createNotification } from '@/lib/notifications';
 
 export async function GET(
@@ -12,7 +14,7 @@ export async function GET(
 ) {
   try {
     const { id } = await params;
-    const { session, error } = await withAuth(['assessor', 'student', 'admin']);
+    const { session, error } = await withAuth(['assessor', 'student', 'admin', 'iqa']);
     if (error) return error;
 
     await dbConnect();
@@ -28,6 +30,15 @@ export async function GET(
     const userRole = session!.user.role;
     if (userRole === 'student') {
       if (assessment.learnerId.toString() !== userId) {
+        return NextResponse.json(
+          { success: false, error: 'Forbidden' },
+          { status: 403 }
+        );
+      }
+    } else if (userRole === 'iqa') {
+      // An IQA may read + give feedback on assessments for their assigned learners.
+      const enrol = await Enrolment.findById(assessment.enrollmentId).select('iqaIds').lean();
+      if (!enrol || !isEnrolmentIqa(enrol, userId)) {
         return NextResponse.json(
           { success: false, error: 'Forbidden' },
           { status: 403 }
@@ -61,7 +72,7 @@ export async function POST(
 ) {
   try {
     const { id } = await params;
-    const { session, error } = await withAuth(['assessor', 'student', 'admin']);
+    const { session, error } = await withAuth(['assessor', 'student', 'admin', 'iqa']);
     if (error) return error;
 
     const body = await request.json();
@@ -90,6 +101,15 @@ export async function POST(
     const userRole = session!.user.role;
     if (userRole === 'student') {
       if (assessment.learnerId.toString() !== userId) {
+        return NextResponse.json(
+          { success: false, error: 'Forbidden' },
+          { status: 403 }
+        );
+      }
+    } else if (userRole === 'iqa') {
+      // An IQA may read + give feedback on assessments for their assigned learners.
+      const enrol = await Enrolment.findById(assessment.enrollmentId).select('iqaIds').lean();
+      if (!enrol || !isEnrolmentIqa(enrol, userId)) {
         return NextResponse.json(
           { success: false, error: 'Forbidden' },
           { status: 403 }

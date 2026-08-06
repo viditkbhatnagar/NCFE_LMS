@@ -4,11 +4,11 @@ import { withAuth } from '@/lib/route-guard';
 import WorkHoursLog from '@/models/WorkHoursLog';
 import Enrolment from '@/models/Enrolment';
 import Qualification from '@/models/Qualification';
-import { isEnrolmentAssessor } from '@/lib/enrolment-access';
+import { isEnrolmentAssessor, isEnrolmentIqa } from '@/lib/enrolment-access';
 
 export async function GET(request: Request) {
   try {
-    const { session, error } = await withAuth(['assessor', 'student']);
+    const { session, error } = await withAuth(['assessor', 'student', 'iqa']);
     if (error) return error;
 
     const { searchParams } = new URL(request.url);
@@ -27,7 +27,9 @@ export async function GET(request: Request) {
     const isOwner =
       user.role === 'student'
         ? enrollment?.userId?.toString() === user.id
-        : isEnrolmentAssessor(enrollment, user.id);
+        : user.role === 'iqa'
+          ? isEnrolmentIqa(enrollment, user.id)
+          : isEnrolmentAssessor(enrollment, user.id);
     if (!enrollment || !isOwner) {
       return NextResponse.json(
         { success: false, error: 'Forbidden' },
