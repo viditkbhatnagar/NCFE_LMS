@@ -8,7 +8,7 @@ import { assessorMatch, iqaMatch } from '@/lib/enrolment-access';
 
 export async function GET(request: Request) {
   try {
-    const { session, error } = await withAuth(['assessor', 'student', 'iqa']);
+    const { session, error } = await withAuth(['assessor', 'student', 'iqa', 'admin']);
     if (error) return error;
 
     const { searchParams } = new URL(request.url);
@@ -34,17 +34,19 @@ export async function GET(request: Request) {
       }
 
       // Verify this learner is assigned to the requester — an assessor (lead or
-      // co-assessor) or an IQA.
-      const enrollment = await Enrolment.findOne({
-        userId,
-        ...(user.role === 'iqa' ? iqaMatch(user.id) : assessorMatch(user.id)),
-      }).lean();
+      // co-assessor) or an IQA. Admin (superset) may view any learner's docs.
+      if (user.role !== 'admin') {
+        const enrollment = await Enrolment.findOne({
+          userId,
+          ...(user.role === 'iqa' ? iqaMatch(user.id) : assessorMatch(user.id)),
+        }).lean();
 
-      if (!enrollment) {
-        return NextResponse.json(
-          { success: false, error: 'Learner not found in your enrollments' },
-          { status: 403 }
-        );
+        if (!enrollment) {
+          return NextResponse.json(
+            { success: false, error: 'Learner not found in your enrollments' },
+            { status: 403 }
+          );
+        }
       }
 
       targetUserId = userId;
@@ -93,7 +95,7 @@ export async function GET(request: Request) {
 
 export async function POST(request: Request) {
   try {
-    const { session, error } = await withAuth(['assessor', 'student']);
+    const { session, error } = await withAuth(['assessor', 'student', 'admin']);
     if (error) return error;
 
     await dbConnect();
@@ -132,17 +134,20 @@ export async function POST(request: Request) {
         );
       }
 
-      // Verify this learner belongs to the assessor's enrollments (lead or co-assessor)
-      const enrollment = await Enrolment.findOne({
-        userId,
-        ...assessorMatch(user.id),
-      }).lean();
+      // Verify this learner belongs to the assessor's enrollments (lead or
+      // co-assessor). Admin (superset) may upload for any learner.
+      if (user.role !== 'admin') {
+        const enrollment = await Enrolment.findOne({
+          userId,
+          ...assessorMatch(user.id),
+        }).lean();
 
-      if (!enrollment) {
-        return NextResponse.json(
-          { success: false, error: 'Forbidden' },
-          { status: 403 }
-        );
+        if (!enrollment) {
+          return NextResponse.json(
+            { success: false, error: 'Forbidden' },
+            { status: 403 }
+          );
+        }
       }
 
       targetUserId = userId;

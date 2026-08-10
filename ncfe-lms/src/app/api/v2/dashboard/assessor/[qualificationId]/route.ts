@@ -15,7 +15,7 @@ export async function GET(
 ) {
   try {
     const { qualificationId } = await params;
-    const { session, error } = await withAuth(['assessor', 'iqa']);
+    const { session, error } = await withAuth(['assessor', 'iqa', 'admin']);
     if (error) return error;
 
     await dbConnect();
@@ -26,7 +26,11 @@ export async function GET(
     // Enrolments in scope: for an assessor, the learners they assess; for an IQA,
     // the learners they are assigned to quality-assure.
     const scopeMatch =
-      session!.user.role === 'iqa' ? iqaMatch(session!.user.id) : assessorMatch(session!.user.id);
+      session!.user.role === 'admin'
+        ? {}
+        : session!.user.role === 'iqa'
+          ? iqaMatch(session!.user.id)
+          : assessorMatch(session!.user.id);
     const enrollments = await Enrolment.find({
       qualificationId,
       ...scopeMatch,

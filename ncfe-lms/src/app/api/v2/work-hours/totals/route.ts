@@ -8,7 +8,7 @@ import { isEnrolmentAssessor, isEnrolmentIqa } from '@/lib/enrolment-access';
 
 export async function GET(request: Request) {
   try {
-    const { session, error } = await withAuth(['assessor', 'student', 'iqa']);
+    const { session, error } = await withAuth(['assessor', 'student', 'iqa', 'admin']);
     if (error) return error;
 
     const { searchParams } = new URL(request.url);
@@ -25,11 +25,13 @@ export async function GET(request: Request) {
     const user = session!.user;
     const enrollment = await Enrolment.findById(enrollmentId).lean();
     const isOwner =
-      user.role === 'student'
-        ? enrollment?.userId?.toString() === user.id
-        : user.role === 'iqa'
-          ? isEnrolmentIqa(enrollment, user.id)
-          : isEnrolmentAssessor(enrollment, user.id);
+      user.role === 'admin'
+        ? true
+        : user.role === 'student'
+          ? enrollment?.userId?.toString() === user.id
+          : user.role === 'iqa'
+            ? isEnrolmentIqa(enrollment, user.id)
+            : isEnrolmentAssessor(enrollment, user.id);
     if (!enrollment || !isOwner) {
       return NextResponse.json(
         { success: false, error: 'Forbidden' },

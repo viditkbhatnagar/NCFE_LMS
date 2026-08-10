@@ -8,7 +8,7 @@ import { isEnrolmentAssessor, assessorMatch, isEnrolmentIqa, iqaMatch } from '@/
 
 export async function GET(request: Request) {
   try {
-    const { session, error } = await withAuth(['assessor', 'student', 'iqa']);
+    const { session, error } = await withAuth(['assessor', 'student', 'iqa', 'admin']);
     if (error) return error;
 
     const { searchParams } = new URL(request.url);
@@ -31,11 +31,13 @@ export async function GET(request: Request) {
     if (enrollmentId) {
       const enrollment = await Enrolment.findById(enrollmentId).lean();
       const isOwner =
-        user.role === 'student'
-          ? enrollment?.userId?.toString() === user.id
-          : user.role === 'iqa'
-            ? isEnrolmentIqa(enrollment, user.id)
-            : isEnrolmentAssessor(enrollment, user.id);
+        user.role === 'admin'
+          ? true
+          : user.role === 'student'
+            ? enrollment?.userId?.toString() === user.id
+            : user.role === 'iqa'
+              ? isEnrolmentIqa(enrollment, user.id)
+              : isEnrolmentAssessor(enrollment, user.id);
       if (!enrollment || !isOwner) {
         return NextResponse.json(
           { success: false, error: 'Forbidden' },
@@ -95,7 +97,7 @@ export async function GET(request: Request) {
 
 export async function POST(request: Request) {
   try {
-    const { session, error } = await withAuth(['assessor', 'student']);
+    const { session, error } = await withAuth(['assessor', 'student', 'admin']);
     if (error) return error;
 
     const body = await request.json();
@@ -121,9 +123,11 @@ export async function POST(request: Request) {
     }
 
     const isOwner =
-      user.role === 'student'
-        ? enrollment.userId?.toString() === user.id
-        : isEnrolmentAssessor(enrollment, user.id);
+      user.role === 'admin'
+        ? true
+        : user.role === 'student'
+          ? enrollment.userId?.toString() === user.id
+          : isEnrolmentAssessor(enrollment, user.id);
     if (!isOwner) {
       return NextResponse.json(
         { success: false, error: 'Forbidden' },

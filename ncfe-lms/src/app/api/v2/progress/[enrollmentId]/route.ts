@@ -15,7 +15,7 @@ export async function GET(
 ) {
   try {
     const { enrollmentId } = await params;
-    const { session, error } = await withAuth(['assessor', 'student', 'iqa']);
+    const { session, error } = await withAuth(['assessor', 'student', 'iqa', 'admin']);
     if (error) return error;
 
     await dbConnect();
@@ -30,11 +30,13 @@ export async function GET(
     }
 
     const isOwner =
-      session!.user.role === 'student'
-        ? enrollment.userId?.toString() === session!.user.id
-        : session!.user.role === 'iqa'
-          ? isEnrolmentIqa(enrollment, session!.user.id)
-          : isEnrolmentAssessor(enrollment, session!.user.id);
+      session!.user.role === 'admin'
+        ? true
+        : session!.user.role === 'student'
+          ? enrollment.userId?.toString() === session!.user.id
+          : session!.user.role === 'iqa'
+            ? isEnrolmentIqa(enrollment, session!.user.id)
+            : isEnrolmentAssessor(enrollment, session!.user.id);
 
     if (!isOwner) {
       return NextResponse.json(

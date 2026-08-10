@@ -12,7 +12,7 @@ export async function GET(
 ) {
   try {
     const { enrollmentId } = await params;
-    const { session, error } = await withAuth(['assessor', 'student', 'iqa']);
+    const { session, error } = await withAuth(['assessor', 'student', 'iqa', 'admin']);
     if (error) return error;
 
     const { searchParams } = new URL(request.url);
@@ -40,11 +40,13 @@ export async function GET(
         ? String((rawUserId as Record<string, unknown>)._id)
         : String(rawUserId ?? '');
     const isOwner =
-      user.role === 'assessor'
-        ? isEnrolmentAssessor(enrollment, user.id)
-        : user.role === 'iqa'
-          ? isEnrolmentIqa(enrollment, user.id)
-          : enrollmentUserId === user.id;
+      user.role === 'admin'
+        ? true
+        : user.role === 'assessor'
+          ? isEnrolmentAssessor(enrollment, user.id)
+          : user.role === 'iqa'
+            ? isEnrolmentIqa(enrollment, user.id)
+            : enrollmentUserId === user.id;
     if (!isOwner) {
       return NextResponse.json(
         { success: false, error: 'Forbidden' },
