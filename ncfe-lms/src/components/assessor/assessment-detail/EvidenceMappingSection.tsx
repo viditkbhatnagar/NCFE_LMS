@@ -25,7 +25,11 @@ export default function EvidenceMappingSection({
   const [showModal, setShowModal] = useState(false);
   const [previewEvidence, setPreviewEvidence] = useState<EvidenceMapEntry['evidenceId'] | null>(null);
 
-  const currentEvidenceIds = evidenceMap.map((m) => m.evidenceId._id);
+  // Skip map rows whose evidence has been deleted (populate returns null). A
+  // dangling reference must never crash the panel — the learner still needs to
+  // read their assessor's feedback.
+  const validMap = evidenceMap.filter((m) => m.evidenceId);
+  const currentEvidenceIds = validMap.map((m) => m.evidenceId._id);
 
   const handleRemove = async (evidenceIdToRemove: string) => {
     const newIds = currentEvidenceIds.filter((id) => id !== evidenceIdToRemove);
@@ -70,7 +74,7 @@ export default function EvidenceMappingSection({
         )}
       </div>
 
-      {evidenceMap.length === 0 ? (
+      {validMap.length === 0 ? (
         <div className="flex flex-col items-center py-6 text-gray-400">
           <svg className="w-8 h-8 mb-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M13.828 10.172a4 4 0 00-5.656 0l-4 4a4 4 0 105.656 5.656l1.102-1.101m-.758-4.899a4 4 0 005.656 0l4-4a4 4 0 00-5.656-5.656l-1.1 1.1" />
@@ -80,9 +84,9 @@ export default function EvidenceMappingSection({
       ) : (
         <div className="space-y-2">
           <p className="text-xs text-gray-500">
-            Attached Evidence ({evidenceMap.length})
+            Attached Evidence ({validMap.length})
           </p>
-          {evidenceMap.map((item) => (
+          {validMap.map((item) => (
             <div
               key={item._id}
               className="flex items-center gap-2 p-2 rounded-[6px] border border-gray-200 bg-gray-50"

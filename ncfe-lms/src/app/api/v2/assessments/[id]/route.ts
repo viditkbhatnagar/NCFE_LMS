@@ -126,12 +126,21 @@ export async function GET(
         .lean(),
     ]);
 
+    // Drop map rows whose target was deleted after mapping (populate → null).
+    // An orphaned reference would otherwise crash the client detail panel, so a
+    // learner could not read their feedback. Deleting evidence/criteria now
+    // cascades to these rows, but we filter defensively for any legacy orphans.
+    const safeEvidenceMap = evidenceMap.filter((m) => m.evidenceId);
+    const safeCriteriaMap = criteriaMap.filter(
+      (m) => m.criteriaId && (m.criteriaId as { unitId?: unknown }).unitId && (m.criteriaId as { learningOutcomeId?: unknown }).learningOutcomeId
+    );
+
     return NextResponse.json({
       success: true,
       data: {
         assessment,
-        criteriaMap,
-        evidenceMap,
+        criteriaMap: safeCriteriaMap,
+        evidenceMap: safeEvidenceMap,
         signOffs,
         remarks,
         canEdit,

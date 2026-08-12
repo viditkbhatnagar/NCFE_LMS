@@ -5,6 +5,7 @@ import { createAuditLog } from '@/lib/audit';
 import { deleteFile } from '@/lib/upload';
 import Evidence from '@/models/Evidence';
 import EvidenceMapping from '@/models/EvidenceMapping';
+import AssessmentEvidenceMap from '@/models/AssessmentEvidenceMap';
 import Enrolment from '@/models/Enrolment';
 
 async function hasEvidenceAccess(
@@ -202,8 +203,11 @@ export async function DELETE(
       storageKey: evidence.storageKey,
     });
 
-    // Delete associated mappings
+    // Delete associated mappings (legacy EvidenceMapping + BRITEthink
+    // AssessmentEvidenceMap) so no assessment is left pointing at deleted
+    // evidence — a dangling reference crashes the assessment detail panel.
     await EvidenceMapping.deleteMany({ evidenceId: id });
+    await AssessmentEvidenceMap.deleteMany({ evidenceId: id });
 
     // Delete the evidence document
     await Evidence.findByIdAndDelete(id);

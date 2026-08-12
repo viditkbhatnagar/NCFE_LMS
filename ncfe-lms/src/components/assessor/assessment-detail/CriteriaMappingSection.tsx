@@ -27,8 +27,12 @@ export default function CriteriaMappingSection({
   const grouped: Record<string, { unit: { _id: string; unitReference: string; title: string }; los: Record<string, { lo: { loNumber: string; description: string }; criteria: CriteriaMapEntry[] }> }> = {};
 
   for (const entry of criteriaMap) {
-    const unit = entry.criteriaId.unitId;
-    const lo = entry.criteriaId.learningOutcomeId;
+    // A criterion (or its unit/LO) may have been deleted after mapping, leaving
+    // a dangling reference that populates to null. Skip it rather than crash the
+    // whole panel — the learner still needs to read the rest of the feedback.
+    const unit = entry.criteriaId?.unitId;
+    const lo = entry.criteriaId?.learningOutcomeId;
+    if (!unit || !lo) continue;
     const unitKey = unit._id;
 
     if (!grouped[unitKey]) {
@@ -41,7 +45,9 @@ export default function CriteriaMappingSection({
     grouped[unitKey].los[loKey].criteria.push(entry);
   }
 
-  const currentMappedIds = criteriaMap.map((m) => m.criteriaId._id);
+  const currentMappedIds = criteriaMap
+    .filter((m) => m.criteriaId)
+    .map((m) => m.criteriaId._id);
 
   return (
     <div className="space-y-3">

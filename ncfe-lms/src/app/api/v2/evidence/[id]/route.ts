@@ -3,6 +3,7 @@ import dbConnect from '@/lib/db';
 import { withAuth } from '@/lib/route-guard';
 import { deleteFile } from '@/lib/upload';
 import Evidence from '@/models/Evidence';
+import AssessmentEvidenceMap from '@/models/AssessmentEvidenceMap';
 import Enrolment from '@/models/Enrolment';
 import { isEnrolmentAssessor } from '@/lib/enrolment-access';
 
@@ -166,6 +167,10 @@ export async function DELETE(
     }
 
     await Evidence.findByIdAndDelete(id);
+
+    // Cascade: remove assessment↔evidence mappings so no assessment is left
+    // pointing at a now-deleted evidence (which crashes the detail panel).
+    await AssessmentEvidenceMap.deleteMany({ evidenceId: id });
 
     return NextResponse.json({ success: true });
   } catch (err) {
