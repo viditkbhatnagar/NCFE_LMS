@@ -62,7 +62,7 @@ export default function SignOffStatusSection({
   onSignOff,
   userRole = 'assessor',
 }: SignOffStatusSectionProps) {
-  const [signingOff, setSigningOff] = useState(false);
+  const [signingRole, setSigningRole] = useState<SignOffRole | null>(null);
 
   const signOffMap: Record<string, SignOffEntry> = {};
   for (const so of signOffs) {
@@ -96,19 +96,21 @@ export default function SignOffStatusSection({
   };
 
   const [signOffError, setSignOffError] = useState<string | null>(null);
-  const [comment, setComment] = useState('');
+  // Comments are keyed by role: an admin (superset) can sign more than one row,
+  // so each row keeps its own optional remark.
+  const [comments, setComments] = useState<Record<string, string>>({});
 
-  const handleSignOff = async () => {
-    setSigningOff(true);
+  const handleSignOff = async (role: SignOffRole) => {
+    setSigningRole(role);
     setSignOffError(null);
     try {
       const res = await fetch(`/api/v2/assessments/${assessmentId}/sign-off`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          role: mySignOffRole,
+          role,
           status: 'signed_off',
-          comments: comment.trim() || undefined,
+          comments: comments[role]?.trim() || undefined,
         }),
       });
       if (res.ok) {
@@ -123,7 +125,7 @@ export default function SignOffStatusSection({
       console.error('Error signing off:', err);
       setSignOffError('Network error');
     } finally {
-      setSigningOff(false);
+      setSigningRole(null);
     }
   };
 
@@ -163,7 +165,9 @@ export default function SignOffStatusSection({
             const isSigned = so?.status === 'signed_off';
             const isRejected = so?.status === 'rejected';
             const isReady = canRoleSignOff(role);
-            const canSign = mySignOffRole === role && isReady;
+            // Admin is a full superset and may sign off on behalf of any role
+            // that is ready; everyone else only signs their own mapped role.
+            const canSign = isReady && (userRole === 'admin' || mySignOffRole === role);
 
             return (
               <div key={role}>
@@ -214,11 +218,11 @@ export default function SignOffStatusSection({
                 {/* Action */}
                 {canSign && !isSigned && (
                   <button
-                    onClick={handleSignOff}
-                    disabled={signingOff}
+                    onClick={() => handleSignOff(role)}
+                    disabled={signingRole !== null}
                     className="px-3 py-1 bg-gray-900 text-white rounded-[6px] text-xs font-medium hover:bg-gray-800 transition-colors disabled:opacity-50 shrink-0"
                   >
-                    {signingOff ? 'Signing...' : 'Sign Off'}
+                    {signingRole === role ? 'Signing...' : 'Sign Off'}
                   </button>
                 )}
                 {!canSign && !isSigned && !isRejected && (
@@ -232,8 +236,10 @@ export default function SignOffStatusSection({
                 </div>
                 {canSign && !isSigned && (
                   <textarea
-                    value={comment}
-                    onChange={(e) => setComment(e.target.value)}
+                    value={comments[role] || ''}
+                    onChange={(e) =>
+                      setComments((prev) => ({ ...prev, [role]: e.target.value }))
+                    }
                     placeholder="Add a remark (optional), then Sign Off…"
                     rows={2}
                     className="w-full mt-2 ml-9 border border-gray-200 rounded-[6px] px-2 py-1.5 text-xs text-gray-900 placeholder:text-gray-400 focus:outline-none focus:ring-1 focus:ring-primary resize-y"

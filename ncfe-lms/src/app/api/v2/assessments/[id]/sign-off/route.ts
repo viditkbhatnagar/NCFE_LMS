@@ -83,10 +83,13 @@ export async function POST(
       );
     }
 
-    // Verify the user's role is allowed to perform this sign-off role
+    // Verify the user's role is allowed to perform this sign-off role.
+    // Admin is a full superset and may sign off on behalf of any role — this
+    // lets an admin who also assesses (e.g. a senior assessor promoted to admin)
+    // complete the Assessor step. The ordering prerequisites below still apply.
     const userRole = session!.user.role;
     const allowedSignOffRole = ALLOWED_SIGN_OFF_ROLE[userRole];
-    if (allowedSignOffRole !== validation.data.role) {
+    if (userRole !== 'admin' && allowedSignOffRole !== validation.data.role) {
       return NextResponse.json(
         {
           success: false,
