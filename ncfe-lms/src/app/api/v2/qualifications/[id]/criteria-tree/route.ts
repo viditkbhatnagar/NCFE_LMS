@@ -11,7 +11,11 @@ export async function GET(
 ) {
   try {
     const { id } = await params;
-    const { error } = await withAuth(['assessor', 'student', 'admin']);
+    // IQA included: this returns only the qualification's Unit/LO/AC reference
+    // tree — no learner records — so it needs no per-user scoping. Without it,
+    // "View Full Curriculum" and the portfolio page 403 for an IQA and render a
+    // confident but false "0 assessment criteria across 0 units".
+    const { error } = await withAuth(['assessor', 'student', 'iqa', 'admin']);
     if (error) return error;
 
     await dbConnect();

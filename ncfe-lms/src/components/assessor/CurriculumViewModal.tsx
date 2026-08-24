@@ -17,6 +17,7 @@ export default function CurriculumViewModal({
 }: CurriculumViewModalProps) {
   const [tree, setTree] = useState<CriteriaTreeUnit[]>([]);
   const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
   const [expandedUnits, setExpandedUnits] = useState<Set<string>>(new Set());
   const [expandedLOs, setExpandedLOs] = useState<Set<string>>(new Set());
 
@@ -25,15 +26,25 @@ export default function CurriculumViewModal({
 
     const fetchTree = async () => {
       setLoading(true);
+      setError(null);
       try {
         const res = await fetch(`/api/v2/qualifications/${qualificationId}/criteria-tree`);
+        if (!res.ok) {
+          // Never fall through to the count header on a failed load — rendering
+          // "0 assessment criteria across 0 units" reads as a real answer.
+          setError('Could not load the curriculum. Please try again.');
+          return;
+        }
         const json = await res.json();
         if (json.success) {
           setTree(json.data);
           setExpandedUnits(new Set(json.data.map((u: CriteriaTreeUnit) => u._id)));
+        } else {
+          setError(json.error || 'Could not load the curriculum.');
         }
       } catch (err) {
         console.error('Error fetching criteria tree:', err);
+        setError('Network error. Check your connection and try again.');
       } finally {
         setLoading(false);
       }
@@ -66,14 +77,20 @@ export default function CurriculumViewModal({
 
   return (
     <Modal isOpen={isOpen} onClose={onClose} title="Qualification Curriculum" size="lg">
-      <div className="flex items-center justify-between mb-4 pb-3 border-b border-gray-100">
-        <span className="text-sm text-gray-600">
-          <span className="font-semibold text-brand-600">{totalCriteria}</span> assessment criteria across{' '}
-          <span className="font-semibold text-brand-600">{tree.length}</span> units
-        </span>
-      </div>
+      {!error && !loading && (
+        <div className="flex items-center justify-between mb-4 pb-3 border-b border-gray-100">
+          <span className="text-sm text-gray-600">
+            <span className="font-semibold text-brand-600">{totalCriteria}</span> assessment criteria across{' '}
+            <span className="font-semibold text-brand-600">{tree.length}</span> units
+          </span>
+        </div>
+      )}
 
-      {loading ? (
+      {error ? (
+        <div className="py-8 text-center">
+          <p className="text-sm text-gray-600">{error}</p>
+        </div>
+      ) : loading ? (
         <div className="flex justify-center py-8">
           <div className="w-6 h-6 border-2 border-primary border-t-transparent rounded-full animate-spin" />
         </div>

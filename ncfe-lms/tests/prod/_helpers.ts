@@ -57,7 +57,13 @@ export async function makeApiContext(creds: Creds): Promise<APIRequestContext> {
 }
 
 export async function makeBrowserContext(browser: Browser, creds: Creds): Promise<BrowserContext> {
-  const context = await browser.newContext({ baseURL: BASE_URL });
+  // `storageState: undefined` is REQUIRED. Playwright applies the project's
+  // `use.contextOptions` — including the admin `storageState` the prod project
+  // sets — to browser.newContext(). Without this, every role context silently
+  // carries the admin session cookie, NextAuth keeps that session, and a test
+  // that believes it is an IQA actually runs as an admin. That is precisely how
+  // an IQA-only 403 reached production unnoticed.
+  const context = await browser.newContext({ baseURL: BASE_URL, storageState: undefined });
   const page = await context.newPage();
   await page.goto('/sign-in');
   await page.getByLabel('Email').fill(creds.email);
@@ -65,6 +71,17 @@ export async function makeBrowserContext(browser: Browser, creds: Creds): Promis
   await page.getByRole('button', { name: 'Continue with email' }).click();
   // role-specific landing — assessor/student → /c, admin → /admin/dashboard, iqa → /iqa or /dashboard
   await page.waitForURL(/\/(admin\/dashboard|iqa|c|dashboard)/, { timeout: 60_000 });
+
+  // Fail fast if we are not who we asked to be — a silent identity mix-up makes
+  // every downstream assertion meaningless.
+  const res = await page.request.get(`${BASE_URL}/api/auth/session`);
+  const body = (await res.json()) as { user?: { email?: string } };
+  const actual = body?.user?.email?.toLowerCase();
+  if (actual !== creds.email.toLowerCase()) {
+    await context.close();
+    throw new Error(`browser context identity mismatch: asked for ${creds.email}, got ${actual ?? 'anonymous'}`);
+  }
+
   await page.close();
   return context;
 }

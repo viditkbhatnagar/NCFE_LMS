@@ -16,7 +16,13 @@ export default function AssessmentsPage() {
   const { qualification, enrollments, currentEnrollmentId, selectedLearner, userRole } =
     useAssessorCourse();
 
+  // Read-only surfaces: a student sees their own work, an IQA gives oversight.
   const readOnly = userRole === 'student' || userRole === 'iqa';
+  // ...but only a student reads from the student endpoint. Every oversight role
+  // (assessor/iqa/admin) reads /api/v2/assessments, which already scopes an IQA
+  // to the enrolments they are assigned to via iqaIds. Routing an IQA at the
+  // student endpoint 403s, because that route is guarded withAuth(['student']).
+  const useStudentApi = userRole === 'student';
 
   const SIDEBAR_W = 65;
   const TOP_NAV_H = 56;
@@ -75,7 +81,7 @@ export default function AssessmentsPage() {
     setError(null);
     try {
       let url: string;
-      if (readOnly) {
+      if (useStudentApi) {
         url = `/api/v2/student/assessments?qualificationId=${qualification._id}`;
       } else {
         const params = new URLSearchParams({ qualificationId: qualification._id });
@@ -100,7 +106,7 @@ export default function AssessmentsPage() {
     } finally {
       setLoading(false);
     }
-  }, [qualification._id, currentEnrollmentId, readOnly]);
+  }, [qualification._id, currentEnrollmentId, useStudentApi]);
 
   useEffect(() => {
     fetchAssessments();
