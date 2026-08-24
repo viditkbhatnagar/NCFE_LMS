@@ -31,6 +31,13 @@ const securityHeaders = [
 ];
 
 const nextConfig: NextConfig = {
+  // pdfkit reads its built-in font metrics (data/*.afm) from its own package
+  // directory at runtime. Bundling it strands those files — none of the 14 .afm
+  // files land in .next — so `new PDFDocument()` throws ENOENT and every
+  // assessment PDF export 500s. Keeping it external lets it resolve them from
+  // node_modules as it expects.
+  serverExternalPackages: ['pdfkit'],
+
   async headers() {
     return [
       {
