@@ -27,15 +27,18 @@ export default function HomeLearnerCard({ assessors, learners, slug, userRole = 
           </svg>
           <h3 className="font-semibold text-gray-900">{isStudent ? 'Course Members' : 'My Learners'}</h3>
         </div>
-        <Link
-          href={`/c/${slug}/members`}
-          className="flex items-center gap-1 text-xs text-primary hover:text-primary/80 font-medium transition-colors"
-        >
-          View all members
-          <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
-          </svg>
-        </Link>
+        {/* The members page excludes students, so don't link them into a 403. */}
+        {!isStudent && (
+          <Link
+            href={`/c/${slug}/members`}
+            className="flex items-center gap-1 text-xs text-primary hover:text-primary/80 font-medium transition-colors"
+          >
+            View all members
+            <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+            </svg>
+          </Link>
+        )}
       </div>
 
       <div className="p-5 grid grid-cols-1 md:grid-cols-2 gap-6">

@@ -5,6 +5,8 @@ import { criterionCommentCreateSchema } from '@/lib/validators';
 import { createAuditLog } from '@/lib/audit';
 import Assessment from '@/models/Assessment';
 import CriterionComment from '@/models/CriterionComment';
+import Enrolment from '@/models/Enrolment';
+import { isEnrolmentIqa } from '@/lib/enrolment-access';
 
 interface PopulatedRef {
   _id?: { toString(): string };
@@ -51,6 +53,12 @@ export async function GET(
       if (refId(assessment.assessorId) !== userId) {
         return NextResponse.json({ success: false, error: 'Forbidden' }, { status: 403 });
       }
+    } else if (role === 'iqa') {
+      // An IQA sees only the learners assigned to them.
+      const enrol = await Enrolment.findById(assessment.enrollmentId).select('iqaIds').lean();
+      if (!enrol || !isEnrolmentIqa(enrol, userId)) {
+        return NextResponse.json({ success: false, error: 'Forbidden' }, { status: 403 });
+      }
     }
 
     const filter: Record<string, unknown> = { assessmentId: id };
@@ -77,7 +85,7 @@ export async function POST(
 ) {
   try {
     const { id } = await params;
-    const { session, error } = await withAuth(['assessor', 'iqa']);
+    const { session, error } = await withAuth(['assessor', 'iqa', 'admin']);
     if (error) return error;
 
     const body = await request.json();
@@ -99,11 +107,19 @@ export async function POST(
       );
     }
 
-    if (
-      session!.user.role === 'assessor' &&
-      refId(assessment.assessorId) !== session!.user.id
-    ) {
-      return NextResponse.json({ success: false, error: 'Forbidden' }, { status: 403 });
+    const role = session!.user.role;
+    const userId = session!.user.id;
+
+    if (role === 'assessor') {
+      if (refId(assessment.assessorId) !== userId) {
+        return NextResponse.json({ success: false, error: 'Forbidden' }, { status: 403 });
+      }
+    } else if (role === 'iqa') {
+      // An IQA may comment only on the learners assigned to them.
+      const enrol = await Enrolment.findById(assessment.enrollmentId).select('iqaIds').lean();
+      if (!enrol || !isEnrolmentIqa(enrol, userId)) {
+        return NextResponse.json({ success: false, error: 'Forbidden' }, { status: 403 });
+      }
     }
 
     const comment = await CriterionComment.create({

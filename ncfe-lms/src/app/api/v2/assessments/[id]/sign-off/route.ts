@@ -5,6 +5,8 @@ import { signOffActionSchema } from '@/lib/validators';
 import Assessment from '@/models/Assessment';
 import SignOff from '@/models/SignOff';
 import User from '@/models/User';
+import Enrolment from '@/models/Enrolment';
+import { isEnrolmentAssessor, isEnrolmentIqa } from '@/lib/enrolment-access';
 import { createNotification } from '@/lib/notifications';
 import type { SignOffRole } from '@/types';
 
@@ -18,13 +20,36 @@ const ALLOWED_SIGN_OFF_ROLE: Record<string, SignOffRole> = {
   student: 'learner',
 };
 
+// A sign-off is a regulated audit record, so matching the caller's role to a
+// sign-off step is not enough — they must also be a party to THIS assessment.
+// The assessment arg comes from findById().lean() with no populate, so the ref
+// fields are plain ObjectIds.
+async function isAssessmentParticipant(
+  assessment: {
+    learnerId?: { toString(): string } | null;
+    assessorId?: { toString(): string } | null;
+    enrollmentId?: unknown;
+  },
+  userId: string,
+  userRole: string
+): Promise<boolean> {
+  if (userRole === 'admin') return true;
+  if (userRole === 'student') return assessment.learnerId?.toString() === userId;
+
+  const enrol = await Enrolment.findById(assessment.enrollmentId)
+    .select('iqaIds assessorId assessorIds')
+    .lean();
+  if (userRole === 'iqa') return isEnrolmentIqa(enrol, userId);
+  return assessment.assessorId?.toString() === userId || isEnrolmentAssessor(enrol, userId);
+}
+
 export async function GET(
   request: Request,
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
     const { id } = await params;
-    const { error } = await withAuth(['assessor', 'iqa', 'admin', 'student']);
+    const { session, error } = await withAuth(['assessor', 'iqa', 'admin', 'student']);
     if (error) return error;
 
     await dbConnect();
@@ -34,6 +59,18 @@ export async function GET(
       return NextResponse.json(
         { success: false, error: 'Assessment not found' },
         { status: 404 }
+      );
+    }
+
+    const allowed = await isAssessmentParticipant(
+      assessment,
+      session!.user.id,
+      session!.user.role
+    );
+    if (!allowed) {
+      return NextResponse.json(
+        { success: false, error: 'Forbidden' },
+        { status: 403 }
       );
     }
 
@@ -83,11 +120,19 @@ export async function POST(
       );
     }
 
+    const userRole = session!.user.role;
+    const allowed = await isAssessmentParticipant(assessment, session!.user.id, userRole);
+    if (!allowed) {
+      return NextResponse.json(
+        { success: false, error: 'Forbidden' },
+        { status: 403 }
+      );
+    }
+
     // Verify the user's role is allowed to perform this sign-off role.
     // Admin is a full superset and may sign off on behalf of any role — this
     // lets an admin who also assesses (e.g. a senior assessor promoted to admin)
     // complete the Assessor step. The ordering prerequisites below still apply.
-    const userRole = session!.user.role;
     const allowedSignOffRole = ALLOWED_SIGN_OFF_ROLE[userRole];
     if (userRole !== 'admin' && allowedSignOffRole !== validation.data.role) {
       return NextResponse.json(

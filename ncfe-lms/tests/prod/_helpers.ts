@@ -18,10 +18,17 @@ export interface Creds {
   password: string;
 }
 
-export const PROD_USERS: Record<'admin' | 'assessor' | 'iqa' | 'studentReal', Creds> = {
+export const PROD_USERS: Record<'admin' | 'assessor' | 'iqa' | 'iqaAssigned' | 'studentReal', Creds> = {
   admin: { email: 'admin@learnerseducation.com', password: 'passwordadmin' },
   assessor: { email: 'jyothi@learnerseducation.com', password: 'password123' },
+  // Sarah has the IQA role but is assigned to NO enrolments, so course-scoped
+  // endpoints legitimately 403 her. Good for role-guard checks, wrong for
+  // anything that needs data.
   iqa: { email: 'iqa@test.com', password: 'iqapassword' },
+  // Disposable test IQA that IS assigned to an enrolment on the EYE course —
+  // this is the one that mirrors a real IQA like Robert. Use it whenever the
+  // assertion is about what an IQA can SEE rather than what they may reach.
+  iqaAssigned: { email: 'rmrepro-mshb1p3g.iqa@example.invalid', password: 'VerifyIqa2026!' },
   studentReal: { email: 'bhatnagar007vidit@gmail.com', password: 'password' },
 };
 

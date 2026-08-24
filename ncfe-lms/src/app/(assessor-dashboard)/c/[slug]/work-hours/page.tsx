@@ -22,6 +22,8 @@ function formatDateParam(date: Date): string {
 export default function WorkHoursPage() {
   const { currentEnrollmentId, selectedLearner, userRole } = useAssessorCourse();
   const isStudent = userRole === 'student';
+  // IQAs have read-only oversight over work logs; every other role can write.
+  const canMutate = userRole !== 'iqa';
 
   const [entries, setEntries] = useState<WorkHourEntryItem[]>([]);
   const [loading, setLoading] = useState(false);
@@ -101,14 +103,20 @@ export default function WorkHoursPage() {
     setDeleting(true);
     try {
       const res = await fetch(`/api/v2/work-hours/${deleteConfirmId}`, { method: 'DELETE' });
-      const json = await res.json();
-      if (json.success) {
+      const json = await res.json().catch(() => null);
+      if (res.ok && json?.success) {
         setDeleteConfirmId(null);
         fetchEntries();
         fetchTotals();
+      } else {
+        // Clearing the id closes the confirm dialog so the error is visible.
+        setDeleteConfirmId(null);
+        setError(json?.error || 'Could not delete this entry.');
       }
     } catch (err) {
       console.error('Error deleting entry:', err);
+      setDeleteConfirmId(null);
+      setError('Network error. Check your connection and retry.');
     } finally {
       setDeleting(false);
     }
@@ -151,13 +159,15 @@ export default function WorkHoursPage() {
       {/* Header */}
       <div className="flex items-center justify-between mb-6">
         <h1 className="text-2xl font-bold text-gray-900">Work Hours Log</h1>
-        <button
-          onClick={handleNewClick}
-          disabled={!selectedLearner}
-          className="px-4 py-2 bg-gray-900 text-white rounded-[6px] text-sm font-medium hover:bg-gray-800 transition-colors disabled:opacity-50"
-        >
-          + New
-        </button>
+        {canMutate && (
+          <button
+            onClick={handleNewClick}
+            disabled={!selectedLearner}
+            className="px-4 py-2 bg-gray-900 text-white rounded-[6px] text-sm font-medium hover:bg-gray-800 transition-colors disabled:opacity-50"
+          >
+            + New
+          </button>
+        )}
       </div>
 
       {/* Progress bar (G13) — shown only when the qualification has a requirement */}
@@ -233,8 +243,8 @@ export default function WorkHoursPage() {
               <WorkHourEntry
                 key={entry._id}
                 entry={entry}
-                onEdit={handleEdit}
-                onDelete={handleDelete}
+                onEdit={canMutate ? handleEdit : undefined}
+                onDelete={canMutate ? handleDelete : undefined}
               />
             ))}
           </ListStateBoundary>
@@ -244,8 +254,8 @@ export default function WorkHoursPage() {
             <WorkHourEntry
               key={entry._id}
               entry={entry}
-              onEdit={handleEdit}
-              onDelete={handleDelete}
+              onEdit={canMutate ? handleEdit : undefined}
+              onDelete={canMutate ? handleDelete : undefined}
             />
           ))}
       </div>

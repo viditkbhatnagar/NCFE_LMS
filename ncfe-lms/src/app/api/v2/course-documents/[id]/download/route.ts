@@ -12,7 +12,7 @@ export async function GET(
 ) {
   try {
     const { id } = await params;
-    const { session, error } = await withAuth(['assessor', 'student']);
+    const { session, error } = await withAuth(['assessor', 'student', 'admin']);
     if (error) return error;
 
     await dbConnect();
@@ -25,12 +25,17 @@ export async function GET(
       );
     }
 
+    // Admin can download any course document; every other role must hold a
+    // matching enrolment on the qualification.
     const user = session!.user;
-    const enrollmentFilter =
-      user.role === 'student'
-        ? { qualificationId: doc.qualificationId, userId: user.id }
-        : { qualificationId: doc.qualificationId, ...assessorMatch(user.id) };
-    const hasAccess = await Enrolment.exists(enrollmentFilter);
+    let hasAccess = user.role === 'admin';
+    if (!hasAccess) {
+      const enrollmentFilter =
+        user.role === 'student'
+          ? { qualificationId: doc.qualificationId, userId: user.id }
+          : { qualificationId: doc.qualificationId, ...assessorMatch(user.id) };
+      hasAccess = !!(await Enrolment.exists(enrollmentFilter));
+    }
     if (!hasAccess) {
       return NextResponse.json(
         { success: false, error: 'Forbidden' },

@@ -54,6 +54,11 @@ export default function AssessmentDetailPanel({
   onUpdated,
 }: AssessmentDetailPanelProps) {
   const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState<string | null>(null);
+  // Tracks whether the panel ever loaded successfully. fetchDetail doubles as
+  // the refresh path for the sub-sections, so a transient failure there must
+  // not replace an already-populated panel with an error screen.
+  const [loaded, setLoaded] = useState(false);
   const [editState, setEditState] = useState<EditState>({
     title: '',
     date: '',
@@ -70,9 +75,14 @@ export default function AssessmentDetailPanel({
   const [deleting, setDeleting] = useState(false);
   // canEdit comes from the detail GET: false when viewing another assessor's
   // assessment (or as an oversight role). Combined with the incoming readOnly
-  // prop, it gates every write affordance in the panel.
-  const [canEdit, setCanEdit] = useState(true);
+  // prop, it gates every write affordance in the panel. Starts false so a
+  // failed load never leaves live Sign Off / Delete buttons on a blank panel.
+  const [canEdit, setCanEdit] = useState(false);
   const effectiveReadOnly = readOnly || !canEdit;
+  // Duplicating creates a fresh draft under the current user, so a non-owning
+  // assessor keeps it even when the panel is read-only — but IQAs and learners
+  // never can.
+  const canDuplicate = userRole === 'assessor' || userRole === 'admin';
   const { enrollments } = useAssessorCourse();
   const [showDuplicate, setShowDuplicate] = useState(false);
   const [duplicating, setDuplicating] = useState(false);
@@ -110,8 +120,8 @@ export default function AssessmentDetailPanel({
   const fetchDetail = useCallback(async () => {
     try {
       const res = await fetch(`/api/v2/assessments/${assessmentId}`);
-      const json = await res.json();
-      if (json.success) {
+      const json = await res.json().catch(() => null);
+      if (res.ok && json?.success) {
         const { assessment, criteriaMap: cm, evidenceMap: em, signOffs: so, remarks: rm } = json.data;
         setCanEdit(json.data.canEdit ?? true);
         setEditState({
@@ -126,9 +136,19 @@ export default function AssessmentDetailPanel({
         setEvidenceMap(em);
         setSignOffs(so);
         setRemarks(rm);
+        setLoadError(null);
+        setLoaded(true);
+      } else {
+        // Deliberately does NOT clear canEdit: fetchDetail is also the refresh
+        // path for four sub-sections, so a transient blip after a remark or a
+        // sign-off would silently strip every write control from an owning
+        // assessor with no visible explanation. canEdit starts false, which is
+        // what protects the initial-load case.
+        setLoadError(json?.error || 'Failed to load this assessment.');
       }
     } catch (err) {
       console.error('Error fetching assessment detail:', err);
+      setLoadError('Network error. Check your connection and retry.');
     } finally {
       setLoading(false);
     }
@@ -136,6 +156,12 @@ export default function AssessmentDetailPanel({
 
   useEffect(() => {
     setLoading(true);
+    setLoaded(false);
+    setLoadError(null);
+    // Reset here rather than in fetchDetail's failure arms, so switching to a
+    // different assessment starts locked while a refresh of the current one
+    // leaves the open panel's controls alone.
+    setCanEdit(false);
     fetchDetail();
   }, [fetchDetail]);
 
@@ -249,6 +275,30 @@ export default function AssessmentDetailPanel({
     );
   }
 
+  // Only when the initial load failed — a refresh blip on a loaded panel keeps
+  // the panel on screen.
+  if (loadError && !loaded) {
+    return (
+      <div className="h-full flex flex-col items-center justify-center gap-3 px-6 text-center">
+        <p className="text-sm text-gray-600">{loadError}</p>
+        <div className="flex items-center gap-3">
+          <button
+            onClick={() => fetchDetail()}
+            className="px-3 py-1 text-xs font-medium text-gray-700 border border-gray-300 rounded-[6px] hover:bg-gray-50"
+          >
+            Retry
+          </button>
+          <button
+            onClick={onClose}
+            className="px-3 py-1 text-xs font-medium text-gray-700 border border-gray-300 rounded-[6px] hover:bg-gray-50"
+          >
+            Close
+          </button>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="h-full flex flex-col">
       <DetailHeader
@@ -264,7 +314,7 @@ export default function AssessmentDetailPanel({
         onPublish={handlePublish}
         onDelete={handleDelete}
         onClose={onClose}
-        onDuplicate={() => setShowDuplicate(true)}
+        onDuplicate={canDuplicate ? () => setShowDuplicate(true) : undefined}
         onAssignAll={() => setConfirmAssignAll(true)}
       />
 

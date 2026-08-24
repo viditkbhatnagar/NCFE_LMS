@@ -7,7 +7,7 @@ import IQASample from '@/models/IQASample';
 
 export async function POST(request: Request) {
   try {
-    const { session, error } = await withAuth(['iqa']);
+    const { session, error } = await withAuth(['iqa', 'admin']);
 
     if (error) {
       return error;
@@ -74,7 +74,7 @@ export async function POST(request: Request) {
 
 export async function GET(request: Request) {
   try {
-    const { session, error } = await withAuth(['iqa']);
+    const { session, error } = await withAuth(['iqa', 'admin']);
 
     if (error) {
       return error;
@@ -89,6 +89,11 @@ export async function GET(request: Request) {
     await dbConnect();
 
     const filter: Record<string, unknown> = {};
+
+    // Admins get full oversight; an IQA only ever sees their own samples.
+    if (session!.user.role !== 'admin') {
+      filter.iqaUserId = session!.user.id;
+    }
 
     // Optional filters
     const assessorId = searchParams.get('assessorId');

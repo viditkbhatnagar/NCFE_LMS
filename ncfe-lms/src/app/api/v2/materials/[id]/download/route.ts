@@ -12,7 +12,7 @@ export async function GET(
 ) {
   try {
     const { id } = await params;
-    const { session, error } = await withAuth(['assessor', 'student', 'iqa']);
+    const { session, error } = await withAuth(['assessor', 'student', 'iqa', 'admin']);
     if (error) return error;
 
     await dbConnect();
@@ -25,14 +25,19 @@ export async function GET(
       );
     }
 
+    // Admin can download any material; every other role must hold a matching
+    // enrolment on the qualification.
     const user = session!.user;
-    const enrollmentFilter =
-      user.role === 'student'
-        ? { qualificationId: material.qualificationId, userId: user.id }
-        : user.role === 'iqa'
-          ? { qualificationId: material.qualificationId, ...iqaMatch(user.id) }
-          : { qualificationId: material.qualificationId, ...assessorMatch(user.id) };
-    const hasAccess = await Enrolment.exists(enrollmentFilter);
+    let hasAccess = user.role === 'admin';
+    if (!hasAccess) {
+      const enrollmentFilter =
+        user.role === 'student'
+          ? { qualificationId: material.qualificationId, userId: user.id }
+          : user.role === 'iqa'
+            ? { qualificationId: material.qualificationId, ...iqaMatch(user.id) }
+            : { qualificationId: material.qualificationId, ...assessorMatch(user.id) };
+      hasAccess = !!(await Enrolment.exists(enrollmentFilter));
+    }
 
     if (!hasAccess) {
       return NextResponse.json(

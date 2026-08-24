@@ -4,6 +4,18 @@ import { withAuth } from '@/lib/route-guard';
 import Submission from '@/models/Submission';
 import Evidence from '@/models/Evidence';
 import EvidenceMapping from '@/models/EvidenceMapping';
+import { isEnrolmentAssessor, isEnrolmentIqa } from '@/lib/enrolment-access';
+import type { IEnrolment } from '@/models/Enrolment';
+
+// `learnerId` / `assessorId` arrive populated here, so read through to `_id`
+// when present before comparing against the session user id.
+function idOf(ref: unknown): string {
+  if (!ref) return '';
+  if (typeof ref === 'object' && '_id' in ref && (ref as { _id?: unknown })._id) {
+    return String((ref as { _id: unknown })._id);
+  }
+  return String(ref);
+}
 
 export async function GET(
   request: Request,
@@ -11,7 +23,7 @@ export async function GET(
 ) {
   try {
     const { id } = await params;
-    const { session, error } = await withAuth(['student', 'assessor', 'iqa']);
+    const { session, error } = await withAuth(['student', 'assessor', 'iqa', 'admin']);
 
     if (error) {
       return error;
@@ -32,13 +44,22 @@ export async function GET(
       );
     }
 
-    // Verify access: students can only see their own submissions
+    // Verify access based on role. Admin can read any submission; everyone
+    // else must be attached to it or to the enrolment behind it.
     const user = session!.user;
-    if (
-      user.role === 'student' &&
-      submission.learnerId?._id?.toString() !== user.id &&
-      (submission.learnerId as unknown as string)?.toString() !== user.id
-    ) {
+    const enrolment = submission.enrolmentId as unknown as IEnrolment | null;
+    let hasAccess = user.role === 'admin';
+    if (user.role === 'student') {
+      hasAccess = idOf(submission.learnerId) === user.id;
+    } else if (user.role === 'assessor') {
+      // Co-assessors are recorded on the enrolment, not on the submission.
+      hasAccess =
+        idOf(submission.assessorId) === user.id ||
+        isEnrolmentAssessor(enrolment, user.id);
+    } else if (user.role === 'iqa') {
+      hasAccess = isEnrolmentIqa(enrolment, user.id);
+    }
+    if (!hasAccess) {
       return NextResponse.json(
         { success: false, error: 'Forbidden' },
         { status: 403 }

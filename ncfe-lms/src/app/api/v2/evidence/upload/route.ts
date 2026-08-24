@@ -11,7 +11,7 @@ import { isEnrolmentAssessor, enrolmentAssessorIds } from '@/lib/enrolment-acces
 
 export async function POST(request: Request) {
   try {
-    const { session, error } = await withAuth(['assessor', 'student']);
+    const { session, error } = await withAuth(['assessor', 'student', 'admin']);
     if (error) return error;
 
     // G22 — rate limit uploads to 10/min per user
@@ -87,9 +87,11 @@ export async function POST(request: Request) {
     }
     const user = session!.user;
     const isOwner =
-      user.role === 'assessor'
-        ? isEnrolmentAssessor(enrollment, user.id)
-        : enrollment.userId?.toString() === user.id;
+      user.role === 'admin'
+        ? true
+        : user.role === 'assessor'
+          ? isEnrolmentAssessor(enrollment, user.id)
+          : enrollment.userId?.toString() === user.id;
     if (!isOwner) {
       return NextResponse.json(
         { success: false, error: 'Forbidden' },
@@ -158,15 +160,16 @@ export async function POST(request: Request) {
 
     const evidenceId = evidence._id.toString();
 
-    // Notify the learner when assessor uploads evidence
-    if (user.role === 'assessor') {
+    // Notify the learner when an assessor or admin uploads evidence
+    if (user.role === 'assessor' || user.role === 'admin') {
       const learnerId = enrollment.userId?.toString();
+      const actor = user.role === 'admin' ? 'An administrator' : 'Your assessor';
       if (learnerId) {
         createNotification({
           userId: learnerId,
           type: 'evidence_uploaded',
           title: 'New Evidence',
-          message: `Your assessor uploaded evidence: ${label.trim()}`,
+          message: `${actor} uploaded evidence: ${label.trim()}`,
           entityType: 'Evidence',
           entityId: evidenceId,
         });

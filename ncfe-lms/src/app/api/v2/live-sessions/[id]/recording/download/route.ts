@@ -3,6 +3,7 @@ import dbConnect from '@/lib/db';
 import { withAuth } from '@/lib/route-guard';
 import { getFileDownloadUrl } from '@/lib/upload';
 import LiveSession from '@/models/LiveSession';
+import { canAccessLiveSession } from '@/lib/live-session-access';
 
 // GET /api/v2/live-sessions/[id]/recording/download
 // Redirects to a (signed, for S3) URL for the uploaded recording.
@@ -11,14 +12,30 @@ export async function GET(
   req: NextRequest,
   { params }: { params: Promise<{ id: string }> },
 ) {
-  const { error } = await withAuth(['assessor', 'student', 'admin']);
+  const { session, error } = await withAuth(['assessor', 'student', 'admin']);
   if (error) return error;
 
   await dbConnect();
   const { id } = await params;
 
   const live = await LiveSession.findById(id).lean();
-  if (!live || !live.recordingUrl) {
+  if (!live) {
+    return NextResponse.json(
+      { success: false, error: 'No recording available' },
+      { status: 404 },
+    );
+  }
+
+  // Authorise before reporting whether a recording exists, so an unauthorised
+  // caller can't probe ids to tell "has a recording" (403) from "doesn't" (404).
+  if (!(await canAccessLiveSession(session!.user, live))) {
+    return NextResponse.json(
+      { success: false, error: 'Forbidden' },
+      { status: 403 },
+    );
+  }
+
+  if (!live.recordingUrl) {
     return NextResponse.json(
       { success: false, error: 'No recording available' },
       { status: 404 },

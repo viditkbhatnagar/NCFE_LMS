@@ -124,9 +124,11 @@ test.describe('Production role sweep — every page, every safe control', () => 
     }
   }
 
+  // Uses the ASSIGNED IQA on purpose: an IQA with no enrolments legitimately
+  // 403s on course-scoped endpoints, which would drown the real signal.
   test('IQA — course view + IQA dashboard load without a single API error', async ({ browser }) => {
     test.setTimeout(15 * 60_000);
-    await runSweep(browser, 'iqa', PROD_USERS.iqa, [
+    await runSweep(browser, 'iqa', PROD_USERS.iqaAssigned, [
       '/c',
       ...IQA_COURSE_PAGES.map((p) => `/c/${EYE_SLUG}${p}`),
       ...IQA_STANDALONE,
@@ -167,7 +169,7 @@ test.describe('Production role sweep — every page, every safe control', () => 
 test.describe('IQA assessment page — Robert Mitton regression', () => {
   test('IQA never calls the student-only assessments endpoint', async ({ browser }) => {
     test.setTimeout(5 * 60_000);
-    const context = await makeBrowserContext(browser, PROD_USERS.iqa);
+    const context = await makeBrowserContext(browser, PROD_USERS.iqaAssigned);
     try {
       const page = await context.newPage();
       const calls: string[] = [];

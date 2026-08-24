@@ -63,10 +63,14 @@ export async function GET(
       role: u.role,
     }));
 
-    // Learners where the requester is an assessor (lead or co-assessor).
-    const myEnrollments = allEnrollments.filter((e) =>
-      isEnrolmentAssessor(e, session!.user.id),
-    );
+    // An assessor sees only their own learners; every other in-scope role sees
+    // the full scoped list. Keyed on 'assessor' positively so a future role
+    // added to the allowlist never falls into the assessor-only path.
+    // allEnrollments is already iqaMatch-scoped for an IQA, so this cannot widen it.
+    const myEnrollments =
+      role === 'assessor'
+        ? allEnrollments.filter((e) => isEnrolmentAssessor(e, session!.user.id))
+        : allEnrollments;
 
     // Group by cohortId
     const cohortMap = new Map<string, typeof myEnrollments>();
@@ -78,17 +82,22 @@ export async function GET(
 
     const learnerGroups = Array.from(cohortMap.entries()).map(([cohortId, enrs]) => ({
       cohortId,
-      learners: enrs.map((e) => {
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        const u = e.userId as any;
-        return {
-          enrollmentId: String(e._id),
-          learnerId: String(u._id),
-          name: u.name,
-          email: u.email,
-          status: e.status,
-        };
-      }),
+      // An admin now walks EVERY enrolment on the course, so a single enrolment
+      // whose learner was deleted would otherwise turn this into a 500.
+      learners: enrs
+        .map((e) => {
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+          const u = e.userId as any;
+          if (!u?._id) return null;
+          return {
+            enrollmentId: String(e._id),
+            learnerId: String(u._id),
+            name: u.name ?? 'Unknown learner',
+            email: u.email ?? '',
+            status: e.status,
+          };
+        })
+        .filter((l): l is NonNullable<typeof l> => l !== null),
     }));
 
     return NextResponse.json({

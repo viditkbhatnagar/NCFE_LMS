@@ -5,12 +5,13 @@ import { createAuditLog } from '@/lib/audit';
 import { deleteFile } from '@/lib/upload';
 import LiveSession from '@/models/LiveSession';
 import { liveSessionUpdateSchema } from '@/lib/validators';
+import { canAccessLiveSession } from '@/lib/live-session-access';
 
 export async function GET(
   _req: NextRequest,
   { params }: { params: Promise<{ id: string }> },
 ) {
-  const { error } = await withAuth(['assessor', 'student', 'admin']);
+  const { session, error } = await withAuth(['assessor', 'student', 'admin']);
   if (error) return error;
 
   await dbConnect();
@@ -18,6 +19,10 @@ export async function GET(
   const found = await LiveSession.findById(id).lean();
   if (!found) {
     return NextResponse.json({ success: false, error: 'Not found' }, { status: 404 });
+  }
+  // The record carries the meeting link, so scope it the same way the list does.
+  if (!(await canAccessLiveSession(session!.user, found))) {
+    return NextResponse.json({ success: false, error: 'Forbidden' }, { status: 403 });
   }
   return NextResponse.json({ success: true, data: found });
 }

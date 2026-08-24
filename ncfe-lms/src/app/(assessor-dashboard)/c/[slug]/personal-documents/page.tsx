@@ -120,11 +120,19 @@ export default function PersonalDocumentsPage() {
       if (!res.ok) {
         const json = await res.json().catch(() => ({}));
         console.error('Delete failed:', json.error || res.statusText);
+        // Surface the failure instead of refetching, which would otherwise
+        // present a failed delete as a success. Clearing the id closes the
+        // confirm dialog so the error is actually visible behind it.
+        setDeleteId(null);
+        setError(json.error || 'Could not delete this document.');
+        return;
       }
       setDeleteId(null);
       await fetchItems();
     } catch (err) {
       console.error('Error deleting personal document:', err);
+      setDeleteId(null);
+      setError('Network error. Check your connection and retry.');
     } finally {
       setDeleting(false);
     }
@@ -201,7 +209,7 @@ export default function PersonalDocumentsPage() {
             onItemClick={handleItemClick}
             onPreview={handlePreview}
             onDownload={handleDownload}
-            onDelete={handleDeleteRequest}
+            onDelete={userRole === 'iqa' ? undefined : handleDeleteRequest}
           />
         ) : (
           <FileListView
@@ -209,7 +217,7 @@ export default function PersonalDocumentsPage() {
             onItemClick={handleItemClick}
             onPreview={handlePreview}
             onDownload={handleDownload}
-            onDelete={handleDeleteRequest}
+            onDelete={userRole === 'iqa' ? undefined : handleDeleteRequest}
           />
         )}
         </ListStateBoundary>

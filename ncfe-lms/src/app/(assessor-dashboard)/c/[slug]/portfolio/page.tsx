@@ -39,6 +39,9 @@ export default function PortfolioPage() {
   const [renameSaving, setRenameSaving] = useState(false);
   const [deleteTarget, setDeleteTarget] = useState<PortfolioEvidence | null>(null);
   const [deleteLoading, setDeleteLoading] = useState(false);
+  // Scoped to the rename/delete dialogs — the page-level `error` drives
+  // ListStateBoundary and would replace the already-loaded evidence list.
+  const [actionError, setActionError] = useState<string | null>(null);
 
   // Filter/sort state
   const [status, setStatus] = useState<EvidenceStatus | ''>('');
@@ -106,6 +109,10 @@ export default function PortfolioPage() {
     fetchEvidence();
   }, [fetchEvidence]);
 
+  // IQAs have read-only oversight: they can view and download evidence but
+  // never rename or delete it.
+  const isReadOnly = userRole === 'iqa';
+
   const handlePreview = (e: PortfolioEvidence) => {
     setPreviewItem(e);
   };
@@ -117,47 +124,61 @@ export default function PortfolioPage() {
   const handleRenameStart = (e: PortfolioEvidence) => {
     setRenameTarget(e);
     setRenameLabel(e.label);
+    setActionError(null);
   };
 
   const handleRenameSubmit = async () => {
     if (!renameTarget || !renameLabel.trim()) return;
     setRenameSaving(true);
+    setActionError(null);
     try {
       const res = await fetch(`/api/v2/evidence/${renameTarget._id}`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ label: renameLabel.trim() }),
       });
-      const json = await res.json();
-      if (json.success) {
+      const json = await res.json().catch(() => null);
+      if (res.ok && json?.success) {
         setEvidence((prev) =>
           prev.map((e) =>
             e._id === renameTarget._id ? { ...e, label: renameLabel.trim() } : e
           )
         );
         setRenameTarget(null);
+      } else {
+        setActionError(json?.error || 'Could not rename this evidence.');
       }
     } catch (err) {
       console.error('Error renaming evidence:', err);
+      setActionError('Network error. Check your connection and retry.');
     } finally {
       setRenameSaving(false);
     }
   };
 
+  const handleDeleteStart = (e: PortfolioEvidence) => {
+    setDeleteTarget(e);
+    setActionError(null);
+  };
+
   const handleDelete = async () => {
     if (!deleteTarget) return;
     setDeleteLoading(true);
+    setActionError(null);
     try {
       const res = await fetch(`/api/v2/evidence/${deleteTarget._id}`, {
         method: 'DELETE',
       });
-      const json = await res.json();
-      if (json.success) {
+      const json = await res.json().catch(() => null);
+      if (res.ok && json?.success) {
         setEvidence((prev) => prev.filter((e) => e._id !== deleteTarget._id));
         setDeleteTarget(null);
+      } else {
+        setActionError(json?.error || 'Could not delete this evidence.');
       }
     } catch (err) {
       console.error('Error deleting evidence:', err);
+      setActionError('Network error. Check your connection and retry.');
     } finally {
       setDeleteLoading(false);
     }
@@ -251,8 +272,8 @@ export default function PortfolioPage() {
                 evidence={e}
                 onPreview={handlePreview}
                 onDownload={handleDownload}
-                onRename={handleRenameStart}
-                onDelete={setDeleteTarget}
+                onRename={isReadOnly ? undefined : handleRenameStart}
+                onDelete={isReadOnly ? undefined : handleDeleteStart}
               />
             ))}
           </div>
@@ -288,8 +309,8 @@ export default function PortfolioPage() {
                     evidence={e}
                     onPreview={handlePreview}
                     onDownload={handleDownload}
-                    onRename={handleRenameStart}
-                    onDelete={setDeleteTarget}
+                    onRename={isReadOnly ? undefined : handleRenameStart}
+                    onDelete={isReadOnly ? undefined : handleDeleteStart}
                   />
                 ))}
               </tbody>
@@ -342,6 +363,9 @@ export default function PortfolioPage() {
               autoFocus
               className="w-full mt-4 px-3 py-2 text-sm border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-brand-500/30"
             />
+            {actionError && (
+              <p className="mt-3 text-sm text-red-600">{actionError}</p>
+            )}
             <div className="flex justify-end gap-3 mt-4">
               <button
                 onClick={() => setRenameTarget(null)}
@@ -371,6 +395,9 @@ export default function PortfolioPage() {
               Are you sure you want to delete <span className="font-medium">&ldquo;{deleteTarget.label}&rdquo;</span>?
               This will permanently remove the file and cannot be undone.
             </p>
+            {actionError && (
+              <p className="mt-3 text-sm text-red-600">{actionError}</p>
+            )}
             <div className="flex justify-end gap-3 mt-5">
               <button
                 onClick={() => setDeleteTarget(null)}

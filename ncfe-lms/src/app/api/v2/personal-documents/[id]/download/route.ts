@@ -12,7 +12,7 @@ export async function GET(
 ) {
   try {
     const { id } = await params;
-    const { session, error } = await withAuth(['assessor', 'student', 'iqa']);
+    const { session, error } = await withAuth(['assessor', 'student', 'iqa', 'admin']);
     if (error) return error;
 
     await dbConnect();
@@ -26,16 +26,19 @@ export async function GET(
     }
 
     const user = session!.user;
-    let canAccess = false;
+    // Admin can download any learner's personal document.
+    let canAccess = user.role === 'admin';
 
-    if (user.role === 'student') {
-      canAccess = doc.userId.toString() === user.id;
-    } else {
-      const enrollment = await Enrolment.findOne({
-        userId: doc.userId,
-        ...(user.role === 'iqa' ? iqaMatch(user.id) : assessorMatch(user.id)),
-      }).lean();
-      canAccess = !!enrollment;
+    if (!canAccess) {
+      if (user.role === 'student') {
+        canAccess = doc.userId.toString() === user.id;
+      } else {
+        const enrollment = await Enrolment.findOne({
+          userId: doc.userId,
+          ...(user.role === 'iqa' ? iqaMatch(user.id) : assessorMatch(user.id)),
+        }).lean();
+        canAccess = !!enrollment;
+      }
     }
 
     if (!canAccess) {

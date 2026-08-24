@@ -11,7 +11,7 @@ import { sendIqaDecisionEmail } from '@/lib/email';
 
 export async function POST(request: Request) {
   try {
-    const { session, error } = await withAuth(['iqa']);
+    const { session, error } = await withAuth(['iqa', 'admin']);
 
     if (error) {
       return error;
@@ -41,6 +41,14 @@ export async function POST(request: Request) {
     const sample = await IQASample.findById(iqaSampleId);
 
     if (!sample) {
+      return NextResponse.json(
+        { success: false, error: 'IQA sample not found' },
+        { status: 404 }
+      );
+    }
+
+    // 404 rather than 403 so we never confirm another IQA's sample exists.
+    if (session!.user.role !== 'admin' && sample.iqaUserId.toString() !== session!.user.id) {
       return NextResponse.json(
         { success: false, error: 'IQA sample not found' },
         { status: 404 }
@@ -97,7 +105,7 @@ export async function POST(request: Request) {
 
 export async function GET(request: Request) {
   try {
-    const { session, error } = await withAuth(['iqa']);
+    const { session, error } = await withAuth(['iqa', 'admin']);
 
     if (error) {
       return error;
@@ -112,6 +120,11 @@ export async function GET(request: Request) {
     await dbConnect();
 
     const filter: Record<string, unknown> = {};
+
+    // Admins get full oversight; an IQA only ever sees their own decisions.
+    if (session!.user.role !== 'admin') {
+      filter.iqaUserId = session!.user.id;
+    }
 
     const decision = searchParams.get('decision');
     if (decision) filter.decision = decision;

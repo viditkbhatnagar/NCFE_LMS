@@ -8,7 +8,7 @@ import Enrolment from '@/models/Enrolment';
 
 export async function GET(request: Request) {
   try {
-    const { session, error } = await withAuth(['assessor', 'student']);
+    const { session, error } = await withAuth(['assessor', 'student', 'admin']);
     if (error) return error;
 
     const { searchParams } = new URL(request.url);

@@ -8,6 +8,7 @@ import Evidence from '@/models/Evidence';
 import EvidenceMapping from '@/models/EvidenceMapping';
 import Enrolment from '@/models/Enrolment';
 import Unit from '@/models/Unit';
+import { iqaMatch } from '@/lib/enrolment-access';
 
 export async function GET(request: Request) {
   try {
@@ -32,8 +33,14 @@ export async function GET(request: Request) {
       filter = { learnerId: user.id };
     } else if (user.role === 'assessor') {
       filter = { assessorId: user.id };
+    } else if (user.role === 'iqa') {
+      // IQA oversight is scoped to the enrolments they're assigned to.
+      const myEnrolments = await Enrolment.find(iqaMatch(user.id))
+        .select('_id')
+        .lean();
+      filter = { enrolmentId: { $in: myEnrolments.map((e) => e._id) } };
     }
-    // iqa and admin can see all submissions
+    // admin sees all submissions
 
     const [submissions, total] = await Promise.all([
       Submission.find(filter)

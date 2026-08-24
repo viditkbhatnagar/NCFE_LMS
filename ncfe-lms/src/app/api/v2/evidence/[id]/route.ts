@@ -13,7 +13,7 @@ export async function PUT(
 ) {
   try {
     const { id } = await params;
-    const { session, error } = await withAuth(['student', 'assessor']);
+    const { session, error } = await withAuth(['student', 'assessor', 'admin']);
     if (error) return error;
 
     await dbConnect();
@@ -37,9 +37,11 @@ export async function PUT(
 
     const user = session!.user;
     const isOwner =
-      user.role === 'assessor'
-        ? isEnrolmentAssessor(enrollment, user.id)
-        : enrollment.userId?.toString() === user.id;
+      user.role === 'admin'
+        ? true
+        : user.role === 'assessor'
+          ? isEnrolmentAssessor(enrollment, user.id)
+          : enrollment.userId?.toString() === user.id;
     if (!isOwner) {
       return NextResponse.json(
         { success: false, error: 'Forbidden' },
@@ -96,7 +98,7 @@ export async function DELETE(
 ) {
   try {
     const { id } = await params;
-    const { session, error } = await withAuth(['student', 'assessor']);
+    const { session, error } = await withAuth(['student', 'assessor', 'admin']);
     if (error) return error;
 
     await dbConnect();
@@ -120,9 +122,11 @@ export async function DELETE(
 
     const user = session!.user;
     const isOwner =
-      user.role === 'assessor'
-        ? isEnrolmentAssessor(enrollment, user.id)
-        : enrollment.userId?.toString() === user.id;
+      user.role === 'admin'
+        ? true
+        : user.role === 'assessor'
+          ? isEnrolmentAssessor(enrollment, user.id)
+          : enrollment.userId?.toString() === user.id;
     if (!isOwner) {
       return NextResponse.json(
         { success: false, error: 'Forbidden' },

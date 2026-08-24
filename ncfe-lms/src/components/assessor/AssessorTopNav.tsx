@@ -25,6 +25,7 @@ export default function AssessorTopNav({ userName, userRole = 'assessor', onMenu
     evidence: [],
   });
   const [isSearching, setIsSearching] = useState(false);
+  const [searchError, setSearchError] = useState<string | null>(null);
   const [searchOpen, setSearchOpen] = useState(false);
   const searchContainerRef = useRef<HTMLDivElement>(null);
   const searchDebounceRef = useRef<NodeJS.Timeout | null>(null);
@@ -75,21 +76,36 @@ export default function AssessorTopNav({ userName, userRole = 'assessor', onMenu
 
     if (value.trim().length < 2) {
       setSearchOpen(false);
+      setSearchError(null);
       return;
     }
 
     setSearchOpen(true);
     setIsSearching(true);
+    setSearchError(null);
 
     searchDebounceRef.current = setTimeout(async () => {
       try {
         const params = new URLSearchParams({ q: value });
         if (qualificationId) params.set('qualificationId', qualificationId);
         const res = await fetch(`/api/v2/search?${params}`);
+        // Without this branch a 403 renders as "No results", which wrongly
+        // asserts that nothing matched.
+        if (!res.ok) {
+          setSearchResults({ members: [], assessments: [], evidence: [] });
+          setSearchError(
+            res.status === 403
+              ? 'You do not have access to search this course.'
+              : 'Search is unavailable right now. Please try again.'
+          );
+          return;
+        }
         const json = await res.json();
         if (json.success) setSearchResults(json.data);
+        else setSearchError(json.error || 'Search failed.');
       } catch {
-        // silently fail
+        setSearchResults({ members: [], assessments: [], evidence: [] });
+        setSearchError('Network error. Check your connection and try again.');
       } finally {
         setIsSearching(false);
       }
@@ -160,10 +176,13 @@ export default function AssessorTopNav({ userName, userRole = 'assessor', onMenu
               results={searchResults}
               query={searchQuery}
               isLoading={isSearching}
+              error={searchError}
               slug={slug}
+              userRole={userRole}
               onClose={() => {
                 setSearchOpen(false);
                 setSearchQuery('');
+                setSearchError(null);
               }}
             />
           )}

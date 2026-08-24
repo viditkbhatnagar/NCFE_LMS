@@ -5,11 +5,11 @@ import Assessment from '@/models/Assessment';
 import Evidence from '@/models/Evidence';
 import Enrolment from '@/models/Enrolment';
 import User from '@/models/User';
-import { assessorMatch, enrolmentAssessorIds } from '@/lib/enrolment-access';
+import { assessorMatch, enrolmentAssessorIds, iqaMatch } from '@/lib/enrolment-access';
 
 export async function GET(request: Request) {
   try {
-    const { session, error } = await withAuth(['assessor', 'student']);
+    const { session, error } = await withAuth(['assessor', 'student', 'iqa', 'admin']);
     if (error) return error;
 
     const { searchParams } = new URL(request.url);
@@ -35,10 +35,14 @@ export async function GET(request: Request) {
     const enrollmentFilter: Record<string, unknown> = {};
     if (user.role === 'student') {
       enrollmentFilter.userId = user.id;
-    } else {
+    } else if (user.role === 'iqa') {
+      // IQA: read-only oversight of the enrolments they are assigned to.
+      Object.assign(enrollmentFilter, iqaMatch(user.id));
+    } else if (user.role === 'assessor') {
       // Assessor: enrolments where they are lead OR co-assessor.
       Object.assign(enrollmentFilter, assessorMatch(user.id));
     }
+    // Admin is left unfiltered — every enrolment is in scope.
     if (qualificationId) enrollmentFilter.qualificationId = qualificationId;
 
     const myEnrollments = await Enrolment.find(enrollmentFilter)
@@ -75,18 +79,24 @@ export async function GET(request: Request) {
       idSet.delete(user.id);
       memberSearchIds = [...idSet];
     } else {
-      memberSearchIds = myEnrollments.map(
+      memberSearchIds = myEnrollments
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        (e) => String((e.userId as any)._id)
-      );
+        .map((e) => (e.userId as any)?._id)
+        .filter(Boolean)
+        .map((id) => String(id));
     }
 
     // Build assessment filter based on role
     const assessmentFilter: Record<string, unknown> = { title: regex };
     if (user.role === 'student') {
       assessmentFilter.learnerId = user.id;
-    } else {
+    } else if (user.role === 'assessor') {
       assessmentFilter.assessorId = user.id;
+    } else {
+      // iqa/admin are never the assessor on a record, so scope by the
+      // enrolments already resolved above. Assessment spells this field
+      // `enrollmentId` (double L); only Evidence uses `enrolmentId`.
+      assessmentFilter.enrollmentId = { $in: enrollmentIds };
     }
     if (qualificationId) assessmentFilter.qualificationId = qualificationId;
 
@@ -121,7 +131,10 @@ export async function GET(request: Request) {
     for (const e of myEnrollments) {
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       const u = e.userId as any;
-      enrollmentToLearnerName.set(String(e._id), u.name);
+      // An admin walks every enrolment, so a deleted learner account must not
+      // take the whole search down.
+      if (!u?._id) continue;
+      enrollmentToLearnerName.set(String(e._id), u.name || '');
       learnerIdToEnrollmentId.set(String(u._id), String(e._id));
     }
 

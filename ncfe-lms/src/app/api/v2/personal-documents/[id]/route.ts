@@ -12,7 +12,7 @@ export async function DELETE(
 ) {
   try {
     const { id } = await params;
-    const { session, error } = await withAuth(['assessor', 'student']);
+    const { session, error } = await withAuth(['assessor', 'student', 'admin']);
     if (error) return error;
 
     await dbConnect();
@@ -28,24 +28,23 @@ export async function DELETE(
     const user = session!.user;
     const ownerId = doc.userId.toString();
 
-    if (user.role === 'student') {
-      if (ownerId !== user.id) {
-        return NextResponse.json(
-          { success: false, error: 'Forbidden' },
-          { status: 403 }
-        );
+    // Admin can delete any learner's personal document.
+    let hasAccess = user.role === 'admin';
+    if (!hasAccess) {
+      if (user.role === 'student') {
+        hasAccess = ownerId === user.id;
+      } else {
+        hasAccess = !!(await Enrolment.exists({
+          userId: ownerId,
+          ...assessorMatch(user.id),
+        }));
       }
-    } else {
-      const hasAccess = await Enrolment.exists({
-        userId: ownerId,
-        ...assessorMatch(user.id),
-      });
-      if (!hasAccess) {
-        return NextResponse.json(
-          { success: false, error: 'Forbidden' },
-          { status: 403 }
-        );
-      }
+    }
+    if (!hasAccess) {
+      return NextResponse.json(
+        { success: false, error: 'Forbidden' },
+        { status: 403 }
+      );
     }
 
     if (!doc.isFolder && doc.fileUrl) {

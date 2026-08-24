@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import dbConnect from '@/lib/db';
 import { withAuth } from '@/lib/route-guard';
+import { createAuditLog } from '@/lib/audit';
 import IQASample from '@/models/IQASample';
 import IQADecision from '@/models/IQADecision';
 import Evidence from '@/models/Evidence';
@@ -13,7 +14,7 @@ export async function GET(
 ) {
   try {
     const { id } = await params;
-    const { session, error } = await withAuth(['iqa']);
+    const { session, error } = await withAuth(['iqa', 'admin']);
 
     if (error) {
       return error;
@@ -28,6 +29,14 @@ export async function GET(
       .populate('qualificationId', 'title');
 
     if (!sample) {
+      return NextResponse.json(
+        { success: false, error: 'IQA sample not found' },
+        { status: 404 }
+      );
+    }
+
+    // 404 rather than 403 so we never confirm another IQA's sample exists.
+    if (session!.user.role !== 'admin' && sample.iqaUserId.toString() !== session!.user.id) {
       return NextResponse.json(
         { success: false, error: 'IQA sample not found' },
         { status: 404 }
@@ -83,7 +92,7 @@ export async function DELETE(
 ) {
   try {
     const { id } = await params;
-    const { error } = await withAuth(['iqa']);
+    const { session, error } = await withAuth(['iqa', 'admin']);
     if (error) return error;
 
     await dbConnect();
@@ -96,8 +105,28 @@ export async function DELETE(
       );
     }
 
+    if (session!.user.role !== 'admin' && sample.iqaUserId.toString() !== session!.user.id) {
+      return NextResponse.json(
+        { success: false, error: 'IQA sample not found' },
+        { status: 404 }
+      );
+    }
+
     await IQADecision.deleteMany({ iqaSampleId: id });
     await IQASample.findByIdAndDelete(id);
+
+    await createAuditLog({
+      userId: session!.user.id,
+      action: 'iqa_sample_deleted',
+      entityType: 'IQASample',
+      entityId: id,
+      oldValue: {
+        assessorId: sample.assessorId?.toString(),
+        learnerId: sample.learnerId?.toString(),
+        unitId: sample.unitId?.toString(),
+        stage: sample.stage,
+      },
+    });
 
     return NextResponse.json({ success: true, data: { deleted: id } });
   } catch (err) {

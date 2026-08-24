@@ -7,6 +7,8 @@ import AssessmentCriteriaMap from '@/models/AssessmentCriteriaMap';
 import AssessmentEvidenceMap from '@/models/AssessmentEvidenceMap';
 import SignOff from '@/models/SignOff';
 import Remark from '@/models/Remark';
+import Enrolment from '@/models/Enrolment';
+import { assessorMatch, isEnrolmentIqa } from '@/lib/enrolment-access';
 import '@/models/AssessmentCriteria';
 import '@/models/Unit';
 import '@/models/LearningOutcome';
@@ -50,7 +52,7 @@ export async function GET(
     const userId = session!.user.id;
     const role = session!.user.role;
 
-    // Authorisation: assessor must own it OR be admin/iqa; student must be the learner
+    // Authorisation: mirrors the detail GET so the PDF never exposes more than the panel
     if (role === 'student') {
       const learnerId = refId(assessment.learnerId);
       if (learnerId !== userId) {
@@ -58,10 +60,27 @@ export async function GET(
       }
     } else if (role === 'assessor') {
       if (refId(assessment.assessorId) !== userId) {
+        // A non-owning assessor may still export any assessment on a course they
+        // teach on — same read-only admission the detail GET grants.
+        const teaches = await Enrolment.exists({
+          qualificationId: assessment.qualificationId,
+          ...assessorMatch(userId),
+        });
+        if (!teaches) {
+          return NextResponse.json({ success: false, error: 'Forbidden' }, { status: 403 });
+        }
+      }
+    } else if (role === 'iqa') {
+      // An IQA may export only assessments for the learners assigned to them.
+      // enrollmentId is populated above, so unwrap it before the lookup.
+      const enrol = await Enrolment.findById(refId(assessment.enrollmentId))
+        .select('iqaIds')
+        .lean();
+      if (!enrol || !isEnrolmentIqa(enrol, userId)) {
         return NextResponse.json({ success: false, error: 'Forbidden' }, { status: 403 });
       }
     }
-    // admin and iqa always allowed
+    // admin always allowed
 
     const [criteriaMap, evidenceMap, signOffs, remarks] = await Promise.all([
       AssessmentCriteriaMap.find({ assessmentId: id })

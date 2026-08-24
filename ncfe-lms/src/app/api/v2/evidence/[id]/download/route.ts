@@ -4,7 +4,7 @@ import { withAuth } from '@/lib/route-guard';
 import { getFileDownloadUrl } from '@/lib/upload';
 import Evidence from '@/models/Evidence';
 import Enrolment from '@/models/Enrolment';
-import { isEnrolmentAssessor } from '@/lib/enrolment-access';
+import { isEnrolmentAssessor, isEnrolmentIqa } from '@/lib/enrolment-access';
 
 export async function GET(
   request: Request,
@@ -26,7 +26,7 @@ export async function GET(
     }
 
     const user = session!.user;
-    if (user.role !== 'iqa' && user.role !== 'admin') {
+    if (user.role !== 'admin') {
       const enrollment = await Enrolment.findById(evidence.enrolmentId).lean();
       if (!enrollment) {
         return NextResponse.json(
@@ -38,7 +38,9 @@ export async function GET(
       const canAccess =
         user.role === 'assessor'
           ? isEnrolmentAssessor(enrollment, user.id)
-          : enrollment.userId?.toString() === user.id;
+          : user.role === 'iqa'
+            ? isEnrolmentIqa(enrollment, user.id)
+            : enrollment.userId?.toString() === user.id;
 
       if (!canAccess) {
         return NextResponse.json(

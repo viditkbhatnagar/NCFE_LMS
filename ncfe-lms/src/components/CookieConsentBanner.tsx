@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useSyncExternalStore } from 'react';
 import Link from 'next/link';
 
 const COOKIE_NAME = 'cookie_consent';
@@ -19,21 +19,25 @@ function writeCookie(name: string, value: string) {
   document.cookie = `${name}=${encodeURIComponent(value)}; Max-Age=${ONE_YEAR_SECONDS}; Path=/; SameSite=Lax`;
 }
 
-export default function CookieConsentBanner() {
-  // Initial state checks the cookie synchronously (only on the client; document
-  // is undefined during SSR so readCookie returns null and the banner stays
-  // hidden until hydration). Keeps the synchronous setVisible(true) out of an
-  // effect (which ESLint flags as a cascading-render anti-pattern).
-  const [visible, setVisible] = useState<boolean>(() => {
-    if (typeof document === 'undefined') return false;
-    return readCookie(COOKIE_NAME) === null;
-  });
+// The cookie is client-only state, so it needs a snapshot React can read during
+// both the server pass and hydration. Reading it in a lazy useState initialiser
+// instead made the server render null (no `document`) while the client rendered
+// the banner — a hydration mismatch that threw React #418 on EVERY page and
+// silently downgraded the whole app to a client re-render. useSyncExternalStore
+// is the sanctioned way to declare "server sees this, client sees that".
+const subscribe = () => () => {};
+const getSnapshot = () => readCookie(COOKIE_NAME) !== null;
+const getServerSnapshot = () => true; // server: assume decided, so it renders nothing
 
-  if (!visible) return null;
+export default function CookieConsentBanner() {
+  const alreadyDecided = useSyncExternalStore(subscribe, getSnapshot, getServerSnapshot);
+  const [dismissed, setDismissed] = useState(false);
+
+  if (alreadyDecided || dismissed) return null;
 
   const decide = (value: 'all' | 'essential') => {
     writeCookie(COOKIE_NAME, value);
-    setVisible(false);
+    setDismissed(true);
   };
 
   return (

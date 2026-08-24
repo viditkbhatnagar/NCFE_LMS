@@ -2,7 +2,7 @@
 
 import { useState, type ReactNode } from 'react';
 import { useRouter } from 'next/navigation';
-import type { SearchResults as SearchResultsType } from '@/types';
+import type { SearchResults as SearchResultsType, UserRole } from '@/types';
 
 type TabId = 'all' | 'members' | 'assessments' | 'evidence';
 
@@ -10,7 +10,9 @@ interface Props {
   results: SearchResultsType;
   query: string;
   isLoading: boolean;
+  error?: string | null;
   slug?: string;
+  userRole?: UserRole;
   onClose: () => void;
 }
 
@@ -33,11 +35,14 @@ export default function SearchResultsDropdown({
   results,
   query,
   isLoading,
+  error,
   slug,
+  userRole = 'assessor',
   onClose,
 }: Props) {
   const [tab, setTab] = useState<TabId>('all');
   const router = useRouter();
+  const isStudent = userRole === 'student';
 
   const total =
     results.members.length + results.assessments.length + results.evidence.length;
@@ -86,7 +91,11 @@ export default function SearchResultsDropdown({
           </div>
         )}
 
-        {!isLoading && total === 0 && (
+        {!isLoading && error && (
+          <p className="text-center text-sm text-red-600 py-8">{error}</p>
+        )}
+
+        {!isLoading && !error && total === 0 && (
           <p className="text-center text-sm text-gray-400 py-8">
             No results for &ldquo;{query}&rdquo;
           </p>
@@ -102,11 +111,17 @@ export default function SearchResultsDropdown({
                   Members
                 </p>
               )}
+              {/* The members page 403s students, so for them a member hit is
+                  informational only rather than a link into an error page. */}
               {results.members.map((m) => (
                 <button
                   key={m._id}
-                  onClick={() => navigateTo(`${basePath}/members`)}
-                  className="w-full flex items-center gap-3 px-4 py-2 hover:bg-gray-50 transition-colors text-left"
+                  onClick={() =>
+                    isStudent ? onClose() : navigateTo(`${basePath}/members`)
+                  }
+                  className={`w-full flex items-center gap-3 px-4 py-2 transition-colors text-left ${
+                    isStudent ? 'cursor-default' : 'hover:bg-gray-50'
+                  }`}
                 >
                   <div className="w-7 h-7 rounded-full bg-primary flex items-center justify-center text-white text-xs font-medium shrink-0">
                     {(m.name || '')

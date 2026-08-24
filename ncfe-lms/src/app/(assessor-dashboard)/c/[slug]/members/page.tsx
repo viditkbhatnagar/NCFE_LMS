@@ -11,7 +11,7 @@ import ListStateBoundary, {
 } from '@/components/common/ListStateBoundary';
 
 export default function MembersPage() {
-  const { qualification } = useAssessorCourse();
+  const { qualification, userRole } = useAssessorCourse();
   const [data, setData] = useState<MembersData | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -50,7 +50,9 @@ export default function MembersPage() {
     <div className="p-6 space-y-6">
       <div>
         <h1 className="text-2xl font-bold text-gray-900">Members</h1>
-        <p className="text-sm text-gray-400 mt-0.5">Your allocated members as ASSESSOR</p>
+        <p className="text-sm text-gray-400 mt-0.5">
+          Your allocated members as {userRole.toUpperCase()}
+        </p>
       </div>
 
       <ListStateBoundary

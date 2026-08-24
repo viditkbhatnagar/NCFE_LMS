@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import dbConnect from '@/lib/db';
 import { withAuth } from '@/lib/route-guard';
+import { createAuditLog } from '@/lib/audit';
 import IQADecision from '@/models/IQADecision';
 import IQASample from '@/models/IQASample';
 
@@ -10,13 +11,21 @@ export async function DELETE(
 ) {
   try {
     const { id } = await params;
-    const { error } = await withAuth(['iqa']);
+    const { session, error } = await withAuth(['iqa', 'admin']);
     if (error) return error;
 
     await dbConnect();
 
     const decision = await IQADecision.findById(id);
     if (!decision) {
+      return NextResponse.json(
+        { success: false, error: 'IQA decision not found' },
+        { status: 404 }
+      );
+    }
+
+    // 404 rather than 403 so we never confirm another IQA's decision exists.
+    if (session!.user.role !== 'admin' && decision.iqaUserId.toString() !== session!.user.id) {
       return NextResponse.json(
         { success: false, error: 'IQA decision not found' },
         { status: 404 }
@@ -32,6 +41,17 @@ export async function DELETE(
         await IQASample.findByIdAndUpdate(sampleId, { status: 'pending' });
       }
     }
+
+    await createAuditLog({
+      userId: session!.user.id,
+      action: 'iqa_decision_deleted',
+      entityType: 'IQADecision',
+      entityId: id,
+      oldValue: {
+        iqaSampleId: sampleId?.toString(),
+        decision: decision.decision,
+      },
+    });
 
     return NextResponse.json({ success: true, data: { deleted: id } });
   } catch (err) {
