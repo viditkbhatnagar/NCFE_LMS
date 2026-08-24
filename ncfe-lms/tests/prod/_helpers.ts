@@ -20,6 +20,11 @@ export interface Creds {
 
 export const PROD_USERS: Record<'admin' | 'assessor' | 'iqa' | 'iqaAssigned' | 'studentReal', Creds> = {
   admin: { email: 'admin@learnerseducation.com', password: 'passwordadmin' },
+  // WARNING: Jyothi was promoted to ADMIN, so this row no longer exercises the
+  // assessor role — it is a second admin. The only true assessor on production
+  // is nahmiya@skillhubinstitute.com, a real user whose password we must not
+  // reset. Until a dedicated assessor test account exists, assessor-specific
+  // behaviour is NOT covered end to end; do not read a green run as proof of it.
   assessor: { email: 'jyothi@learnerseducation.com', password: 'password123' },
   // Sarah has the IQA role but is assigned to NO enrolments, so course-scoped
   // endpoints legitimately 403 her. Good for role-guard checks, wrong for
