@@ -167,7 +167,15 @@ export async function hardDeleteUser(userId: string | ID): Promise<{
     { $pull: { assessorIds: uid } },
   );
 
-  // 5. The user document.
+  // 5. Remove from any enrolment's iqaIds list. Without this the id survives as
+  //    a dangling ref: admin/enrolments populates iqaIds, so the deleted user
+  //    comes back as a null entry and the Edit dialog crashes reading a._id.
+  await Enrolment.updateMany(
+    { iqaIds: uid },
+    { $pull: { iqaIds: uid } },
+  );
+
+  // 6. The user document.
   await User.findByIdAndDelete(uid);
 
   return {

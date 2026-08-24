@@ -94,6 +94,8 @@ function report(role: string, failures: Failure[]) {
 /** Course-scoped pages an IQA is allowed to see (Course Documents + Live Classes are hidden for IQA). */
 const IQA_COURSE_PAGES = ['', '/assessment', '/progress', '/portfolio', '/personal-documents', '/materials', '/work-hours'];
 const ASSESSOR_COURSE_PAGES = [...IQA_COURSE_PAGES, '/course-documents', '/live-sessions', '/members'];
+/** A student sees the course pages but not /members — that route excludes them by design. */
+const STUDENT_COURSE_PAGES = [...IQA_COURSE_PAGES, '/course-documents', '/live-sessions'];
 
 const IQA_STANDALONE = ['/iqa/dashboard', '/iqa/sampling', '/iqa/decisions', '/iqa/actions', '/iqa/eqa-readiness', '/iqa/standardisation', '/iqa/documents'];
 
@@ -153,6 +155,20 @@ test.describe('Production role sweep — every page, every safe control', () => 
       '/admin/dashboard',
       '/c',
       ...ASSESSOR_COURSE_PAGES.map((p) => `/c/${EYE_SLUG}${p}`),
+      '/notifications',
+      '/profile',
+    ]);
+  });
+
+  // Uses the fixture learner, never a real one — the sweep clicks controls, and
+  // a real student's record must not be touched by a test run.
+  test('student — own course view loads without a single API error', async ({ browser }) => {
+    test.setTimeout(15 * 60_000);
+    await runSweep(browser, 'student', PROD_USERS.studentFixture, [
+      '/c',
+      // /members is deliberately excluded: the members route excludes students
+      // by design, so listing it here would assert a bug that is not one.
+      ...STUDENT_COURSE_PAGES.map((p) => `/c/${EYE_SLUG}${p}`),
       '/notifications',
       '/profile',
     ]);

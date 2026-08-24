@@ -18,22 +18,32 @@ export interface Creds {
   password: string;
 }
 
-export const PROD_USERS: Record<'admin' | 'assessor' | 'iqa' | 'iqaAssigned' | 'studentReal', Creds> = {
+/**
+ * The `e2e-*@example.invalid` accounts are permanent, purpose-built fixtures
+ * provisioned by `scripts/e2e-fixtures.mjs` — run that to (re)create them:
+ *
+ *   ADMIN_EMAIL=... ADMIN_PASSWORD=... node scripts/e2e-fixtures.mjs
+ *
+ * They share one enrolment on the EYE course, so the assessor assesses, and the
+ * IQA quality-assures, exactly the fixture learner and nobody real. `.invalid`
+ * is an RFC 2606 reserved TLD, so the welcome emails cannot reach a mailbox.
+ *
+ * Do NOT point these at real people's accounts: the suite re-asserts fixture
+ * passwords on every provisioning run.
+ */
+export const PROD_USERS: Record<
+  'admin' | 'assessor' | 'iqa' | 'iqaAssigned' | 'studentFixture' | 'studentReal',
+  Creds
+> = {
   admin: { email: 'admin@learnerseducation.com', password: 'passwordadmin' },
-  // WARNING: Jyothi was promoted to ADMIN, so this row no longer exercises the
-  // assessor role — it is a second admin. The only true assessor on production
-  // is nahmiya@skillhubinstitute.com, a real user whose password we must not
-  // reset. Until a dedicated assessor test account exists, assessor-specific
-  // behaviour is NOT covered end to end; do not read a green run as proof of it.
-  assessor: { email: 'jyothi@learnerseducation.com', password: 'password123' },
+  assessor: { email: 'e2e-assessor@example.invalid', password: 'E2eFixture2026!' },
   // Sarah has the IQA role but is assigned to NO enrolments, so course-scoped
   // endpoints legitimately 403 her. Good for role-guard checks, wrong for
-  // anything that needs data.
+  // anything that needs data — that is what `iqaAssigned` is for.
   iqa: { email: 'iqa@test.com', password: 'iqapassword' },
-  // Disposable test IQA that IS assigned to an enrolment on the EYE course —
-  // this is the one that mirrors a real IQA like Robert. Use it whenever the
-  // assertion is about what an IQA can SEE rather than what they may reach.
-  iqaAssigned: { email: 'rmrepro-mshb1p3g.iqa@example.invalid', password: 'VerifyIqa2026!' },
+  iqaAssigned: { email: 'e2e-iqa@example.invalid', password: 'E2eFixture2026!' },
+  studentFixture: { email: 'e2e-learner@example.invalid', password: 'E2eFixture2026!' },
+  // A real learner — use only for read-only assertions, never for mutations.
   studentReal: { email: 'bhatnagar007vidit@gmail.com', password: 'password' },
 };
 

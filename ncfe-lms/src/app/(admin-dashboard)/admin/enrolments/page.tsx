@@ -224,14 +224,18 @@ export default function AdminEnrolmentsPage() {
       status: e.status,
     });
     // Prefer the full set; fall back to the lead for legacy rows.
+    // These arrays are populated server-side, so a since-deleted user arrives as
+    // a null entry — filter before dereferencing or opening Edit throws.
+    const refIds = (refs?: Array<{ _id: string } | null>) =>
+      (refs ?? []).filter((a): a is { _id: string } => !!a?._id).map((a) => a._id);
     const ids =
       Array.isArray(e.assessorIds) && e.assessorIds.length > 0
-        ? e.assessorIds.map((a) => a._id)
-        : e.assessorId
+        ? refIds(e.assessorIds)
+        : e.assessorId?._id
           ? [e.assessorId._id]
           : [];
     setFormAssessorIds(ids);
-    setFormIqaIds(Array.isArray(e.iqaIds) ? e.iqaIds.map((a) => a._id) : []);
+    setFormIqaIds(refIds(e.iqaIds));
     setEditingId(e._id);
     setShowForm(true);
   };
