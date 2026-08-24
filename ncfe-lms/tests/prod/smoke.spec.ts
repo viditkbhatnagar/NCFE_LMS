@@ -37,22 +37,26 @@ test.describe('Production smoke — public + role logins', () => {
     await page.waitForURL(/\/admin\/dashboard/, { timeout: 60_000 });
   });
 
-  test('assessor login → /c', async ({ page }) => {
+  // Jyothi was promoted to admin, so she lands on the admin dashboard — this is
+  // no longer assessor coverage. The only true assessor on production is
+  // nahmiya@skillhubinstitute.com, a real user whose password must not be reset.
+  test('jyothi login → /admin/dashboard (promoted to admin)', async ({ page }) => {
     test.setTimeout(90_000);
     await page.goto('/sign-in');
     await page.getByLabel('Email').fill('jyothi@learnerseducation.com');
     await page.getByLabel('Password').fill('password123');
     await page.getByRole('button', { name: 'Continue with email' }).click();
-    await page.waitForURL(/\/c(\/|$|\?)/, { timeout: 60_000 });
+    await page.waitForURL(/\/admin\/dashboard/, { timeout: 60_000 });
   });
 
-  test('IQA login with new password "iqapassword" → /iqa or /dashboard', async ({ page }) => {
+  test('IQA login with password "iqapassword" → /c', async ({ page }) => {
     test.setTimeout(90_000);
     await page.goto('/sign-in');
     await page.getByLabel('Email').fill('iqa@test.com');
     await page.getByLabel('Password').fill('iqapassword');
     await page.getByRole('button', { name: 'Continue with email' }).click();
-    await page.waitForURL(/\/(iqa|dashboard)/, { timeout: 60_000 });
+    // An IQA lands on the shared course view, not the legacy /iqa dashboard.
+    await page.waitForURL(/\/c(\/|$|\?)/, { timeout: 60_000 });
   });
 
   test('student login → /c or /dashboard', async ({ page }) => {
