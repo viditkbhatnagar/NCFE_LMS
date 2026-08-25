@@ -95,6 +95,22 @@ export default function SignOffStatusSection({
     return false;
   };
 
+  // A blocked row used to render a bare "Pending" with no action and no reason,
+  // so an IQA whose turn had not come read it as the button being broken. Name
+  // the step we are actually waiting on.
+  const blockedReason = (role: SignOffRole): string | null => {
+    if (signOffMap[role]?.status === 'signed_off' || canRoleSignOff(role)) return null;
+    if (role === 'iqa') {
+      const waitingOn = [
+        signOffMap['assessor']?.status !== 'signed_off' && 'the assessor',
+        signOffMap['learner']?.status !== 'signed_off' && 'the learner',
+      ].filter(Boolean);
+      return waitingOn.length ? `Waiting for ${waitingOn.join(' and ')} to sign off first` : null;
+    }
+    if (role === 'eqa') return 'Waiting for the internal quality assurer to sign off first';
+    return null;
+  };
+
   const [signOffError, setSignOffError] = useState<string | null>(null);
   // Comments are keyed by role: an admin (superset) can sign more than one row,
   // so each row keeps its own optional remark.
@@ -208,8 +224,15 @@ export default function SignOffStatusSection({
                       ? 'Rejected'
                       : isReady
                       ? 'Awaiting sign off'
-                      : 'Pending'}
+                      : (blockedReason(role) ?? 'Pending')}
                   </p>
+                  {/* Say it plainly on the viewer's own row — that is the person
+                      who would otherwise think the button is missing. */}
+                  {!isSigned && !isReady && mySignOffRole === role && blockedReason(role) && (
+                    <p className="text-xs text-amber-700 bg-amber-50 border border-amber-200 rounded-[4px] px-2 py-1 mt-1.5">
+                      You can sign off here once that step is complete.
+                    </p>
+                  )}
                   {isSigned && so?.comments && (
                     <p className="text-xs text-gray-600 mt-1 italic">&ldquo;{so.comments}&rdquo;</p>
                   )}

@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useEffect, useCallback, useRef } from 'react';
+import { useSearchParams } from 'next/navigation';
 import { useAssessorCourse } from '@/contexts/AssessorCourseContext';
 import AssessmentCard from '@/components/assessor/AssessmentCard';
 import LearnerSelectionModal from '@/components/assessor/LearnerSelectionModal';
@@ -31,7 +32,13 @@ export default function AssessmentsPage() {
   const [assessments, setAssessments] = useState<AssessmentListItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [selectedAssessmentId, setSelectedAssessmentId] = useState<string | null>(null);
+  // Deep link: the Progress page links a criterion's assessment straight to its
+  // detail panel via ?assessmentId=. Read once on mount — the panel fetches its
+  // own detail by id, so it opens even if the id is outside the current list.
+  const searchParams = useSearchParams();
+  const [selectedAssessmentId, setSelectedAssessmentId] = useState<string | null>(
+    () => searchParams.get('assessmentId'),
+  );
   const [showLearnerModal, setShowLearnerModal] = useState(false);
   const [creating, setCreating] = useState(false);
   const [collapsedFolders, setCollapsedFolders] = useState<Set<string>>(new Set());
