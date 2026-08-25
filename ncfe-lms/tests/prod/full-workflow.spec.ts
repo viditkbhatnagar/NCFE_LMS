@@ -5,6 +5,7 @@ import {
   PROD_RUN_ID,
   PROD_USERS,
   makeApiContext,
+  findUserIdByEmail,
 } from './_helpers';
 
 // Production end-to-end UAT walkthrough.
@@ -186,17 +187,15 @@ test.describe('Production — full onboarding-to-IQA workflow', () => {
   });
 
   test('3. admin creates enrolment linking student to qual under Jyothi', async () => {
-    // Find Jyothi's user id
-    const usersResp = await adminApi.get('/api/v2/admin/users?search=jyothi');
-    const users = (await usersResp.json()).data as Array<{ _id: string; email: string }>;
-    const jyothi = users.find((u) => u.email === PROD_USERS.assessor.email);
-    expect(jyothi, 'Jyothi user not found').toBeTruthy();
+    // Resolve the configured assessor by email rather than a hardcoded name —
+    // the account behind PROD_USERS.assessor has changed before.
+    const assessorId = await findUserIdByEmail(adminApi, PROD_USERS.assessor.email);
 
     const enrolResp = await adminApi.post('/api/v2/admin/enrolments', {
       data: {
         userId: created.testStudentId,
         qualificationId: created.qualificationId,
-        assessorId: jyothi!._id,
+        assessorId: assessorId,
         cohortId: `E2E-${PROD_RUN_ID}`,
         status: 'in_progress',
       },
@@ -411,8 +410,7 @@ test.describe('Production — full onboarding-to-IQA workflow', () => {
   test('13. IQA creates a sample for the assessment learner+unit', async () => {
     const resp = await iqaApi.post('/api/iqa/samples', {
       data: {
-        assessorId: (await (await adminApi.get('/api/v2/admin/users?search=jyothi')).json()).data
-          .find((u: { email: string }) => u.email === PROD_USERS.assessor.email)._id,
+        assessorId: await findUserIdByEmail(adminApi, PROD_USERS.assessor.email),
         learnerId: created.testStudentId,
         unitId: created.unitId,
         qualificationId: created.qualificationId,

@@ -47,6 +47,24 @@ export const PROD_USERS: Record<
   studentReal: { email: 'bhatnagar007vidit@gmail.com', password: 'password' },
 };
 
+/**
+ * Look up a user id by exact email, via the admin API.
+ *
+ * Specs used to hardcode `?search=jyothi` and then match on
+ * PROD_USERS.assessor.email — which silently finds nothing the moment that
+ * account changes. Search on the address' local part (no regex metacharacters,
+ * so it dodges the `+`-in-email search bug) and match the address exactly.
+ */
+export async function findUserIdByEmail(admin: APIRequestContext, email: string): Promise<string> {
+  const res = await admin.get(`/api/v2/admin/users?search=${encodeURIComponent(email.split('@')[0])}&limit=100`);
+  const body = (await res.json()) as { data?: { users?: Array<{ _id: string; email: string }> } | Array<{ _id: string; email: string }> };
+  const raw = body.data;
+  const users = Array.isArray(raw) ? raw : (raw?.users ?? []);
+  const match = users.find((u) => u.email?.toLowerCase() === email.toLowerCase());
+  if (!match) throw new Error(`user ${email} not found on production — is the fixture provisioned? (scripts/e2e-fixtures.mjs)`);
+  return match._id;
+}
+
 export async function makeApiContext(creds: Creds): Promise<APIRequestContext> {
   const ctx = await playwrightRequest.newContext({
     baseURL: BASE_URL,

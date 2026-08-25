@@ -1,5 +1,5 @@
 import { test, expect, type APIRequestContext } from '@playwright/test';
-import { PROD_RUN_ID, PROD_USERS, makeApiContext } from './_helpers';
+import { PROD_RUN_ID, PROD_USERS, makeApiContext, findUserIdByEmail } from './_helpers';
 
 // G1, G2, G3, G6, G7, G8, G9, G10 verification against production.
 // G4 (self-service password reset) and G5 (force-change-password) are
@@ -63,12 +63,7 @@ test.describe('Production — UI gap fixes (G1, G2, G3, G6, G7, G8, G10)', () =>
   });
 
   test('G1 — combined create+enrol creates BOTH user and enrolment', async () => {
-    // Find Jyothi as the assessor target
-    const assessorRes = await admin.get('/api/v2/admin/users?search=jyothi');
-    const jyothi = ((await assessorRes.json()).data as Array<{ _id: string; email: string }>).find(
-      (u) => u.email === PROD_USERS.assessor.email,
-    );
-    expect(jyothi).toBeTruthy();
+    const assessorId = await findUserIdByEmail(admin, PROD_USERS.assessor.email);
 
     // Create a temporary qualification first
     const qResp = await admin.post('/api/v2/admin/qualifications', {
@@ -103,7 +98,7 @@ test.describe('Production — UI gap fixes (G1, G2, G3, G6, G7, G8, G10)', () =>
       data: {
         userId,
         qualificationId: created.qualificationId,
-        assessorId: jyothi!._id,
+        assessorId: assessorId,
         cohortId: `E2E-${PROD_RUN_ID}-Q1`,
         status: 'in_progress',
       },

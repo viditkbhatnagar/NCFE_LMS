@@ -1,5 +1,5 @@
 import { test, expect, type APIRequestContext } from '@playwright/test';
-import { PROD_RUN_ID, PROD_USERS, makeApiContext } from './_helpers';
+import { PROD_RUN_ID, PROD_USERS, makeApiContext, findUserIdByEmail } from './_helpers';
 
 // Phase 2 / Batches A+B verification on production.
 // Covers: G11 (per-criterion comments), G13 (work-hours totals API),
@@ -107,17 +107,13 @@ test.describe('Production — remaining-gaps verification (G11, G13, G14, G16, G
     expect(qResp.status()).toBe(201);
     created.qualificationId = (await qResp.json()).data._id;
 
-    const assessorRes = await admin.get('/api/v2/admin/users?search=jyothi');
-    const jyothi = ((await assessorRes.json()).data as Array<{ _id: string; email: string }>).find(
-      (u) => u.email === PROD_USERS.assessor.email,
-    );
-    expect(jyothi).toBeTruthy();
+    const assessorId = await findUserIdByEmail(admin, PROD_USERS.assessor.email);
 
     const enrolResp = await admin.post('/api/v2/admin/enrolments', {
       data: {
         userId: created.studentId,
         qualificationId: created.qualificationId,
-        assessorId: jyothi!._id,
+        assessorId: assessorId,
         cohortId: `E2E-${PROD_RUN_ID}-G16`,
         status: 'in_progress',
       },
