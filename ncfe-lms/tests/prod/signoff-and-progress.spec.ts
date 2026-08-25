@@ -91,25 +91,62 @@ test.describe('IQA sign-off', () => {
       expect(byRole.assessor).toBe('signed_off');
       expect(byRole.learner).toBe('signed_off');
     } finally {
-      await assessor.delete(`/api/v2/assessments/${assessmentId}`);
+      // Delete as ADMIN and assert it worked. An assessor may only delete DRAFT
+      // assessments, and this one has to be published for the learner to sign —
+      // so an assessor-issued delete 400s, and a silent cleanup would leak a new
+      // assessment into production on every single run.
+      const admin = await makeApiContext(PROD_USERS.admin);
+      const removed = await admin.delete(`/api/v2/assessments/${assessmentId}`);
+      await admin.dispose();
+      expect(removed.status(), 'test assessment must be cleaned up').toBe(200);
     }
   });
 });
 
 test.describe('progress page → assessment', () => {
   test('clicking a linked assessment opens its detail panel', async ({ browser }) => {
-    test.setTimeout(5 * 60_000);
-    const context = await makeBrowserContext(browser, PROD_USERS.assessor);
+    test.setTimeout(6 * 60_000);
+
+    // Resolve a real (enrolment → unit → outcome → criterion) path that actually
+    // has a linked assessment, rather than clicking the first card in each
+    // column and hoping. Keeps the test deterministic as curriculum data shifts.
+    const admin = await makeApiContext(PROD_USERS.admin);
+    let target: { enrolmentId: string; unit: string; lo: string; ac: string } | null = null;
+    try {
+      const enrolments = await (await admin.get(`/api/v2/admin/enrolments?qualificationId=${EYE_QUALIFICATION_ID}&limit=200`)).json();
+      const list = enrolments.data?.enrolments ?? enrolments.data ?? [];
+      for (const e of list) {
+        const progress = await (await admin.get(`/api/v2/progress/${e._id}`)).json();
+        for (const unit of progress.data?.units ?? []) {
+          for (const lo of unit.learningOutcomes ?? []) {
+            for (const ac of lo.assessmentCriteria ?? []) {
+              if ((ac.linkedAssessments ?? []).length > 0) {
+                target = { enrolmentId: e._id, unit: unit.unitReference ?? unit.title, lo: lo.loNumber ?? lo.description, ac: ac.acNumber ?? ac.description };
+                break;
+              }
+            }
+            if (target) break;
+          }
+          if (target) break;
+        }
+        if (target) break;
+      }
+    } finally {
+      await admin.dispose();
+    }
+    expect(target, 'need a criterion with a linked assessment to test against').toBeTruthy();
+
+    const context = await makeBrowserContext(browser, PROD_USERS.admin);
     try {
       const page = await context.newPage();
-      await page.goto(`/c/${EYE_SLUG}/progress`, { waitUntil: 'domcontentloaded' });
+      await page.setViewportSize({ width: 1600, height: 1000 });
+      // The progress page renders an empty state until a learner is chosen.
+      await page.goto(`/c/${EYE_SLUG}/progress?currentEnrollmentId=${target!.enrolmentId}`, { waitUntil: 'domcontentloaded' });
       await page.waitForLoadState('networkidle', { timeout: 45_000 }).catch(() => {});
 
-      // Drill in: unit → outcome → criterion, then the assessments column fills.
-      for (const column of ['Units', 'Outcomes', 'Criteria']) {
-        const first = page.locator(`section:has-text("${column}") button, div:has-text("${column}") button`).first();
-        await first.click({ timeout: 20_000 }).catch(() => {});
-        await page.waitForTimeout(600);
+      for (const label of [target!.unit, target!.lo, target!.ac]) {
+        await page.locator('button', { hasText: String(label).slice(0, 24) }).first().click({ timeout: 20_000 });
+        await page.waitForTimeout(700);
       }
 
       const card = page.getByRole('button', { name: /^Open assessment / }).first();
