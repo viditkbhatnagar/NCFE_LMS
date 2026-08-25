@@ -38,7 +38,7 @@ test.afterAll(async () => {
 });
 
 test.describe('IQA sign-off', () => {
-  test('is gated on assessor + learner, and succeeds once both have signed', async () => {
+  test('is independent of assessor and learner, while EQA still waits on IQA', async () => {
     test.setTimeout(180_000);
 
     // Fresh assessment on the fixture enrolment, so the sign-off state is known.
@@ -64,14 +64,20 @@ test.describe('IQA sign-off', () => {
     const assessmentId = (await created.json()).data._id;
 
     try {
-      // 1. Blocked, with a reason the UI can show rather than an empty row.
-      const early = await iqa.post(`/api/v2/assessments/${assessmentId}/sign-off`, {
-        data: { role: 'iqa', status: 'signed_off' },
+      // 1. EQA is still sequenced behind IQA.
+      const eqaEarly = await assessor.post(`/api/v2/assessments/${assessmentId}/sign-off`, {
+        data: { role: 'eqa', status: 'signed_off' },
       });
-      expect(early.status()).toBe(400);
-      expect((await early.json()).error).toMatch(/assessor and learner must sign off before iqa/i);
+      expect(eqaEarly.status(), 'EQA must still wait for IQA').not.toBe(200);
 
-      // 2. Prerequisites.
+      // 2. The IQA signs FIRST — nothing else has been signed yet. This is the
+      //    rule Robert was blocked by; an IQA now samples on their own schedule.
+      const signed = await iqa.post(`/api/v2/assessments/${assessmentId}/sign-off`, {
+        data: { role: 'iqa', status: 'signed_off', comments: 'verified' },
+      });
+      expect(signed.status(), 'IQA must be able to sign without waiting on anyone').toBe(200);
+
+      // 3. Assessor and learner still sign independently, in any order.
       expect((await assessor.post(`/api/v2/assessments/${assessmentId}/sign-off`, {
         data: { role: 'assessor', status: 'signed_off' },
       })).status()).toBe(200);
@@ -79,15 +85,11 @@ test.describe('IQA sign-off', () => {
         data: { role: 'learner', status: 'signed_off' },
       })).status()).toBe(200);
 
-      // 3. Now the IQA step goes through.
-      const signed = await iqa.post(`/api/v2/assessments/${assessmentId}/sign-off`, {
-        data: { role: 'iqa', status: 'signed_off', comments: 'verified' },
-      });
-      expect(signed.status(), 'IQA must be able to sign once assessor and learner have').toBe(200);
-
       const rows = await (await iqa.get(`/api/v2/assessments/${assessmentId}/sign-off`)).json();
       const byRole = Object.fromEntries((rows.data ?? []).map((s: { role: string; status: string }) => [s.role, s.status]));
       expect(byRole.iqa).toBe('signed_off');
+      expect(byRole.assessor).toBe('signed_off');
+      expect(byRole.learner).toBe('signed_off');
     } finally {
       await assessor.delete(`/api/v2/assessments/${assessmentId}`);
     }

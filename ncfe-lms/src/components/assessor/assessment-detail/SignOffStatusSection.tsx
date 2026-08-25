@@ -76,23 +76,15 @@ export default function SignOffStatusSection({
   // Determine which sign-off role the current user can perform
   const mySignOffRole = SIGN_OFF_ROLE_FOR_USER[userRole] || null;
 
-  // Determine if a role can sign off right now:
-  // - Assessor & Learner can sign off independently (no prerequisites)
-  // - IQA requires both Assessor AND Learner to have signed off
-  // - EQA requires IQA to have signed off
+  // Determine if a role can sign off right now. Mirrors the server rules in
+  // /api/v2/assessments/[id]/sign-off:
+  // - Assessor, Learner and IQA sign off independently (no prerequisites) — an
+  //   IQA samples on their own schedule rather than waiting on the learner
+  // - EQA still requires IQA to have signed off
   const canRoleSignOff = (role: SignOffRole): boolean => {
     if (signOffMap[role]?.status === 'signed_off') return false;
-    if (role === 'assessor' || role === 'learner') return true;
-    if (role === 'iqa') {
-      return (
-        signOffMap['assessor']?.status === 'signed_off' &&
-        signOffMap['learner']?.status === 'signed_off'
-      );
-    }
-    if (role === 'eqa') {
-      return signOffMap['iqa']?.status === 'signed_off';
-    }
-    return false;
+    if (role === 'eqa') return signOffMap['iqa']?.status === 'signed_off';
+    return true;
   };
 
   // A blocked row used to render a bare "Pending" with no action and no reason,
@@ -100,13 +92,6 @@ export default function SignOffStatusSection({
   // the step we are actually waiting on.
   const blockedReason = (role: SignOffRole): string | null => {
     if (signOffMap[role]?.status === 'signed_off' || canRoleSignOff(role)) return null;
-    if (role === 'iqa') {
-      const waitingOn = [
-        signOffMap['assessor']?.status !== 'signed_off' && 'the assessor',
-        signOffMap['learner']?.status !== 'signed_off' && 'the learner',
-      ].filter(Boolean);
-      return waitingOn.length ? `Waiting for ${waitingOn.join(' and ')} to sign off first` : null;
-    }
     if (role === 'eqa') return 'Waiting for the internal quality assurer to sign off first';
     return null;
   };

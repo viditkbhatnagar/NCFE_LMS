@@ -10,8 +10,6 @@ import { isEnrolmentAssessor, isEnrolmentIqa } from '@/lib/enrolment-access';
 import { createNotification } from '@/lib/notifications';
 import type { SignOffRole } from '@/types';
 
-const SIGN_OFF_ORDER: SignOffRole[] = ['assessor', 'learner', 'iqa', 'eqa'];
-
 // Map user roles to the sign-off roles they are allowed to perform
 const ALLOWED_SIGN_OFF_ROLE: Record<string, SignOffRole> = {
   assessor: 'assessor',
@@ -161,19 +159,17 @@ export async function POST(
       );
     }
 
-    // Assessor & Learner can sign off independently (no prerequisites).
-    // IQA requires both Assessor AND Learner signed off.
-    // EQA requires IQA signed off.
-    if (requestedRole === 'iqa') {
-      const assessorDone = signOffByRole['assessor']?.status === 'signed_off';
-      const learnerDone = signOffByRole['learner']?.status === 'signed_off';
-      if (!assessorDone || !learnerDone) {
-        return NextResponse.json(
-          { success: false, error: 'Both Assessor and Learner must sign off before IQA' },
-          { status: 400 }
-        );
-      }
-    } else if (requestedRole === 'eqa') {
+    // Assessor, Learner and IQA can each sign off independently.
+    //
+    // The IQA step deliberately has NO prerequisites: an IQA samples on their own
+    // schedule and was previously blocked behind the learner's signature, which
+    // left quality assurance waiting on learners who may never sign. Decision
+    // taken 2026-08-25. Consequence to be aware of: the chain no longer evidences
+    // that the assessment was complete at the moment it was sampled, so the order
+    // of signatures is not by itself proof of sequence for an EQA.
+    //
+    // EQA still requires IQA signed off.
+    if (requestedRole === 'eqa') {
       if (signOffByRole['iqa']?.status !== 'signed_off') {
         return NextResponse.json(
           { success: false, error: 'IQA must sign off before EQA' },
