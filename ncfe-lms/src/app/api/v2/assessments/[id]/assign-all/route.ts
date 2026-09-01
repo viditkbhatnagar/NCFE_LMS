@@ -58,10 +58,23 @@ export async function POST(
       .select('userId assessorId assessorIds cohortId')
       .lean();
 
-    const targets = enrolments.filter((e) => e.userId);
+    // Skip the source assessment's own enrolment — that learner already has it.
+    // Without this the originating learner ends up with two identical copies.
+    const sourceEnrolId = source.enrollmentId ? String(source.enrollmentId) : null;
+    const targets = enrolments.filter((e) => e.userId && String(e._id) !== sourceEnrolId);
     if (targets.length === 0) {
-      return NextResponse.json({ success: false, error: 'No active learners to assign to' }, { status: 400 });
+      return NextResponse.json(
+        { success: false, error: 'No other active learners to assign to' },
+        { status: 400 },
+      );
     }
+
+    // Mirror the source's published state. Copies used to be forced to 'draft',
+    // which meant "assign to all" still left the assessor publishing each copy
+    // one by one — and learners could not see the work at all until they did.
+    const isSourcePublished =
+      source.status === 'published' || source.status === 'published_modified';
+    const copyStatus = isSourcePublished ? ('published' as const) : ('draft' as const);
 
     const groupId = new mongoose.Types.ObjectId();
     const srcMaps = await AssessmentCriteriaMap.find({ assessmentId: source._id })
@@ -79,8 +92,8 @@ export async function POST(
         assessmentKind: source.assessmentKind,
         planIntent: source.planIntent,
         planImplementation: source.planImplementation,
-        status: 'draft' as const,
-        publishCount: 0,
+        status: copyStatus,
+        publishCount: isSourcePublished ? 1 : 0,
         learnerId: e.userId,
         // Each learner's copy is owned by their own lead assessor (fallback: the
         // caller) so it lands in the right assessor's workspace.
@@ -115,9 +128,11 @@ export async function POST(
       for (const a of created) {
         createNotification({
           userId: a.learnerId.toString(),
-          type: 'assessment_created',
-          title: 'New Assessment',
-          message: `${assessorName} created a new assessment: ${source.title || 'Untitled'}`,
+          type: isSourcePublished ? 'assessment_published' : 'assessment_created',
+          title: isSourcePublished ? 'Assessment Published' : 'New Assessment',
+          message: isSourcePublished
+            ? `Assessment "${source.title || 'Untitled'}" is now available for review`
+            : `${assessorName} created a new assessment: ${source.title || 'Untitled'}`,
           entityType: 'Assessment',
           entityId: a._id.toString(),
         });

@@ -255,7 +255,7 @@ export default function AssessmentDetailPanel({
       const json = await res.json();
       if (json.success) {
         setConfirmAssignAll(false);
-        alert(`Assigned to ${json.data?.count ?? 0} learner(s).`);
+        alert(`Assigned to ${json.data?.count ?? 0} other learner(s) on this course.`);
         onUpdated();
       } else {
         alert(json.error || 'Failed to assign to all learners');
@@ -414,7 +414,7 @@ export default function AssessmentDetailPanel({
       <ConfirmDialog
         open={confirmAssignAll}
         title="Assign to all learners?"
-        message="This creates a copy of this assessment for every active learner on the course, each under their own assessor. Existing copies are not affected."
+        message="This gives every other active learner on the course their own copy of this assessment — same plan and criteria, but their own evidence and sign-offs. If this assessment is published, their copies are published too, so you do not have to publish them one by one."
         confirmLabel="Assign to all"
         loading={assigningAll}
         onConfirm={handleAssignAll}
